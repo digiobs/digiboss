@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.hubspot]
 verify_jwt = false
+
+[functions.wrike]
+verify_jwt = false

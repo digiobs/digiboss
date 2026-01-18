@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Calendar, LayoutGrid, List, Plus, Sparkles, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar, LayoutGrid, List, Plus, Sparkles, Clock, RefreshCw, Link2 } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -20,6 +20,8 @@ import { KanbanColumn } from '@/components/plan/KanbanColumn';
 import { DraggableTaskCard } from '@/components/plan/DraggableTaskCard';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { useWrike } from '@/hooks/useWrike';
+import { toast } from 'sonner';
 
 type ViewMode = 'calendar' | 'kanban' | 'list';
 
@@ -35,6 +37,47 @@ export default function Plan() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [wrikeEnabled, setWrikeEnabled] = useState(false);
+
+  const {
+    loading: wrikeLoading,
+    connected: wrikeConnected,
+    fetchTasks: fetchWrikeTasks,
+    fetchContacts,
+    contacts,
+    convertToLocalTasks,
+    checkConnection,
+  } = useWrike();
+
+  // Check Wrike connection on mount
+  useEffect(() => {
+    const initWrike = async () => {
+      const isConnected = await checkConnection();
+      if (isConnected) {
+        setWrikeEnabled(true);
+        await loadWrikeTasks();
+      }
+    };
+    initWrike();
+  }, []);
+
+  const loadWrikeTasks = async () => {
+    try {
+      const [wrikeTasks, wrikeContacts] = await Promise.all([
+        fetchWrikeTasks(),
+        fetchContacts(),
+      ]);
+      
+      if (wrikeTasks.length > 0) {
+        const localTasks = convertToLocalTasks(wrikeTasks, wrikeContacts);
+        setTasks(localTasks);
+        toast.success(`Loaded ${localTasks.length} tasks from Wrike`);
+      }
+    } catch (error) {
+      console.error('Failed to load Wrike tasks:', error);
+      toast.error('Failed to load Wrike tasks');
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -139,12 +182,29 @@ export default function Plan() {
           <div className="flex items-center gap-2">
             <Calendar className="w-6 h-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">Plan</h1>
+            {wrikeEnabled && (
+              <Badge variant="secondary" className="gap-1 text-xs">
+                <Link2 className="w-3 h-3" />
+                Wrike
+              </Badge>
+            )}
           </div>
           <p className="text-muted-foreground mt-1">
             Your marketing roadmap, calendar, and task execution hub.
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {wrikeEnabled && (
+            <Button 
+              variant="outline" 
+              className="gap-2" 
+              onClick={loadWrikeTasks}
+              disabled={wrikeLoading}
+            >
+              <RefreshCw className={cn("w-4 h-4", wrikeLoading && "animate-spin")} />
+              Sync Wrike
+            </Button>
+          )}
           <Button variant="outline" className="gap-2">
             <Sparkles className="w-4 h-4" />
             AI Suggest Plan

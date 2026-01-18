@@ -199,11 +199,11 @@ export const zeroConversionPages = [
 
 // Leads Data
 export const leadsData: LeadData[] = [
-  { id: '1', date: '2024-01-14', source: 'Organic Search', lastSeen: '2h ago', page: '/solutions/erp-logiciel', contact: 'Marie Dupont', email: 'm.dupont@acme.fr' },
-  { id: '2', date: '2024-01-14', source: 'Paid Search', lastSeen: '4h ago', page: '/demo-gratuite', contact: 'Jean Martin', email: 'j.martin@startup.io' },
-  { id: '3', date: '2024-01-13', source: 'LinkedIn', lastSeen: '1d ago', page: '/tarifs', contact: 'Sophie Bernard', email: 's.bernard@corp.com' },
-  { id: '4', date: '2024-01-13', source: 'Direct', lastSeen: '1d ago', page: '/contact', contact: 'Pierre Leroy', email: 'p.leroy@tech.fr' },
-  { id: '5', date: '2024-01-12', source: 'Referral', lastSeen: '2d ago', page: '/solutions/crm-gestion', contact: 'Claire Moreau', email: 'c.moreau@enterprise.com' },
+  { id: '1', date: '2024-01-14', source: 'Organic Search', lastSeen: '2h ago', page: '/solutions/erp-logiciel', contact: 'Marie Dupont', email: 'm.dupont@huckoccitania.fr' },
+  { id: '2', date: '2024-01-14', source: 'Paid Search', lastSeen: '4h ago', page: '/demo-gratuite', contact: 'Jean Martin', email: 'j.martin@veinsound.io' },
+  { id: '3', date: '2024-01-13', source: 'LinkedIn', lastSeen: '1d ago', page: '/tarifs', contact: 'Sophie Bernard', email: 's.bernard@srainstruments.com' },
+  { id: '4', date: '2024-01-13', source: 'Direct', lastSeen: '1d ago', page: '/contact', contact: 'Pierre Leroy', email: 'p.leroy@amont.fr' },
+  { id: '5', date: '2024-01-12', source: 'Referral', lastSeen: '2d ago', page: '/solutions/crm-gestion', contact: 'Claire Moreau', email: 'c.moreau@apmoniatx.com' },
 ];
 
 // Lead Sources Breakdown
@@ -321,7 +321,7 @@ export const socialKPIs = {
 export const bestPosts: SocialPost[] = [
   { id: '1', content: '🚀 Notre guide complet sur la transformation digitale des PME est maintenant disponible...', date: '2024-01-10', impressions: 8456, clicks: 342, likes: 156, comments: 28, shares: 45 },
   { id: '2', content: '💡 5 erreurs à éviter lors du choix de votre ERP. Article complet sur notre blog...', date: '2024-01-08', impressions: 6234, clicks: 278, likes: 124, comments: 18, shares: 32 },
-  { id: '3', content: '📊 Retour d\'expérience : comment [Client] a augmenté sa productivité de 40%...', date: '2024-01-05', impressions: 5890, clicks: 245, likes: 98, comments: 22, shares: 28 },
+  { id: '3', content: '📊 Retour d\'expérience : comment Amarok a augmenté sa productivité de 40%...', date: '2024-01-05', impressions: 5890, clicks: 245, likes: 98, comments: 22, shares: 28 },
 ];
 
 // Paid Performance (Google Ads)

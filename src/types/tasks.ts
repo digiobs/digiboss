@@ -105,7 +105,7 @@ export const mockTasks: Task[] = [
   {
     id: '4',
     title: 'Create case study draft',
-    description: 'Write first draft of TechCorp case study. Focus on 3x ROI achieved and implementation timeline. Include quotes from customer.',
+    description: 'Write first draft of Alsbom case study. Focus on 3x ROI achieved and implementation timeline. Include quotes from customer.',
     status: 'backlog',
     priority: 'medium',
     assignee: 'Mike',

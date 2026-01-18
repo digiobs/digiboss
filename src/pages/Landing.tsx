@@ -70,7 +70,7 @@ const testimonials = [
       "DigiObs transformed how we run marketing. Instead of drowning in dashboards, we now have clear actions every morning.",
     author: 'Sarah Chen',
     role: 'VP of Marketing',
-    company: 'TechScale Inc.',
+    company: 'Mabsilico',
     avatar: 'SC',
   },
   {
@@ -78,7 +78,7 @@ const testimonials = [
       "The AI recommendations are scary accurate. It caught a conversion opportunity we'd been missing for months.",
     author: 'Marcus Johnson',
     role: 'Growth Lead',
-    company: 'Velocity Labs',
+    company: 'Nerya',
     avatar: 'MJ',
   },
   {
@@ -86,7 +86,7 @@ const testimonials = [
       "Finally, a tool that tells me what to do instead of just showing me more charts. Game changer for our agency.",
     author: 'Emily Watson',
     role: 'Agency Director',
-    company: 'GrowthPartners',
+    company: 'Kaptory',
     avatar: 'EW',
   },
 ];

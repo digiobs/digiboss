@@ -1,56 +1,9 @@
 import { useState } from 'react';
-import { Linkedin, Users, Eye, ThumbsUp, MessageSquare, Share2, ExternalLink } from 'lucide-react';
+import { Linkedin, Users, Eye, ThumbsUp, MessageSquare, Share2, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-
-// Mock data - in production, this would come from LinkedIn API
-const mockLinkedInData = {
-  companyPage: {
-    name: "Your Company",
-    followers: 12450,
-    followersChange: 3.2,
-    impressions: 45200,
-    impressionsChange: 12.5,
-    engagement: 4.8,
-    engagementChange: 0.3,
-  },
-  recentPosts: [
-    {
-      id: '1',
-      content: "🚀 Excited to announce our latest AI-powered marketing features! Automation has never been smarter. #B2BMarketing #AI",
-      imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400",
-      likes: 234,
-      comments: 45,
-      shares: 28,
-      impressions: 12500,
-      timestamp: "2 days ago",
-      url: "https://linkedin.com/posts/example1"
-    },
-    {
-      id: '2',
-      content: "📊 New case study: How Bioseb increased lead generation by 340% in 6 months. Read the full story →",
-      imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400",
-      likes: 189,
-      comments: 32,
-      shares: 51,
-      impressions: 9800,
-      timestamp: "5 days ago",
-      url: "https://linkedin.com/posts/example2"
-    },
-    {
-      id: '3',
-      content: "Join us for our upcoming webinar on 'The Future of B2B Marketing in 2024' 🎯 Link in comments!",
-      imageUrl: "https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?w=400",
-      likes: 156,
-      comments: 67,
-      shares: 19,
-      impressions: 7200,
-      timestamp: "1 week ago",
-      url: "https://linkedin.com/posts/example3"
-    }
-  ]
-};
+import { useLinkedIn } from '@/hooks/useLinkedIn';
 
 interface MetricCardProps {
   label: string;
@@ -75,8 +28,20 @@ function MetricCard({ label, value, change, icon }: MetricCardProps) {
   );
 }
 
+interface Post {
+  id: string;
+  content: string;
+  imageUrl: string | null;
+  likes: number;
+  comments: number;
+  shares: number;
+  impressions: number;
+  timestamp: string;
+  url: string;
+}
+
 interface PostCardProps {
-  post: typeof mockLinkedInData.recentPosts[0];
+  post: Post;
 }
 
 function PostCard({ post }: PostCardProps) {
@@ -90,7 +55,7 @@ function PostCard({ post }: PostCardProps) {
       className="group flex gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
     >
       <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted shrink-0">
-        {!imageError ? (
+        {post.imageUrl && !imageError ? (
           <img
             src={post.imageUrl}
             alt=""
@@ -126,8 +91,7 @@ function PostCard({ post }: PostCardProps) {
 }
 
 export function LinkedInWidget() {
-  const [isLoading] = useState(false);
-  const data = mockLinkedInData;
+  const { data, isLoading, error, refetch, isRefetching } = useLinkedIn();
 
   return (
     <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
@@ -137,17 +101,50 @@ export function LinkedInWidget() {
             <Linkedin className="w-4 h-4 text-[#0A66C2]" />
           </div>
           <div>
-            <h3 className="font-semibold">LinkedIn</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">LinkedIn</h3>
+              {data?.isConnected ? (
+                <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  Sample Data
+                </Badge>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Company page performance</p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" asChild>
-          <a href="https://www.linkedin.com/company/dashboard" target="_blank" rel="noopener noreferrer" className="gap-1">
-            View page
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => refetch()}
+            disabled={isRefetching}
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefetching ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <a href="https://www.linkedin.com/company/dashboard" target="_blank" rel="noopener noreferrer" className="gap-1">
+              View page
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </Button>
+        </div>
       </div>
+
+      {!data?.isConnected && !isLoading && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+            <div className="text-xs text-amber-700 dark:text-amber-400">
+              <p className="font-medium">LinkedIn API not configured</p>
+              <p className="mt-1">Add LINKEDIN_ACCESS_TOKEN and LINKEDIN_ORGANIZATION_ID to backend secrets to display real data.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-4">
@@ -159,7 +156,15 @@ export function LinkedInWidget() {
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
         </div>
-      ) : (
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <AlertCircle className="w-8 h-8 text-destructive mb-2" />
+          <p className="text-sm text-muted-foreground">Failed to load LinkedIn data</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : data ? (
         <>
           {/* Metrics */}
           <div className="flex gap-3 mb-4">
@@ -198,7 +203,7 @@ export function LinkedInWidget() {
             </div>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

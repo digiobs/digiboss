@@ -46,6 +46,7 @@ export interface HubSpotCompany {
 }
 
 export interface HubSpotAnalytics {
+  connected: boolean;
   contacts: { total: number };
   deals: { total: number };
   companies: { total: number };
@@ -59,129 +60,110 @@ export function useHubSpot() {
   const [analytics, setAnalytics] = useState<HubSpotAnalytics | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
 
+  const callHubSpot = useCallback(async (action: string, params: Record<string, string> = {}) => {
+    const queryParams = new URLSearchParams({ action, ...params }).toString();
+    
+    const { data, error } = await supabase.functions.invoke('hubspot', {
+      body: null,
+      method: 'GET',
+    });
+
+    // supabase.functions.invoke doesn't support query params well, use fetch
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hubspot?${queryParams}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+
+    return response.json();
+  }, []);
+
   const fetchContacts = useCallback(async (limit = 100) => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('hubspot', {
-        body: null,
-        method: 'GET',
-      });
-
-      // Use fetch directly for GET with query params
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hubspot/contacts?limit=${limit}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch contacts');
+      const result = await callHubSpot('contacts', { limit: String(limit) });
+      
+      if (result.error && !result.connected) {
+        setIsConnected(false);
+        return [];
       }
-
-      const result = await response.json();
+      
       setContacts(result.results || []);
-      setIsConnected(true);
+      setIsConnected(result.connected ?? true);
       return result.results || [];
     } catch (error) {
       console.error('Error fetching HubSpot contacts:', error);
       setIsConnected(false);
-      toast.error('Failed to fetch HubSpot contacts');
       return [];
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [callHubSpot]);
 
   const fetchDeals = useCallback(async (limit = 100) => {
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hubspot/deals?limit=${limit}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch deals');
+      const result = await callHubSpot('deals', { limit: String(limit) });
+      
+      if (result.error && !result.connected) {
+        setIsConnected(false);
+        return [];
       }
-
-      const result = await response.json();
+      
       setDeals(result.results || []);
-      setIsConnected(true);
+      setIsConnected(result.connected ?? true);
       return result.results || [];
     } catch (error) {
       console.error('Error fetching HubSpot deals:', error);
       setIsConnected(false);
-      toast.error('Failed to fetch HubSpot deals');
       return [];
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [callHubSpot]);
 
   const fetchCompanies = useCallback(async (limit = 100) => {
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hubspot/companies?limit=${limit}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch companies');
+      const result = await callHubSpot('companies', { limit: String(limit) });
+      
+      if (result.error && !result.connected) {
+        setIsConnected(false);
+        return [];
       }
-
-      const result = await response.json();
+      
       setCompanies(result.results || []);
-      setIsConnected(true);
+      setIsConnected(result.connected ?? true);
       return result.results || [];
     } catch (error) {
       console.error('Error fetching HubSpot companies:', error);
       setIsConnected(false);
-      toast.error('Failed to fetch HubSpot companies');
       return [];
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [callHubSpot]);
 
   const fetchAnalytics = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hubspot/analytics`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch analytics');
+      const result = await callHubSpot('analytics');
+      
+      if (result.error && !result.connected) {
+        setIsConnected(false);
+        return null;
       }
-
-      const result = await response.json();
+      
       setAnalytics(result);
-      setIsConnected(true);
+      setIsConnected(result.connected ?? true);
       return result;
     } catch (error) {
       console.error('Error fetching HubSpot analytics:', error);
@@ -190,31 +172,18 @@ export function useHubSpot() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [callHubSpot]);
 
   const checkConnection = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hubspot/analytics`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        }
-      );
-      
-      if (response.ok) {
-        setIsConnected(true);
-        return true;
-      }
-      setIsConnected(false);
-      return false;
+      const result = await callHubSpot('status');
+      setIsConnected(result.connected ?? false);
+      return result.connected ?? false;
     } catch {
       setIsConnected(false);
       return false;
     }
-  }, []);
+  }, [callHubSpot]);
 
   return {
     isLoading,

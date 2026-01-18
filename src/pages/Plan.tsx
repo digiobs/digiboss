@@ -1,29 +1,42 @@
 import { useState } from 'react';
-import { Calendar, LayoutGrid, List, Plus, Sparkles } from 'lucide-react';
+import { Calendar, LayoutGrid, List, Plus, Sparkles, Clock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { campaigns } from '@/data/mockData';
+import { Task, mockTasks, taskColumns, TaskStatus } from '@/types/tasks';
+import { TaskDetailPanel } from '@/components/plan/TaskDetailPanel';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 type ViewMode = 'calendar' | 'kanban' | 'list';
 
-const tasks = [
-  { id: '1', title: 'Review Q1 content calendar', status: 'done', priority: 'high', assignee: 'Alex' },
-  { id: '2', title: 'Launch LinkedIn retargeting', status: 'doing', priority: 'high', assignee: 'Sarah' },
-  { id: '3', title: 'A/B test pricing page', status: 'doing', priority: 'medium', assignee: 'Alex' },
-  { id: '4', title: 'Create case study draft', status: 'backlog', priority: 'medium', assignee: 'Mike' },
-  { id: '5', title: 'Optimize blog for SEO', status: 'backlog', priority: 'high', assignee: null },
-  { id: '6', title: 'Update email sequences', status: 'review', priority: 'low', assignee: 'Sarah' },
-];
-
-const columns = [
-  { id: 'backlog', title: 'Backlog', color: 'bg-muted' },
-  { id: 'doing', title: 'In Progress', color: 'bg-blue-100 dark:bg-blue-900/30' },
-  { id: 'review', title: 'Review', color: 'bg-amber-100 dark:bg-amber-900/30' },
-  { id: 'done', title: 'Done', color: 'bg-emerald-100 dark:bg-emerald-900/30' },
-];
+const priorityColors = {
+  high: 'impact-high',
+  medium: 'impact-medium',
+  low: 'impact-low',
+};
 
 export default function Plan() {
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setDetailOpen(true);
+  };
+
+  const handleUpdateTask = (updatedTask: Task) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
+    );
+    setSelectedTask(updatedTask);
+  };
+
+  const getTasksByStatus = (status: TaskStatus) => 
+    tasks.filter((t) => t.status === status);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -86,8 +99,8 @@ export default function Plan() {
       {/* Kanban View */}
       {viewMode === 'kanban' && (
         <div className="grid grid-cols-4 gap-4">
-          {columns.map((column) => {
-            const columnTasks = tasks.filter((t) => t.status === column.id);
+          {taskColumns.map((column) => {
+            const columnTasks = getTasksByStatus(column.id);
             return (
               <div key={column.id} className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -102,33 +115,83 @@ export default function Plan() {
                   </Button>
                 </div>
                 <div className={`${column.color} rounded-lg p-2 min-h-[400px] space-y-2`}>
-                  {columnTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="bg-card rounded-lg border border-border p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                    >
-                      <p className="text-sm font-medium mb-2">{task.title}</p>
-                      <div className="flex items-center justify-between">
-                        <Badge
-                          variant="secondary"
-                          className={
-                            task.priority === 'high'
-                              ? 'impact-high'
-                              : task.priority === 'medium'
-                              ? 'impact-medium'
-                              : 'impact-low'
-                          }
-                        >
-                          {task.priority}
-                        </Badge>
-                        {task.assignee && (
-                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                            {task.assignee[0]}
+                  {columnTasks.map((task) => {
+                    const completedSubtasks = task.subtasks.filter((s) => s.completed).length;
+                    const subtaskProgress = task.subtasks.length > 0 
+                      ? (completedSubtasks / task.subtasks.length) * 100 
+                      : 0;
+
+                    return (
+                      <div
+                        key={task.id}
+                        onClick={() => handleTaskClick(task)}
+                        className="bg-card rounded-lg border border-border p-3 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group"
+                      >
+                        {/* AI Badge */}
+                        {task.aiGenerated && (
+                          <div className="flex items-center gap-1 mb-2">
+                            <Sparkles className="w-3 h-3 text-primary" />
+                            <span className="text-[10px] text-primary font-medium">AI Suggested</span>
                           </div>
                         )}
+                        
+                        {/* Title */}
+                        <p className="text-sm font-medium mb-2 group-hover:text-primary transition-colors">
+                          {task.title}
+                        </p>
+
+                        {/* Subtask Progress */}
+                        {task.subtasks.length > 0 && (
+                          <div className="mb-2">
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                              <span>Subtasks</span>
+                              <span>{completedSubtasks}/{task.subtasks.length}</span>
+                            </div>
+                            <Progress value={subtaskProgress} className="h-1" />
+                          </div>
+                        )}
+
+                        {/* Tags */}
+                        {task.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {task.tags.slice(0, 2).map((tag) => (
+                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                {tag}
+                              </span>
+                            ))}
+                            {task.tags.length > 2 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                +{task.tags.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between">
+                          <Badge
+                            variant="secondary"
+                            className={cn('text-[10px]', priorityColors[task.priority])}
+                          >
+                            {task.priority}
+                          </Badge>
+                          <div className="flex items-center gap-2">
+                            {task.dueDate && (
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                {format(new Date(task.dueDate), 'MMM d')}
+                              </div>
+                            )}
+                            {task.assignee && (
+                              <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary">
+                                {task.assignee[0]}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -136,17 +199,84 @@ export default function Plan() {
         </div>
       )}
 
-      {/* Calendar/List View Placeholder */}
-      {(viewMode === 'calendar' || viewMode === 'list') && (
+      {/* List View */}
+      {viewMode === 'list' && (
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="col-span-5">Task</div>
+            <div className="col-span-2">Status</div>
+            <div className="col-span-1">Priority</div>
+            <div className="col-span-2">Assignee</div>
+            <div className="col-span-2">Due Date</div>
+          </div>
+          <div className="divide-y divide-border">
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                onClick={() => handleTaskClick(task)}
+                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/30 cursor-pointer transition-colors items-center"
+              >
+                <div className="col-span-5 flex items-center gap-3">
+                  {task.aiGenerated && (
+                    <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{task.title}</p>
+                    {task.tags.length > 0 && (
+                      <div className="flex gap-1 mt-1">
+                        {task.tags.slice(0, 2).map((tag) => (
+                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <Badge variant="secondary" className={cn(
+                    'text-xs',
+                    task.status === 'done' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+                    task.status === 'doing' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                    task.status === 'review' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+                    task.status === 'backlog' && 'bg-muted text-muted-foreground'
+                  )}>
+                    {taskColumns.find((c) => c.id === task.status)?.title}
+                  </Badge>
+                </div>
+                <div className="col-span-1">
+                  <Badge variant="secondary" className={cn('text-xs', priorityColors[task.priority])}>
+                    {task.priority}
+                  </Badge>
+                </div>
+                <div className="col-span-2">
+                  {task.assignee ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                        {task.assignee[0]}
+                      </div>
+                      <span className="text-sm">{task.assignee}</span>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Unassigned</span>
+                  )}
+                </div>
+                <div className="col-span-2 text-sm text-muted-foreground">
+                  {task.dueDate ? format(new Date(task.dueDate), 'MMM d, yyyy') : '—'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Calendar View Placeholder */}
+      {viewMode === 'calendar' && (
         <div className="bg-card rounded-xl border border-border p-12 text-center">
           <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">
-            {viewMode === 'calendar' ? 'Calendar View' : 'List View'}
-          </h3>
+          <h3 className="text-lg font-medium mb-2">Calendar View</h3>
           <p className="text-muted-foreground">
-            {viewMode === 'calendar'
-              ? 'Visual calendar with content, campaigns, and meetings.'
-              : 'All tasks in a sortable, filterable list.'}
+            Visual calendar with content, campaigns, and meetings.
           </p>
         </div>
       )}
@@ -189,6 +319,14 @@ export default function Plan() {
           ))}
         </div>
       </div>
+
+      {/* Task Detail Panel */}
+      <TaskDetailPanel
+        task={selectedTask}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onUpdateTask={handleUpdateTask}
+      />
     </div>
   );
 }

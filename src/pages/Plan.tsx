@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { campaigns } from '@/data/mockData';
 import { Task, mockTasks, taskColumns, TaskStatus } from '@/types/tasks';
 import { TaskDetailPanel } from '@/components/plan/TaskDetailPanel';
+import { CreateTaskDialog } from '@/components/plan/CreateTaskDialog';
 import { KanbanColumn } from '@/components/plan/KanbanColumn';
 import { DraggableTaskCard } from '@/components/plan/DraggableTaskCard';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,8 @@ export default function Plan() {
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [wrikeEnabled, setWrikeEnabled] = useState(false);
 
@@ -46,6 +49,7 @@ export default function Plan() {
     fetchContacts,
     contacts,
     convertToLocalTasks,
+    createTask: createWrikeTask,
     checkConnection,
   } = useWrike();
 
@@ -97,6 +101,52 @@ export default function Plan() {
       prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
     );
     setSelectedTask(updatedTask);
+  };
+
+  const handleCreateTask = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'subtasks' | 'comments'>) => {
+    setCreating(true);
+    
+    try {
+      // Create task locally first
+      const newTask: Task = {
+        ...taskData,
+        id: `local-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        subtasks: [],
+        comments: [],
+      };
+
+      // If Wrike is connected, create task there too
+      if (wrikeEnabled) {
+        try {
+          const wrikeTask = await createWrikeTask({
+            title: taskData.title,
+            description: taskData.description,
+            priority: taskData.priority,
+            dueDate: taskData.dueDate || undefined,
+          });
+          
+          if (wrikeTask) {
+            newTask.id = wrikeTask.id;
+            toast.success('Task created and synced to Wrike!');
+          }
+        } catch (error) {
+          console.error('Failed to sync to Wrike:', error);
+          toast.error('Task created locally, but failed to sync to Wrike');
+        }
+      } else {
+        toast.success('Task created successfully!');
+      }
+
+      setTasks((prev) => [newTask, ...prev]);
+      setCreateOpen(false);
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      toast.error('Failed to create task');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const getTasksByStatus = (status: TaskStatus) => 
@@ -209,7 +259,7 @@ export default function Plan() {
             <Sparkles className="w-4 h-4" />
             AI Suggest Plan
           </Button>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4" />
             Add Task
           </Button>
@@ -407,6 +457,15 @@ export default function Plan() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         onUpdateTask={handleUpdateTask}
+      />
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreateTask={handleCreateTask}
+        wrikeEnabled={wrikeEnabled}
+        isLoading={creating}
       />
     </div>
   );

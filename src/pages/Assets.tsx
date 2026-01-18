@@ -5,12 +5,27 @@ import { Badge } from '@/components/ui/badge';
 import { assets } from '@/data/mockData';
 import { useState } from 'react';
 
+// Import asset illustrations
+import assetLogo from '@/assets/illustrations/asset-logo.jpg';
+import assetDeck from '@/assets/illustrations/asset-deck.jpg';
+import assetGuideline from '@/assets/illustrations/asset-guideline.jpg';
+import assetTemplate from '@/assets/illustrations/asset-template.jpg';
+import assetImage from '@/assets/illustrations/asset-image.jpg';
+
 const typeIcons = {
   logo: Image,
   deck: FileText,
   guideline: Palette,
   template: Layout,
   image: Image,
+};
+
+const typeIllustrations: Record<string, string> = {
+  logo: assetLogo,
+  deck: assetDeck,
+  guideline: assetGuideline,
+  template: assetTemplate,
+  image: assetImage,
 };
 
 export default function Assets() {
@@ -84,8 +99,12 @@ export default function Assets() {
                 key={asset.id}
                 className="bg-card rounded-lg border border-border overflow-hidden hover:shadow-md hover:border-primary/20 transition-all cursor-pointer group"
               >
-                <div className="aspect-square bg-muted flex items-center justify-center">
-                  <Icon className="w-12 h-12 text-muted-foreground group-hover:text-primary transition-colors" />
+                <div className="aspect-square bg-muted overflow-hidden">
+                  <img 
+                    src={typeIllustrations[asset.type]} 
+                    alt={asset.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
                 </div>
                 <div className="p-3">
                   <p className="font-medium text-sm truncate">{asset.name}</p>
@@ -132,8 +151,12 @@ export default function Assets() {
                   <tr key={asset.id} className="border-b border-border last:border-0 hover:bg-muted/50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
-                          <Icon className="w-4 h-4 text-muted-foreground" />
+                        <div className="w-10 h-10 rounded bg-muted overflow-hidden">
+                          <img 
+                            src={typeIllustrations[asset.type]} 
+                            alt={asset.name}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                         <span className="font-medium text-sm">{asset.name}</span>
                       </div>

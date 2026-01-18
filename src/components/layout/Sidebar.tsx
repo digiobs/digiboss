@@ -9,16 +9,36 @@ import {
   MessageSquare,
   Settings,
   ChevronDown,
+  Building2,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { workspaces } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface Client {
+  id: string;
+  name: string;
+  color: string;
+}
+
+const colorClasses: Record<string, string> = {
+  red: 'bg-red-500',
+  orange: 'bg-orange-500',
+  yellow: 'bg-yellow-500',
+  green: 'bg-green-500',
+  blue: 'bg-blue-500',
+  purple: 'bg-purple-500',
+  pink: 'bg-pink-500',
+  cyan: 'bg-cyan-500',
+};
 
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -36,11 +56,50 @@ const bottomNavItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const [currentWorkspace, setCurrentWorkspace] = useState(workspaces[0]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [currentClient, setCurrentClient] = useState<Client | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name, color')
+        .order('name');
+      
+      if (!error && data) {
+        setClients(data);
+        if (data.length > 0) {
+          setCurrentClient(data[0]);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    fetchClients();
+
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel('clients-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'clients' },
+        () => {
+          fetchClients();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const getColorClass = (color: string) => colorClasses[color] || 'bg-blue-500';
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      {/* Logo & Workspace Selector */}
+      {/* Logo & Client Selector */}
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
@@ -51,21 +110,40 @@ export function Sidebar() {
         
         <DropdownMenu>
           <DropdownMenuTrigger className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-sidebar-accent text-sidebar-accent-foreground text-sm hover:bg-sidebar-accent/80 transition-colors">
-            <span className="truncate">{currentWorkspace.name}</span>
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : currentClient ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <div className={`w-5 h-5 rounded ${getColorClass(currentClient.color)} flex items-center justify-center shrink-0`}>
+                  <Building2 className="w-3 h-3 text-white" />
+                </div>
+                <span className="truncate">{currentClient.name}</span>
+              </div>
+            ) : (
+              <span className="text-muted-foreground">Select client</span>
+            )}
             <ChevronDown className="w-4 h-4 shrink-0 opacity-70" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            {workspaces.map((workspace) => (
-              <DropdownMenuItem
-                key={workspace.id}
-                onClick={() => setCurrentWorkspace(workspace)}
-                className={cn(
-                  workspace.id === currentWorkspace.id && 'bg-accent'
-                )}
-              >
-                {workspace.name}
-              </DropdownMenuItem>
-            ))}
+          <DropdownMenuContent align="start" className="w-56 p-0">
+            <ScrollArea className="max-h-[400px]">
+              <div className="p-1">
+                {clients.map((client) => (
+                  <DropdownMenuItem
+                    key={client.id}
+                    onClick={() => setCurrentClient(client)}
+                    className={cn(
+                      'flex items-center gap-2',
+                      client.id === currentClient?.id && 'bg-accent'
+                    )}
+                  >
+                    <div className={`w-5 h-5 rounded ${getColorClass(client.color)} flex items-center justify-center shrink-0`}>
+                      <Building2 className="w-3 h-3 text-white" />
+                    </div>
+                    <span className="truncate">{client.name}</span>
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </ScrollArea>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { WeeklySummary } from '@/components/dashboard/WeeklySummary';
 import { RecommendationCard } from '@/components/dashboard/RecommendationCard';
@@ -6,41 +5,17 @@ import { NewsCarousel } from '@/components/dashboard/NewsCarousel';
 import { LinkedInWidget } from '@/components/dashboard/LinkedInWidget';
 import { BlogPostsWidget } from '@/components/dashboard/BlogPostsWidget';
 import { kpis, recommendations } from '@/data/mockData';
-import { Zap, Calendar } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Zap } from 'lucide-react';
 
 export default function Dashboard() {
-  const [dateRange, setDateRange] = useState('30d');
-
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Your marketing command center. Here's what matters most.
-          </p>
-        </div>
-        <Select value={dateRange} onValueChange={setDateRange}>
-          <SelectTrigger className="w-44">
-            <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7d">Last 7 days</SelectItem>
-            <SelectItem value="14d">Last 14 days</SelectItem>
-            <SelectItem value="30d">Last 30 days</SelectItem>
-            <SelectItem value="90d">Last 90 days</SelectItem>
-            <SelectItem value="ytd">Year to date</SelectItem>
-          </SelectContent>
-        </Select>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-muted-foreground mt-1">
+          Your marketing command center. Here's what matters most.
+        </p>
       </div>
 
       {/* KPI Grid */}

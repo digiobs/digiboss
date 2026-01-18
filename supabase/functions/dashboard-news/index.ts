@@ -22,36 +22,41 @@ serve(async (req) => {
   }
 
   try {
-    const { type, query, competitors } = await req.json();
+    const { type, industry, competitors, keywords } = await req.json();
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
 
     if (!PERPLEXITY_API_KEY) {
+      console.error("PERPLEXITY_API_KEY is not configured");
       return new Response(
         JSON.stringify({ error: "Perplexity API key not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    console.log(`Fetching ${type} news for industry: ${industry}, competitors: ${competitors}, keywords: ${keywords}`);
+
     let searchPrompt = "";
     
     if (type === "industry") {
-      searchPrompt = `Find the 5 most recent and important B2B marketing news, trends, and updates from the last 7 days. Focus on:
-- Digital marketing trends
-- Marketing technology updates
-- B2B lead generation strategies
-- Content marketing insights
-- Marketing automation news
+      const industryContext = industry || "B2B marketing";
+      const keywordContext = keywords?.length > 0 ? keywords.join(", ") : "";
+      
+      searchPrompt = `Find the 5 most recent and important news, trends, and updates about the ${industryContext} industry from the last 7 days.
+${keywordContext ? `Focus on topics related to: ${keywordContext}` : ''}
 
 For each article, provide:
 1. A compelling title
-2. A 2-3 sentence summary
+2. A 2-3 sentence summary explaining why this matters for ${industryContext} professionals
 3. The source/publication name
-4. A relevant image URL (if available, use real image URLs from the source)
-5. The article URL
+4. The article URL
 
-Format as JSON array with fields: title, summary, source, imageUrl, url`;
+Format as JSON array with fields: title, summary, source, url`;
+
     } else if (type === "competitor") {
-      const competitorList = competitors?.join(", ") || "HubSpot, Marketo, Salesforce Marketing Cloud, Mailchimp, ActiveCampaign";
+      const competitorList = competitors?.length > 0 
+        ? competitors.join(", ") 
+        : "major industry players";
+      
       searchPrompt = `Find the latest news and updates about these companies from the last 14 days: ${competitorList}
 
 Look for:
@@ -60,17 +65,17 @@ Look for:
 - Partnerships and acquisitions
 - Leadership changes
 - Market positioning changes
+- Major announcements
 
 For each piece of news, provide:
-1. A title mentioning the company
-2. A 2-3 sentence summary of the update
+1. A title mentioning the specific company
+2. A 2-3 sentence summary of the update and its implications
 3. The source/publication
-4. A relevant image URL (company logo or article image if available)
-5. The article URL
+4. The article URL
 
-Format as JSON array with fields: title, summary, source, imageUrl, url`;
+Format as JSON array with fields: title, summary, source, url`;
     } else {
-      searchPrompt = query || "Latest B2B marketing news and trends";
+      searchPrompt = "Latest B2B marketing news and trends";
     }
 
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
@@ -84,7 +89,7 @@ Format as JSON array with fields: title, summary, source, imageUrl, url`;
         messages: [
           {
             role: "system",
-            content: "You are a marketing intelligence assistant. Always respond with valid JSON arrays. For imageUrl, use placeholder URLs in format https://images.unsplash.com/photo-[id]?w=400 if you can't find real images. Never use broken or made-up URLs."
+            content: "You are a market intelligence analyst. Always respond with valid JSON arrays. Provide real, recent news with accurate source attribution. For imageUrl, use a relevant Unsplash image URL in format https://images.unsplash.com/photo-[relevant-id]?w=400."
           },
           {
             role: "user",
@@ -92,12 +97,27 @@ Format as JSON array with fields: title, summary, source, imageUrl, url`;
           }
         ],
         temperature: 0.3,
+        search_recency_filter: type === "industry" ? "week" : "month",
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Perplexity API error:", response.status, errorText);
+      
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "Payment required. Please add funds to continue." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: "Failed to fetch news", details: errorText }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -107,6 +127,8 @@ Format as JSON array with fields: title, summary, source, imageUrl, url`;
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
     const citations = data.citations || [];
+
+    console.log("Perplexity response received, parsing articles...");
 
     // Parse the JSON response
     let articles: NewsArticle[] = [];
@@ -120,7 +142,7 @@ Format as JSON array with fields: title, summary, source, imageUrl, url`;
           title: article.title || "Untitled",
           summary: article.summary || article.description || "",
           source: article.source || "Unknown",
-          imageUrl: article.imageUrl || article.image_url || article.image || `https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400`,
+          imageUrl: article.imageUrl || article.image_url || article.image || getDefaultImage(type, index),
           url: article.url || article.link || citations[index] || "#",
           timestamp: new Date().toISOString(),
           category: type as 'industry' | 'competitor',
@@ -131,15 +153,17 @@ Format as JSON array with fields: title, summary, source, imageUrl, url`;
       // Create a single article from the text response
       articles = [{
         id: `${type}-${Date.now()}-0`,
-        title: type === "industry" ? "Latest Marketing News" : "Competitor Update",
+        title: type === "industry" ? `${industry || 'Industry'} Update` : "Competitor Update",
         summary: content.substring(0, 200),
         source: "Perplexity AI",
-        imageUrl: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400",
+        imageUrl: getDefaultImage(type, 0),
         url: citations[0] || "#",
         timestamp: new Date().toISOString(),
         category: type as 'industry' | 'competitor',
       }];
     }
+
+    console.log(`Returning ${articles.length} ${type} articles`);
 
     return new Response(
       JSON.stringify({ articles, citations }),
@@ -153,3 +177,23 @@ Format as JSON array with fields: title, summary, source, imageUrl, url`;
     );
   }
 });
+
+function getDefaultImage(type: string, index: number): string {
+  const industryImages = [
+    "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400",
+    "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=400",
+    "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400",
+    "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400",
+    "https://images.unsplash.com/photo-1432888622747-4eb9a8efeb07?w=400",
+  ];
+  const competitorImages = [
+    "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=400",
+    "https://images.unsplash.com/photo-1552664730-d307ca884978?w=400",
+    "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=400",
+    "https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400",
+    "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400",
+  ];
+  
+  const images = type === "industry" ? industryImages : competitorImages;
+  return images[index % images.length];
+}

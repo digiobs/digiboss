@@ -12,6 +12,12 @@ export interface NewsArticle {
   category: 'industry' | 'competitor';
 }
 
+interface UseDashboardNewsConfig {
+  competitors?: string[];
+  industry?: string;
+  keywords?: string[];
+}
+
 interface UseDashboardNewsResult {
   industryNews: NewsArticle[];
   competitorNews: NewsArticle[];
@@ -20,7 +26,7 @@ interface UseDashboardNewsResult {
   refetch: () => Promise<void>;
 }
 
-export function useDashboardNews(competitors?: string[], industry?: string): UseDashboardNewsResult {
+export function useDashboardNews(config?: UseDashboardNewsConfig): UseDashboardNewsResult {
   const [industryNews, setIndustryNews] = useState<NewsArticle[]>([]);
   const [competitorNews, setCompetitorNews] = useState<NewsArticle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,13 +37,20 @@ export function useDashboardNews(competitors?: string[], industry?: string): Use
     setError(null);
 
     try {
-      // Fetch both types in parallel
+      // Fetch both types in parallel with client-specific config
       const [industryResponse, competitorResponse] = await Promise.all([
         supabase.functions.invoke('dashboard-news', {
-          body: { type: 'industry', industry }
+          body: { 
+            type: 'industry', 
+            industry: config?.industry,
+            keywords: config?.keywords,
+          }
         }),
         supabase.functions.invoke('dashboard-news', {
-          body: { type: 'competitor', competitors }
+          body: { 
+            type: 'competitor', 
+            competitors: config?.competitors,
+          }
         })
       ]);
 
@@ -58,7 +71,7 @@ export function useDashboardNews(competitors?: string[], industry?: string): Use
     } finally {
       setIsLoading(false);
     }
-  }, [competitors?.join(','), industry]);
+  }, [config?.competitors?.join(','), config?.industry, config?.keywords?.join(',')]);
 
   useEffect(() => {
     fetchNews();

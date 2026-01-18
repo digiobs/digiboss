@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { TeamChatWidget } from '@/components/chat/TeamChatWidget';
 
 export function AppLayout() {
   return (
@@ -12,6 +13,7 @@ export function AppLayout() {
           <Outlet />
         </div>
       </main>
+      <TeamChatWidget />
     </div>
   );
 }

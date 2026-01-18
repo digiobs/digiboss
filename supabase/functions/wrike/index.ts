@@ -57,9 +57,9 @@ serve(async (req) => {
       case 'tasks':
         // Get tasks (optionally from a specific folder)
         if (folderId) {
-          endpoint = `${WRIKE_API_BASE}/folders/${folderId}/tasks?fields=["description","briefDescription","parentIds","superParentIds","responsibleIds","status","importance","dates","customFields","authorIds","hasAttachments","superTaskIds","subTaskIds"]`;
+          endpoint = `${WRIKE_API_BASE}/folders/${folderId}/tasks?fields=["description","briefDescription","parentIds","superParentIds","responsibleIds","importance","dates","customFields","authorIds","hasAttachments","superTaskIds","subTaskIds"]`;
         } else {
-          endpoint = `${WRIKE_API_BASE}/tasks?fields=["description","briefDescription","parentIds","superParentIds","responsibleIds","status","importance","dates","customFields","authorIds","hasAttachments","superTaskIds","subTaskIds"]&status=Active,InProgress,Completed`;
+          endpoint = `${WRIKE_API_BASE}/tasks?fields=["description","briefDescription","parentIds","superParentIds","responsibleIds","importance","dates","customFields","authorIds","hasAttachments","superTaskIds","subTaskIds"]`;
         }
         break;
 

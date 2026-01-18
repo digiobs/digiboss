@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.google-search-console]
 verify_jwt = false
+
+[functions.hubspot]
+verify_jwt = false

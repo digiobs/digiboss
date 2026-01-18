@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Search, Calendar, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Calendar, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,10 +21,20 @@ import {
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { NotificationPreferencesPanel } from '@/components/notifications/NotificationPreferencesPanel';
 import { useDateRange } from '@/contexts/DateRangeContext';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 export function TopBar() {
+  const navigate = useNavigate();
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const { dateRange, setDateRange } = useDateRange();
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success('Signed out successfully');
+    navigate('/auth');
+  };
 
   return (
     <>
@@ -72,8 +83,8 @@ export function TopBar() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>
                 <div>
-                  <p className="font-medium">Alex Morgan</p>
-                  <p className="text-xs text-muted-foreground">Marketing Manager</p>
+                  <p className="font-medium">{user?.email?.split('@')[0] || 'User'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -83,7 +94,10 @@ export function TopBar() {
               </DropdownMenuItem>
               <DropdownMenuItem>Help & Support</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">Sign out</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign out
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

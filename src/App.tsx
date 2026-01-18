@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { ClientProvider } from "@/contexts/ClientContext";
 import Landing from "@/pages/Landing";
+import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import Insights from "@/pages/Insights";
 import Prospects from "@/pages/Prospects";
@@ -28,8 +29,9 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Public landing page */}
+              {/* Public routes */}
               <Route path="/" element={<Landing />} />
+              <Route path="/auth" element={<Auth />} />
               
               {/* App routes with layout */}
               <Route element={<AppLayout />}>

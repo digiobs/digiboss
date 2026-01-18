@@ -1,7 +1,52 @@
-import { Settings, Users, CreditCard, Link, Shield, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { Settings, Users, CreditCard, Link, Shield, ChevronRight, Building2, Pencil, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+
+interface Client {
+  id: string;
+  name: string;
+  color: string;
+}
+
+const colorOptions = [
+  { value: 'red', label: 'Red', class: 'bg-red-500' },
+  { value: 'orange', label: 'Orange', class: 'bg-orange-500' },
+  { value: 'yellow', label: 'Yellow', class: 'bg-yellow-500' },
+  { value: 'green', label: 'Green', class: 'bg-green-500' },
+  { value: 'blue', label: 'Blue', class: 'bg-blue-500' },
+  { value: 'purple', label: 'Purple', class: 'bg-purple-500' },
+  { value: 'pink', label: 'Pink', class: 'bg-pink-500' },
+  { value: 'cyan', label: 'Cyan', class: 'bg-cyan-500' },
+];
+
+const initialClients: Client[] = [
+  { id: '1', name: 'Adechotech', color: 'red' },
+  { id: '2', name: 'Agro-Bio', color: 'orange' },
+  { id: '3', name: 'AlibeeZ', color: 'yellow' },
+  { id: '4', name: 'Alsbom', color: 'green' },
+  { id: '5', name: 'Amarok', color: 'blue' },
+  { id: '6', name: 'Amont', color: 'purple' },
+  { id: '7', name: 'Apmonia Therapeutics', color: 'pink' },
+  { id: '8', name: 'Bioseb', color: 'cyan' },
+  { id: '9', name: 'BlueSpine', color: 'blue' },
+  { id: '10', name: 'Board4care', color: 'green' },
+  { id: '11', name: 'Centaur Clinical', color: 'purple' },
+  { id: '12', name: 'DigiObs', color: 'blue' },
+  { id: '13', name: 'Huck Occitania', color: 'orange' },
+  { id: '14', name: 'IMV Technologies', color: 'cyan' },
+  { id: '15', name: 'Kaptory', color: 'pink' },
+  { id: '16', name: 'Mabsilico', color: 'purple' },
+  { id: '17', name: 'Nerya', color: 'green' },
+  { id: '18', name: 'Spark Lasers', color: 'red' },
+  { id: '19', name: 'SRA Instruments', color: 'blue' },
+  { id: '20', name: 'Veinsound', color: 'orange' },
+];
 
 const integrations = [
   { name: 'Google Analytics', status: 'connected', lastSync: '2 hours ago' },
@@ -12,10 +57,10 @@ const integrations = [
 ];
 
 const teamMembers = [
-  { name: 'Alex Morgan', email: 'alex@company.com', role: 'Admin', status: 'active' },
-  { name: 'Sarah Chen', email: 'sarah@company.com', role: 'Manager', status: 'active' },
-  { name: 'Mike Johnson', email: 'mike@company.com', role: 'Contributor', status: 'active' },
-  { name: 'Emily Watson', email: 'emily@company.com', role: 'Viewer', status: 'invited' },
+  { name: 'Alex Morgan', email: 'alex@digiobs.com', role: 'Admin', status: 'active' },
+  { name: 'Sarah Chen', email: 'sarah@digiobs.com', role: 'Manager', status: 'active' },
+  { name: 'Mike Johnson', email: 'mike@digiobs.com', role: 'Contributor', status: 'active' },
+  { name: 'Emily Watson', email: 'emily@digiobs.com', role: 'Viewer', status: 'invited' },
 ];
 
 const auditLog = [
@@ -26,6 +71,68 @@ const auditLog = [
 ];
 
 export default function Admin() {
+  const [clients, setClients] = useState<Client[]>(initialClients);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [clientName, setClientName] = useState('');
+  const [clientColor, setClientColor] = useState('blue');
+  const [isCreating, setIsCreating] = useState(false);
+
+  const openCreateDialog = () => {
+    setIsCreating(true);
+    setEditingClient(null);
+    setClientName('');
+    setClientColor('blue');
+    setIsDialogOpen(true);
+  };
+
+  const openEditDialog = (client: Client) => {
+    setIsCreating(false);
+    setEditingClient(client);
+    setClientName(client.name);
+    setClientColor(client.color);
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = () => {
+    const trimmedName = clientName.trim();
+    if (!trimmedName) {
+      toast.error('Client name cannot be empty');
+      return;
+    }
+    if (trimmedName.length > 100) {
+      toast.error('Client name must be less than 100 characters');
+      return;
+    }
+
+    if (isCreating) {
+      const newClient: Client = {
+        id: Date.now().toString(),
+        name: trimmedName,
+        color: clientColor,
+      };
+      setClients([...clients, newClient]);
+      toast.success(`Client "${trimmedName}" created`);
+    } else if (editingClient) {
+      setClients(clients.map(c => 
+        c.id === editingClient.id 
+          ? { ...c, name: trimmedName, color: clientColor }
+          : c
+      ));
+      toast.success(`Client "${trimmedName}" updated`);
+    }
+    setIsDialogOpen(false);
+  };
+
+  const handleDelete = (client: Client) => {
+    setClients(clients.filter(c => c.id !== client.id));
+    toast.success(`Client "${client.name}" deleted`);
+  };
+
+  const getColorClass = (color: string) => {
+    return colorOptions.find(c => c.value === color)?.class || 'bg-blue-500';
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
@@ -37,6 +144,41 @@ export default function Admin() {
         <p className="text-muted-foreground mt-1">
           Workspace settings, users, billing, and integrations.
         </p>
+      </div>
+
+      {/* Clients Management */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold">Clients</h2>
+            <Badge variant="secondary">{clients.length}</Badge>
+          </div>
+          <Button size="sm" onClick={openCreateDialog}>
+            <Plus className="w-4 h-4 mr-1" />
+            Add Client
+          </Button>
+        </div>
+        <div className="max-h-[400px] overflow-y-auto divide-y divide-border">
+          {clients.map((client) => (
+            <div key={client.id} className="p-3 flex items-center justify-between hover:bg-muted/50 group">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg ${getColorClass(client.color)} flex items-center justify-center`}>
+                  <Building2 className="w-4 h-4 text-white" />
+                </div>
+                <span className="font-medium">{client.name}</span>
+              </div>
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(client)}>
+                  <Pencil className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(client)}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -192,6 +334,53 @@ export default function Admin() {
           </div>
         </div>
       </div>
+
+      {/* Edit/Create Client Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isCreating ? 'Add New Client' : 'Edit Client'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="clientName">Client Name</Label>
+              <Input
+                id="clientName"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Enter client name"
+                maxLength={100}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {colorOptions.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    onClick={() => setClientColor(color.value)}
+                    className={`w-8 h-8 rounded-lg ${color.class} transition-all ${
+                      clientColor === color.value 
+                        ? 'ring-2 ring-offset-2 ring-primary' 
+                        : 'hover:scale-110'
+                    }`}
+                    title={color.label}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              {isCreating ? 'Create' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { AnalyticsTopBar } from '@/components/reporting/AnalyticsTopBar';
 import { KPIStrip } from '@/components/reporting/KPIStrip';
@@ -12,10 +11,10 @@ import { SocialSection } from '@/components/reporting/SocialSection';
 import { PaidSection } from '@/components/reporting/PaidSection';
 import { AIInsightsPanel } from '@/components/reporting/AIInsightsPanel';
 import { kpiStripData } from '@/data/analyticsData';
+import { useDateRange } from '@/contexts/DateRangeContext';
 
 export default function Reporting() {
-  const [dateRange, setDateRange] = useState('30d');
-  const [compareMode, setCompareMode] = useState('previous');
+  const { dateRange, setDateRange, compareMode, setCompareMode } = useDateRange();
 
   return (
     <div className="animate-fade-in">

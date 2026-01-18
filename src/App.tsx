@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Insights from "@/pages/Insights";
@@ -20,28 +21,30 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* Public landing page */}
-          <Route path="/" element={<Landing />} />
-          
-          {/* App routes with layout */}
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/insights" element={<Insights />} />
-            <Route path="/prospects" element={<Prospects />} />
-            <Route path="/plan" element={<Plan />} />
-            <Route path="/assets" element={<Assets />} />
-            <Route path="/reporting" element={<Reporting />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/admin" element={<Admin />} />
-          </Route>
-          
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <DateRangeProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            {/* Public landing page */}
+            <Route path="/" element={<Landing />} />
+            
+            {/* App routes with layout */}
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/insights" element={<Insights />} />
+              <Route path="/prospects" element={<Prospects />} />
+              <Route path="/plan" element={<Plan />} />
+              <Route path="/assets" element={<Assets />} />
+              <Route path="/reporting" element={<Reporting />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/admin" element={<Admin />} />
+            </Route>
+            
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </DateRangeProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

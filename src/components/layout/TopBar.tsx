@@ -19,18 +19,11 @@ import {
 } from '@/components/ui/select';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { NotificationPreferencesPanel } from '@/components/notifications/NotificationPreferencesPanel';
-
-const dateRangeLabels: Record<string, string> = {
-  '7d': 'Last 7 days',
-  '14d': 'Last 14 days',
-  '30d': 'Last 30 days',
-  '90d': 'Last 90 days',
-  'ytd': 'Year to date',
-};
+import { useDateRange } from '@/contexts/DateRangeContext';
 
 export function TopBar() {
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [dateRange, setDateRange] = useState('30d');
+  const { dateRange, setDateRange } = useDateRange();
 
   return (
     <>

@@ -14,15 +14,26 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { campaigns } from '@/data/mockData';
-import { Task, mockTasks, taskColumns, TaskStatus } from '@/types/tasks';
+import { Task, mockTasks, taskColumns, TaskStatus, TaskPriority } from '@/types/tasks';
 import { TaskDetailPanel } from '@/components/plan/TaskDetailPanel';
 import { CreateTaskDialog } from '@/components/plan/CreateTaskDialog';
+import { AISuggestionsDialog } from '@/components/plan/AISuggestionsDialog';
 import { KanbanColumn } from '@/components/plan/KanbanColumn';
 import { DraggableTaskCard } from '@/components/plan/DraggableTaskCard';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useWrike } from '@/hooks/useWrike';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+interface AISuggestion {
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  category: string;
+  estimatedHours?: number;
+  tags?: string[];
+}
 
 type ViewMode = 'calendar' | 'kanban' | 'list';
 
@@ -41,6 +52,12 @@ export default function Plan() {
   const [creating, setCreating] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [wrikeEnabled, setWrikeEnabled] = useState(false);
+  
+  // AI Suggestions state
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const {
     loading: wrikeLoading,
@@ -149,6 +166,68 @@ export default function Plan() {
     }
   };
 
+  // AI Suggest Plan
+  const fetchAISuggestions = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    setAiDialogOpen(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-suggest-tasks', {
+        body: {
+          currentTasks: tasks.map(t => ({
+            title: t.title,
+            status: t.status,
+            priority: t.priority,
+          })),
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to get AI suggestions');
+      }
+
+      if (data?.suggestions) {
+        setAiSuggestions(data.suggestions);
+      } else {
+        setAiSuggestions([]);
+      }
+    } catch (error: any) {
+      console.error('AI suggestions error:', error);
+      if (error.message?.includes('429') || error.message?.includes('Rate limit')) {
+        setAiError('Rate limit exceeded. Please try again in a moment.');
+      } else if (error.message?.includes('402') || error.message?.includes('Payment')) {
+        setAiError('AI credits exhausted. Please add funds to continue.');
+      } else {
+        setAiError(error.message || 'Failed to get AI suggestions');
+      }
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAddAISuggestions = (suggestions: AISuggestion[]) => {
+    const newTasks: Task[] = suggestions.map((s, index) => ({
+      id: `ai-${Date.now()}-${index}`,
+      title: s.title,
+      description: s.description,
+      status: 'backlog' as TaskStatus,
+      priority: s.priority,
+      assignee: null,
+      dueDate: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tags: s.tags || [],
+      subtasks: [],
+      comments: [],
+      estimatedHours: s.estimatedHours,
+      aiGenerated: true,
+    }));
+
+    setTasks((prev) => [...newTasks, ...prev]);
+    toast.success(`Added ${suggestions.length} AI-suggested task${suggestions.length > 1 ? 's' : ''} to your plan!`);
+  };
+
   const getTasksByStatus = (status: TaskStatus) => 
     tasks.filter((t) => t.status === status);
 
@@ -255,8 +334,8 @@ export default function Plan() {
               Sync Wrike
             </Button>
           )}
-          <Button variant="outline" className="gap-2">
-            <Sparkles className="w-4 h-4" />
+          <Button variant="outline" className="gap-2" onClick={fetchAISuggestions} disabled={aiLoading}>
+            <Sparkles className={cn("w-4 h-4", aiLoading && "animate-pulse")} />
             AI Suggest Plan
           </Button>
           <Button className="gap-2" onClick={() => setCreateOpen(true)}>
@@ -466,6 +545,17 @@ export default function Plan() {
         onCreateTask={handleCreateTask}
         wrikeEnabled={wrikeEnabled}
         isLoading={creating}
+      />
+
+      {/* AI Suggestions Dialog */}
+      <AISuggestionsDialog
+        open={aiDialogOpen}
+        onOpenChange={setAiDialogOpen}
+        suggestions={aiSuggestions}
+        isLoading={aiLoading}
+        error={aiError}
+        onAddSuggestions={handleAddAISuggestions}
+        onRetry={fetchAISuggestions}
       />
     </div>
   );

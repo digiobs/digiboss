@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.wrike]
 verify_jwt = false
+
+[functions.ai-suggest-tasks]
+verify_jwt = false

@@ -1,11 +1,23 @@
 import { useState } from 'react';
-import { Calendar, LayoutGrid, List, Plus, Sparkles, Clock, User } from 'lucide-react';
+import { Calendar, LayoutGrid, List, Plus, Sparkles, Clock } from 'lucide-react';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+} from '@dnd-kit/core';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { campaigns } from '@/data/mockData';
 import { Task, mockTasks, taskColumns, TaskStatus } from '@/types/tasks';
 import { TaskDetailPanel } from '@/components/plan/TaskDetailPanel';
+import { KanbanColumn } from '@/components/plan/KanbanColumn';
+import { DraggableTaskCard } from '@/components/plan/DraggableTaskCard';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -22,6 +34,15 @@ export default function Plan() {
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -37,6 +58,78 @@ export default function Plan() {
 
   const getTasksByStatus = (status: TaskStatus) => 
     tasks.filter((t) => t.status === status);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = tasks.find((t) => t.id === event.active.id);
+    if (task) setActiveTask(task);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const activeTask = tasks.find((t) => t.id === activeId);
+    if (!activeTask) return;
+
+    // Check if dropping over a column
+    const isOverColumn = taskColumns.some((col) => col.id === overId);
+    if (isOverColumn) {
+      const newStatus = overId as TaskStatus;
+      if (activeTask.status !== newStatus) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === activeId ? { ...t, status: newStatus } : t
+          )
+        );
+      }
+      return;
+    }
+
+    // Check if dropping over another task
+    const overTask = tasks.find((t) => t.id === overId);
+    if (overTask && activeTask.status !== overTask.status) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === activeId ? { ...t, status: overTask.status } : t
+        )
+      );
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTask(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    if (activeId === overId) return;
+
+    const activeTask = tasks.find((t) => t.id === activeId);
+    if (!activeTask) return;
+
+    // Reorder within same column
+    const overTask = tasks.find((t) => t.id === overId);
+    if (overTask && activeTask.status === overTask.status) {
+      setTasks((prev) => {
+        const columnTasks = prev.filter((t) => t.status === activeTask.status);
+        const otherTasks = prev.filter((t) => t.status !== activeTask.status);
+        
+        const oldIndex = columnTasks.findIndex((t) => t.id === activeId);
+        const newIndex = columnTasks.findIndex((t) => t.id === overId);
+        
+        const reorderedTasks = [...columnTasks];
+        const [movedTask] = reorderedTasks.splice(oldIndex, 1);
+        reorderedTasks.splice(newIndex, 0, movedTask);
+        
+        return [...otherTasks, ...reorderedTasks];
+      });
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -98,105 +191,33 @@ export default function Plan() {
 
       {/* Kanban View */}
       {viewMode === 'kanban' && (
-        <div className="grid grid-cols-4 gap-4">
-          {taskColumns.map((column) => {
-            const columnTasks = getTasksByStatus(column.id);
-            return (
-              <div key={column.id} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-sm">{column.title}</h3>
-                    <Badge variant="secondary" className="text-xs">
-                      {columnTasks.length}
-                    </Badge>
-                  </div>
-                  <Button variant="ghost" size="icon" className="w-6 h-6">
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className={`${column.color} rounded-lg p-2 min-h-[400px] space-y-2`}>
-                  {columnTasks.map((task) => {
-                    const completedSubtasks = task.subtasks.filter((s) => s.completed).length;
-                    const subtaskProgress = task.subtasks.length > 0 
-                      ? (completedSubtasks / task.subtasks.length) * 100 
-                      : 0;
-
-                    return (
-                      <div
-                        key={task.id}
-                        onClick={() => handleTaskClick(task)}
-                        className="bg-card rounded-lg border border-border p-3 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group"
-                      >
-                        {/* AI Badge */}
-                        {task.aiGenerated && (
-                          <div className="flex items-center gap-1 mb-2">
-                            <Sparkles className="w-3 h-3 text-primary" />
-                            <span className="text-[10px] text-primary font-medium">AI Suggested</span>
-                          </div>
-                        )}
-                        
-                        {/* Title */}
-                        <p className="text-sm font-medium mb-2 group-hover:text-primary transition-colors">
-                          {task.title}
-                        </p>
-
-                        {/* Subtask Progress */}
-                        {task.subtasks.length > 0 && (
-                          <div className="mb-2">
-                            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-                              <span>Subtasks</span>
-                              <span>{completedSubtasks}/{task.subtasks.length}</span>
-                            </div>
-                            <Progress value={subtaskProgress} className="h-1" />
-                          </div>
-                        )}
-
-                        {/* Tags */}
-                        {task.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {task.tags.slice(0, 2).map((tag) => (
-                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                                {tag}
-                              </span>
-                            ))}
-                            {task.tags.length > 2 && (
-                              <span className="text-[10px] text-muted-foreground">
-                                +{task.tags.length - 2}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Footer */}
-                        <div className="flex items-center justify-between">
-                          <Badge
-                            variant="secondary"
-                            className={cn('text-[10px]', priorityColors[task.priority])}
-                          >
-                            {task.priority}
-                          </Badge>
-                          <div className="flex items-center gap-2">
-                            {task.dueDate && (
-                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                <Clock className="w-3 h-3" />
-                                {format(new Date(task.dueDate), 'MMM d')}
-                              </div>
-                            )}
-                            {task.assignee && (
-                              <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary">
-                                {task.assignee[0]}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid grid-cols-4 gap-4">
+            {taskColumns.map((column) => (
+              <KanbanColumn
+                key={column.id}
+                id={column.id}
+                title={column.title}
+                color={column.color}
+                tasks={getTasksByStatus(column.id)}
+                onTaskClick={handleTaskClick}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeTask ? (
+              <div className="opacity-90">
+                <DraggableTaskCard task={activeTask} onClick={() => {}} />
               </div>
-            );
-          })}
-        </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* List View */}

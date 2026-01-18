@@ -1,6 +1,9 @@
 import { KPICard } from '@/components/dashboard/KPICard';
 import { WeeklySummary } from '@/components/dashboard/WeeklySummary';
 import { RecommendationCard } from '@/components/dashboard/RecommendationCard';
+import { NewsCarousel } from '@/components/dashboard/NewsCarousel';
+import { LinkedInWidget } from '@/components/dashboard/LinkedInWidget';
+import { BlogPostsWidget } from '@/components/dashboard/BlogPostsWidget';
 import { kpis, recommendations } from '@/data/mockData';
 import { Zap } from 'lucide-react';
 
@@ -20,6 +23,11 @@ export default function Dashboard() {
         {kpis.map((kpi, index) => (
           <KPICard key={kpi.label} kpi={kpi} />
         ))}
+      </div>
+
+      {/* Market Intelligence - News Carousels */}
+      <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+        <NewsCarousel />
       </div>
 
       {/* Main Content Grid */}
@@ -44,6 +52,12 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Social & Content Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LinkedInWidget />
+        <BlogPostsWidget />
       </div>
     </div>
   );

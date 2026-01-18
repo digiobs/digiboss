@@ -148,15 +148,20 @@ function NewsCarouselSection({ title, icon, articles, isLoading }: NewsCarouselS
 interface NewsCarouselProps {
   competitors?: string[];
   industry?: string;
+  keywords?: string[];
 }
 
-export function NewsCarousel({ competitors, industry }: NewsCarouselProps) {
-  const { industryNews, competitorNews, isLoading, refetch } = useDashboardNews(competitors, industry);
+export function NewsCarousel({ competitors, industry, keywords }: NewsCarouselProps) {
+  const { industryNews, competitorNews, isLoading, refetch } = useDashboardNews({
+    competitors,
+    industry,
+    keywords,
+  });
 
-  // Refetch when competitors or industry changes
+  // Refetch when config changes
   useEffect(() => {
     refetch();
-  }, [competitors?.join(','), industry]);
+  }, [competitors?.join(','), industry, keywords?.join(',')]);
 
   return (
     <div className="space-y-6">

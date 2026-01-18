@@ -35,6 +35,7 @@ export default function Dashboard() {
         <NewsCarousel 
           competitors={clientConfig?.competitors} 
           industry={clientConfig?.industry}
+          keywords={clientConfig?.market_news_keywords}
         />
       </div>
 

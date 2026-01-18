@@ -22,7 +22,7 @@ serve(async (req) => {
   }
 
   try {
-    const { query, category } = await req.json();
+    const { category, competitors, keywords, industry } = await req.json();
     const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
     
     if (!PERPLEXITY_API_KEY) {
@@ -30,18 +30,31 @@ serve(async (req) => {
       throw new Error('Perplexity API key is not configured');
     }
 
-    // Build the search query based on category
-    const categoryQueries: Record<string, string> = {
-      'marketing': 'latest B2B marketing trends, digital marketing news, advertising industry updates',
-      'technology': 'latest technology news, AI developments, software industry updates',
-      'finance': 'latest finance news, stock market updates, business financial news',
-      'industry': 'B2B industry news, SaaS trends, enterprise software updates',
-      'competitor': 'marketing technology company news, martech competitor updates',
-    };
+    console.log(`Fetching market news - category: ${category}, industry: ${industry}, competitors: ${competitors}, keywords: ${keywords}`);
 
-    const searchQuery = query || categoryQueries[category] || categoryQueries['marketing'];
+    // Build customized search query based on client config
+    let searchQuery = '';
     
-    console.log(`Fetching market news for query: ${searchQuery}`);
+    if (category === 'competitor' && competitors?.length > 0) {
+      searchQuery = `Latest news about ${competitors.join(', ')}: product updates, announcements, market moves, partnerships`;
+    } else if (category === 'industry' && industry) {
+      const keywordContext = keywords?.length > 0 ? ` focusing on ${keywords.join(', ')}` : '';
+      searchQuery = `Latest ${industry} industry news and trends${keywordContext}`;
+    } else if (keywords?.length > 0) {
+      searchQuery = `Latest news about ${keywords.join(', ')}`;
+    } else {
+      // Default category queries
+      const categoryQueries: Record<string, string> = {
+        'marketing': 'latest B2B marketing trends, digital marketing news, advertising industry updates',
+        'technology': 'latest technology news, AI developments, software industry updates',
+        'finance': 'latest finance news, stock market updates, business financial news',
+        'industry': industry ? `${industry} industry news and updates` : 'B2B industry news, SaaS trends, enterprise software updates',
+        'competitor': competitors?.length > 0 ? `news about ${competitors.join(', ')}` : 'marketing technology company news, martech competitor updates',
+      };
+      searchQuery = categoryQueries[category] || categoryQueries['marketing'];
+    }
+    
+    console.log(`Search query: ${searchQuery}`);
 
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
@@ -54,7 +67,7 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: `You are a market intelligence analyst. Provide 5 recent news articles about the requested topic. For each article, provide a title, a 2-3 sentence summary, the source name, and categorize it as one of: marketing, technology, finance, industry, or competitor. Format your response as a JSON array.` 
+            content: `You are a market intelligence analyst specializing in ${industry || 'business'}. Provide 5 recent news articles about the requested topic. For each article, provide a title, a 2-3 sentence summary explaining the significance, the source name, and categorize it appropriately. Format your response as a JSON array.` 
           },
           { 
             role: 'user', 
@@ -75,6 +88,12 @@ serve(async (req) => {
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'Payment required. Please add funds to continue.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       
       throw new Error(`Perplexity API error: ${response.status}`);
     }
@@ -83,7 +102,7 @@ serve(async (req) => {
     const content = data.choices?.[0]?.message?.content || '';
     const citations = data.citations || [];
     
-    console.log('Raw Perplexity response:', content);
+    console.log('Raw Perplexity response received');
 
     // Parse the news articles from the response
     let articles: NewsArticle[] = [];
@@ -108,7 +127,7 @@ serve(async (req) => {
       // Fallback: create a single article from the response
       articles = [{
         id: `news-${Date.now()}-0`,
-        title: 'Market Intelligence Update',
+        title: `${industry || 'Market'} Intelligence Update`,
         summary: content.slice(0, 300),
         source: 'Perplexity AI',
         timestamp: new Date().toISOString(),

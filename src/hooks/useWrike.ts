@@ -63,26 +63,29 @@ export function useWrike() {
   const [contacts, setContacts] = useState<WrikeContact[]>([]);
   const [spaces, setSpaces] = useState<WrikeSpace[]>([]);
 
-  const callWrike = useCallback(async (action: string, params: Record<string, string> = {}) => {
+  const callWrike = useCallback(async (
+    action: string, 
+    params: Record<string, string> = {},
+    options?: { method?: string; body?: any }
+  ) => {
     const queryParams = new URLSearchParams({ action, ...params });
+    const method = options?.method || 'GET';
     
-    const { data, error } = await supabase.functions.invoke('wrike', {
-      body: null,
+    const fetchOptions: RequestInit = {
+      method,
       headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         'Content-Type': 'application/json',
       },
-    });
+    };
 
-    // Actually call with query params
+    if (options?.body && method !== 'GET') {
+      fetchOptions.body = JSON.stringify(options.body);
+    }
+
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/wrike?${queryParams.toString()}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
+      fetchOptions
     );
 
     if (!response.ok) {
@@ -216,6 +219,29 @@ export function useWrike() {
     }));
   }, []);
 
+  const createTask = useCallback(async (taskData: {
+    title: string;
+    description?: string;
+    priority?: string;
+    dueDate?: string;
+    folderId?: string;
+  }) => {
+    setLoading(true);
+    try {
+      const result = await callWrike('create-task', {}, {
+        method: 'POST',
+        body: taskData,
+      });
+      console.log('Task created in Wrike:', result);
+      return result.data?.[0] || null;
+    } catch (error) {
+      console.error('Failed to create Wrike task:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [callWrike]);
+
   return {
     loading,
     connected,
@@ -228,6 +254,7 @@ export function useWrike() {
     fetchFolders,
     fetchContacts,
     fetchTasks,
+    createTask,
     convertToLocalTasks,
     callWrike,
   };

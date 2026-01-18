@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,20 @@ interface NewsArticle {
   citations: string[];
 }
 
+// Cache duration in hours
+const CACHE_DURATION_HOURS = 4;
+
+function generateCacheKey(category: string, industry: string, competitors: string[], keywords: string[]): string {
+  const parts = [
+    'market-news',
+    category || 'default',
+    industry || 'default',
+    (competitors || []).sort().join(','),
+    (keywords || []).sort().join(','),
+  ];
+  return parts.join('|').toLowerCase();
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -24,10 +39,41 @@ serve(async (req) => {
   try {
     const { category, competitors, keywords, industry } = await req.json();
     const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!PERPLEXITY_API_KEY) {
       console.error('PERPLEXITY_API_KEY is not configured');
       throw new Error('Perplexity API key is not configured');
+    }
+
+    // Initialize Supabase client for caching
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    // Generate cache key
+    const cacheKey = generateCacheKey(category, industry, competitors || [], keywords || []);
+    console.log(`Cache key: ${cacheKey}`);
+
+    // Check cache first
+    const { data: cachedData, error: cacheError } = await supabase
+      .from('news_cache')
+      .select('articles, expires_at')
+      .eq('cache_key', cacheKey)
+      .single();
+
+    if (!cacheError && cachedData) {
+      const expiresAt = new Date(cachedData.expires_at);
+      if (expiresAt > new Date()) {
+        console.log('Returning cached market news');
+        return new Response(
+          JSON.stringify({ articles: cachedData.articles, cached: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        console.log('Cache expired, fetching fresh data');
+        // Delete expired cache
+        await supabase.from('news_cache').delete().eq('cache_key', cacheKey);
+      }
     }
 
     console.log(`Fetching market news - category: ${category}, industry: ${industry}, competitors: ${competitors}, keywords: ${keywords}`);
@@ -138,8 +184,30 @@ serve(async (req) => {
 
     console.log(`Returning ${articles.length} articles`);
 
+    // Store in cache
+    if (articles.length > 0) {
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + CACHE_DURATION_HOURS);
+
+      const { error: upsertError } = await supabase
+        .from('news_cache')
+        .upsert({
+          cache_key: cacheKey,
+          articles: articles,
+          expires_at: expiresAt.toISOString(),
+        }, {
+          onConflict: 'cache_key',
+        });
+
+      if (upsertError) {
+        console.error('Failed to cache articles:', upsertError);
+      } else {
+        console.log('Articles cached successfully');
+      }
+    }
+
     return new Response(
-      JSON.stringify({ articles, citations }),
+      JSON.stringify({ articles, citations, cached: false }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

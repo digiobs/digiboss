@@ -88,6 +88,30 @@ export type Database = {
         }
         Relationships: []
       }
+      news_cache: {
+        Row: {
+          articles: Json
+          cache_key: string
+          created_at: string
+          expires_at: string
+          id: string
+        }
+        Insert: {
+          articles: Json
+          cache_key: string
+          created_at?: string
+          expires_at: string
+          id?: string
+        }
+        Update: {
+          articles?: Json
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

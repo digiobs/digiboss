@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Settings, Users, CreditCard, Link, Shield, ChevronRight, Building2, Pencil, Trash2, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Users, CreditCard, Link, Shield, ChevronRight, Building2, Pencil, Trash2, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Client {
   id: string;
@@ -23,29 +24,6 @@ const colorOptions = [
   { value: 'purple', label: 'Purple', class: 'bg-purple-500' },
   { value: 'pink', label: 'Pink', class: 'bg-pink-500' },
   { value: 'cyan', label: 'Cyan', class: 'bg-cyan-500' },
-];
-
-const initialClients: Client[] = [
-  { id: '1', name: 'Adechotech', color: 'red' },
-  { id: '2', name: 'Agro-Bio', color: 'orange' },
-  { id: '3', name: 'AlibeeZ', color: 'yellow' },
-  { id: '4', name: 'Alsbom', color: 'green' },
-  { id: '5', name: 'Amarok', color: 'blue' },
-  { id: '6', name: 'Amont', color: 'purple' },
-  { id: '7', name: 'Apmonia Therapeutics', color: 'pink' },
-  { id: '8', name: 'Bioseb', color: 'cyan' },
-  { id: '9', name: 'BlueSpine', color: 'blue' },
-  { id: '10', name: 'Board4care', color: 'green' },
-  { id: '11', name: 'Centaur Clinical', color: 'purple' },
-  { id: '12', name: 'DigiObs', color: 'blue' },
-  { id: '13', name: 'Huck Occitania', color: 'orange' },
-  { id: '14', name: 'IMV Technologies', color: 'cyan' },
-  { id: '15', name: 'Kaptory', color: 'pink' },
-  { id: '16', name: 'Mabsilico', color: 'purple' },
-  { id: '17', name: 'Nerya', color: 'green' },
-  { id: '18', name: 'Spark Lasers', color: 'red' },
-  { id: '19', name: 'SRA Instruments', color: 'blue' },
-  { id: '20', name: 'Veinsound', color: 'orange' },
 ];
 
 const integrations = [
@@ -71,12 +49,35 @@ const auditLog = [
 ];
 
 export default function Admin() {
-  const [clients, setClients] = useState<Client[]>(initialClients);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [clientName, setClientName] = useState('');
   const [clientColor, setClientColor] = useState('blue');
   const [isCreating, setIsCreating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch clients from database
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const fetchClients = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('clients')
+      .select('id, name, color')
+      .order('name');
+    
+    if (error) {
+      toast.error('Failed to load clients');
+      console.error('Error fetching clients:', error);
+    } else {
+      setClients(data || []);
+    }
+    setIsLoading(false);
+  };
 
   const openCreateDialog = () => {
     setIsCreating(true);
@@ -94,7 +95,7 @@ export default function Admin() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedName = clientName.trim();
     if (!trimmedName) {
       toast.error('Client name cannot be empty');
@@ -105,28 +106,59 @@ export default function Admin() {
       return;
     }
 
+    setIsSaving(true);
+
     if (isCreating) {
-      const newClient: Client = {
-        id: Date.now().toString(),
-        name: trimmedName,
-        color: clientColor,
-      };
-      setClients([...clients, newClient]);
-      toast.success(`Client "${trimmedName}" created`);
+      const { data, error } = await supabase
+        .from('clients')
+        .insert({ name: trimmedName, color: clientColor })
+        .select()
+        .single();
+
+      if (error) {
+        toast.error('Failed to create client');
+        console.error('Error creating client:', error);
+      } else if (data) {
+        setClients([...clients, data].sort((a, b) => a.name.localeCompare(b.name)));
+        toast.success(`Client "${trimmedName}" created`);
+        setIsDialogOpen(false);
+      }
     } else if (editingClient) {
-      setClients(clients.map(c => 
-        c.id === editingClient.id 
-          ? { ...c, name: trimmedName, color: clientColor }
-          : c
-      ));
-      toast.success(`Client "${trimmedName}" updated`);
+      const { error } = await supabase
+        .from('clients')
+        .update({ name: trimmedName, color: clientColor })
+        .eq('id', editingClient.id);
+
+      if (error) {
+        toast.error('Failed to update client');
+        console.error('Error updating client:', error);
+      } else {
+        setClients(
+          clients
+            .map(c => c.id === editingClient.id ? { ...c, name: trimmedName, color: clientColor } : c)
+            .sort((a, b) => a.name.localeCompare(b.name))
+        );
+        toast.success(`Client "${trimmedName}" updated`);
+        setIsDialogOpen(false);
+      }
     }
-    setIsDialogOpen(false);
+
+    setIsSaving(false);
   };
 
-  const handleDelete = (client: Client) => {
-    setClients(clients.filter(c => c.id !== client.id));
-    toast.success(`Client "${client.name}" deleted`);
+  const handleDelete = async (client: Client) => {
+    const { error } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', client.id);
+
+    if (error) {
+      toast.error('Failed to delete client');
+      console.error('Error deleting client:', error);
+    } else {
+      setClients(clients.filter(c => c.id !== client.id));
+      toast.success(`Client "${client.name}" deleted`);
+    }
   };
 
   const getColorClass = (color: string) => {
@@ -159,6 +191,15 @@ export default function Admin() {
             Add Client
           </Button>
         </div>
+        {isLoading ? (
+          <div className="p-8 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : clients.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            No clients yet. Click "Add Client" to create one.
+          </div>
+        ) : (
         <div className="max-h-[400px] overflow-y-auto divide-y divide-border">
           {clients.map((client) => (
             <div key={client.id} className="p-3 flex items-center justify-between hover:bg-muted/50 group">
@@ -179,6 +220,7 @@ export default function Admin() {
             </div>
           ))}
         </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -375,7 +417,8 @@ export default function Admin() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {isCreating ? 'Create' : 'Save Changes'}
             </Button>
           </DialogFooter>

@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Task, TaskStatus, TaskPriority, taskColumns } from '@/types/tasks';
-import { CalendarIcon, Link2, Loader2, Sparkles } from 'lucide-react';
+import { CalendarIcon, Loader2, Sparkles } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -30,7 +30,6 @@ interface CreateTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'subtasks' | 'comments'>) => void;
-  wrikeEnabled?: boolean;
   isLoading?: boolean;
 }
 
@@ -38,7 +37,6 @@ export function CreateTaskDialog({
   open,
   onOpenChange,
   onCreateTask,
-  wrikeEnabled = false,
   isLoading = false,
 }: CreateTaskDialogProps) {
   const [title, setTitle] = useState('');
@@ -49,7 +47,6 @@ export function CreateTaskDialog({
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [syncToWrike, setSyncToWrike] = useState(wrikeEnabled);
 
   const handleSubmit = () => {
     if (!title.trim()) return;
@@ -102,12 +99,6 @@ export function CreateTaskDialog({
           </DialogTitle>
           <DialogDescription>
             Add a new task to your marketing plan.
-            {wrikeEnabled && (
-              <span className="flex items-center gap-1 mt-1 text-primary">
-                <Link2 className="w-3 h-3" />
-                Will sync to Wrike
-              </span>
-            )}
           </DialogDescription>
         </DialogHeader>
 

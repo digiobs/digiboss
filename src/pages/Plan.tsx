@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Calendar, LayoutGrid, List, Plus, Sparkles, Clock, RefreshCw, Link2 } from 'lucide-react';
+import { useState } from 'react';
+import { Calendar, LayoutGrid, List, Plus, Sparkles } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -22,7 +22,6 @@ import { KanbanColumn } from '@/components/plan/KanbanColumn';
 import { DraggableTaskCard } from '@/components/plan/DraggableTaskCard';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { useWrike } from '@/hooks/useWrike';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -51,54 +50,12 @@ export default function Plan() {
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const [wrikeEnabled, setWrikeEnabled] = useState(false);
   
   // AI Suggestions state
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-
-  const {
-    loading: wrikeLoading,
-    connected: wrikeConnected,
-    fetchTasks: fetchWrikeTasks,
-    fetchContacts,
-    contacts,
-    convertToLocalTasks,
-    createTask: createWrikeTask,
-    checkConnection,
-  } = useWrike();
-
-  // Check Wrike connection on mount
-  useEffect(() => {
-    const initWrike = async () => {
-      const isConnected = await checkConnection();
-      if (isConnected) {
-        setWrikeEnabled(true);
-        await loadWrikeTasks();
-      }
-    };
-    initWrike();
-  }, []);
-
-  const loadWrikeTasks = async () => {
-    try {
-      const [wrikeTasks, wrikeContacts] = await Promise.all([
-        fetchWrikeTasks(),
-        fetchContacts(),
-      ]);
-      
-      if (wrikeTasks.length > 0) {
-        const localTasks = convertToLocalTasks(wrikeTasks, wrikeContacts);
-        setTasks(localTasks);
-        toast.success(`Loaded ${localTasks.length} tasks from Wrike`);
-      }
-    } catch (error) {
-      console.error('Failed to load Wrike tasks:', error);
-      toast.error('Failed to load Wrike tasks');
-    }
-  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -124,7 +81,6 @@ export default function Plan() {
     setCreating(true);
     
     try {
-      // Create task locally first
       const newTask: Task = {
         ...taskData,
         id: `local-${Date.now()}`,
@@ -134,28 +90,7 @@ export default function Plan() {
         comments: [],
       };
 
-      // If Wrike is connected, create task there too
-      if (wrikeEnabled) {
-        try {
-          const wrikeTask = await createWrikeTask({
-            title: taskData.title,
-            description: taskData.description,
-            priority: taskData.priority,
-            dueDate: taskData.dueDate || undefined,
-          });
-          
-          if (wrikeTask) {
-            newTask.id = wrikeTask.id;
-            toast.success('Task created and synced to Wrike!');
-          }
-        } catch (error) {
-          console.error('Failed to sync to Wrike:', error);
-          toast.error('Task created locally, but failed to sync to Wrike');
-        }
-      } else {
-        toast.success('Task created successfully!');
-      }
-
+      toast.success('Task created successfully!');
       setTasks((prev) => [newTask, ...prev]);
       setCreateOpen(false);
     } catch (error) {
@@ -311,29 +246,12 @@ export default function Plan() {
           <div className="flex items-center gap-2">
             <Calendar className="w-6 h-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">Plan</h1>
-            {wrikeEnabled && (
-              <Badge variant="secondary" className="gap-1 text-xs">
-                <Link2 className="w-3 h-3" />
-                Wrike
-              </Badge>
-            )}
           </div>
           <p className="text-muted-foreground mt-1">
             Your marketing roadmap, calendar, and task execution hub.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {wrikeEnabled && (
-            <Button 
-              variant="outline" 
-              className="gap-2" 
-              onClick={loadWrikeTasks}
-              disabled={wrikeLoading}
-            >
-              <RefreshCw className={cn("w-4 h-4", wrikeLoading && "animate-spin")} />
-              Sync Wrike
-            </Button>
-          )}
           <Button variant="outline" className="gap-2" onClick={fetchAISuggestions} disabled={aiLoading}>
             <Sparkles className={cn("w-4 h-4", aiLoading && "animate-pulse")} />
             AI Suggest Plan
@@ -495,38 +413,30 @@ export default function Plan() {
       <div>
         <h2 className="text-lg font-semibold mb-4">Active Campaigns</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {campaigns.map((campaign) => (
-            <div key={campaign.id} className="bg-card rounded-lg border border-border p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium">{campaign.name}</h3>
-                <Badge
-                  variant="secondary"
-                  className={
-                    campaign.status === 'active'
-                      ? 'status-completed'
-                      : campaign.status === 'draft'
-                      ? 'status-new'
-                      : 'status-in-progress'
-                  }
-                >
-                  {campaign.status}
-                </Badge>
+          {campaigns.map((campaign) => {
+            const progress = campaign.budget > 0 ? Math.round((campaign.spent / campaign.budget) * 100) : 0;
+            return (
+              <div key={campaign.id} className="bg-card rounded-lg border border-border p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium">{campaign.name}</span>
+                  <Badge variant="secondary">{campaign.status}</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground mb-3">
+                  {campaign.channel} • ${campaign.budget.toLocaleString()}
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-primary rounded-full h-2 transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                  <span>{progress}% spent</span>
+                  <span>{campaign.endDate}</span>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground mb-3">{campaign.channel}</p>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  ${campaign.spent.toLocaleString()} / ${campaign.budget.toLocaleString()}
-                </span>
-                <span className="font-medium">{campaign.leads} leads</span>
-              </div>
-              <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full"
-                  style={{ width: `${(campaign.spent / campaign.budget) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -543,7 +453,6 @@ export default function Plan() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreateTask={handleCreateTask}
-        wrikeEnabled={wrikeEnabled}
         isLoading={creating}
       />
 

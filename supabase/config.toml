@@ -9,11 +9,5 @@ verify_jwt = false
 [functions.google-search-console]
 verify_jwt = false
 
-[functions.hubspot]
-verify_jwt = false
-
-[functions.wrike]
-verify_jwt = false
-
 [functions.ai-suggest-tasks]
 verify_jwt = false

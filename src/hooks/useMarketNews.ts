@@ -11,25 +11,36 @@ export interface NewsArticle {
   citations: string[];
 }
 
+interface MarketNewsConfig {
+  competitors?: string[];
+  keywords?: string[];
+  industry?: string;
+}
+
 interface UseMarketNewsResult {
   articles: NewsArticle[];
   isLoading: boolean;
   error: string | null;
-  refetch: (category?: string) => Promise<void>;
+  refetch: (category?: string, config?: MarketNewsConfig) => Promise<void>;
 }
 
-export function useMarketNews(initialCategory: string = 'marketing'): UseMarketNewsResult {
+export function useMarketNews(initialCategory: string = 'marketing', config?: MarketNewsConfig): UseMarketNewsResult {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchNews = useCallback(async (category: string = initialCategory) => {
+  const fetchNews = useCallback(async (category: string = initialCategory, newsConfig?: MarketNewsConfig) => {
     setIsLoading(true);
     setError(null);
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('market-news', {
-        body: { category },
+        body: { 
+          category,
+          competitors: newsConfig?.competitors || config?.competitors,
+          keywords: newsConfig?.keywords || config?.keywords,
+          industry: newsConfig?.industry || config?.industry,
+        },
       });
 
       if (fnError) {
@@ -48,10 +59,10 @@ export function useMarketNews(initialCategory: string = 'marketing'): UseMarketN
     } finally {
       setIsLoading(false);
     }
-  }, [initialCategory]);
+  }, [initialCategory, config?.competitors?.join(','), config?.keywords?.join(','), config?.industry]);
 
   useEffect(() => {
-    fetchNews(initialCategory);
+    fetchNews(initialCategory, config);
   }, [initialCategory, fetchNews]);
 
   return {

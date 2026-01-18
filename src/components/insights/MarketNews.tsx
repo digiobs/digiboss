@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   Newspaper,
@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMarketNews, NewsArticle } from '@/hooks/useMarketNews';
 import { cn } from '@/lib/utils';
 
-const categories = [
+const defaultCategories = [
   { id: 'marketing', label: 'Marketing', icon: TrendingUp },
   { id: 'technology', label: 'Technology', icon: Cpu },
   { id: 'finance', label: 'Finance', icon: DollarSign },
@@ -99,14 +99,33 @@ function NewsCardSkeleton() {
   );
 }
 
-export function MarketNews() {
+interface MarketNewsProps {
+  competitors?: string[];
+  keywords?: string[];
+  industry?: string;
+}
+
+export function MarketNews({ competitors, keywords, industry }: MarketNewsProps) {
   const [activeCategory, setActiveCategory] = useState('marketing');
-  const { articles, isLoading, error, refetch } = useMarketNews(activeCategory);
+  const { articles, isLoading, error, refetch } = useMarketNews(activeCategory, { competitors, keywords, industry });
+
+  // Add custom competitor category if competitors are configured
+  const categories = useMemo(() => {
+    if (competitors && competitors.length > 0) {
+      return defaultCategories;
+    }
+    return defaultCategories.filter(c => c.id !== 'competitor');
+  }, [competitors]);
 
   const handleCategoryChange = (category: string) => {
     setActiveCategory(category);
-    refetch(category);
+    refetch(category, { competitors, keywords, industry });
   };
+
+  // Refetch when config changes
+  useEffect(() => {
+    refetch(activeCategory, { competitors, keywords, industry });
+  }, [competitors?.join(','), keywords?.join(','), industry]);
 
   return (
     <div className="space-y-4">
@@ -122,7 +141,7 @@ export function MarketNews() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => refetch(activeCategory)}
+          onClick={() => refetch(activeCategory, { competitors, keywords, industry })}
           disabled={isLoading}
           className="gap-2"
         >
@@ -163,7 +182,7 @@ export function MarketNews() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => refetch(activeCategory)}
+                  onClick={() => refetch(activeCategory, { competitors, keywords, industry })}
                   className="mt-3"
                 >
                   Try Again

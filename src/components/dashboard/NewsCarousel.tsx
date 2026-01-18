@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ExternalLink, Newspaper, Target, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -145,8 +145,18 @@ function NewsCarouselSection({ title, icon, articles, isLoading }: NewsCarouselS
   );
 }
 
-export function NewsCarousel() {
-  const { industryNews, competitorNews, isLoading, refetch } = useDashboardNews();
+interface NewsCarouselProps {
+  competitors?: string[];
+  industry?: string;
+}
+
+export function NewsCarousel({ competitors, industry }: NewsCarouselProps) {
+  const { industryNews, competitorNews, isLoading, refetch } = useDashboardNews(competitors, industry);
+
+  // Refetch when competitors or industry changes
+  useEffect(() => {
+    refetch();
+  }, [competitors?.join(','), industry]);
 
   return (
     <div className="space-y-6">

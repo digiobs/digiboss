@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Lightbulb, Filter } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useClient } from '@/contexts/ClientContext';
 
 const filterTypes = ['all', 'competitor', 'seo', 'product', 'industry', 'client'] as const;
 
 export default function Insights() {
   const [activeFilter, setActiveFilter] = useState<(typeof filterTypes)[number]>('all');
+  const { currentClient, clientConfig } = useClient();
 
   const filteredInsights =
     activeFilter === 'all'
@@ -24,11 +26,28 @@ export default function Insights() {
         <div>
           <div className="flex items-center gap-2">
             <Lightbulb className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Insights</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {currentClient ? `${currentClient.name} Insights` : 'Insights'}
+            </h1>
           </div>
           <p className="text-muted-foreground mt-1">
             Market intelligence, competitive monitoring, and AI-detected opportunities.
           </p>
+          {clientConfig?.competitors && clientConfig.competitors.length > 0 && (
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <span className="text-xs text-muted-foreground">Monitoring:</span>
+              {clientConfig.competitors.slice(0, 3).map((c) => (
+                <Badge key={c} variant="outline" className="text-xs">
+                  {c}
+                </Badge>
+              ))}
+              {clientConfig.competitors.length > 3 && (
+                <Badge variant="secondary" className="text-xs">
+                  +{clientConfig.competitors.length - 3} more
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
         <Button variant="outline" className="gap-2">
           <Filter className="w-4 h-4" />
@@ -49,7 +68,11 @@ export default function Insights() {
         </TabsList>
 
         <TabsContent value="news" className="mt-6">
-          <MarketNews />
+          <MarketNews 
+            competitors={clientConfig?.competitors}
+            keywords={clientConfig?.market_news_keywords}
+            industry={clientConfig?.industry}
+          />
         </TabsContent>
 
         <TabsContent value="insights" className="mt-6 space-y-6">

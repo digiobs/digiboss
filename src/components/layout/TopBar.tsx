@@ -10,11 +10,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { NotificationPreferencesPanel } from '@/components/notifications/NotificationPreferencesPanel';
 
+const dateRangeLabels: Record<string, string> = {
+  '7d': 'Last 7 days',
+  '14d': 'Last 14 days',
+  '30d': 'Last 30 days',
+  '90d': 'Last 90 days',
+  'ytd': 'Year to date',
+};
+
 export function TopBar() {
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [dateRange, setDateRange] = useState('30d');
 
   return (
     <>
@@ -34,10 +50,19 @@ export function TopBar() {
         {/* Right side - Date, Notifications, Profile */}
         <div className="flex items-center gap-3">
           {/* Date Range Selector */}
-          <Button variant="outline" size="sm" className="gap-2">
-            <Calendar className="w-4 h-4" />
-            <span className="text-sm">Last 7 days</span>
-          </Button>
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="w-40 h-9">
+              <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="14d">Last 14 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="ytd">Year to date</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Notification Center */}
           <NotificationCenter onOpenPreferences={() => setPreferencesOpen(true)} />

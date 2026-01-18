@@ -1,1 +1,4 @@
 project_id = "cdidlnlytaomnpoirwuz"
+
+[functions.market-news]
+verify_jwt = false

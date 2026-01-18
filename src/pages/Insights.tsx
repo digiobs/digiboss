@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { InsightCard } from '@/components/insights/InsightCard';
+import { MarketNews } from '@/components/insights/MarketNews';
 import { insights } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Lightbulb, Filter } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const filterTypes = ['all', 'competitor', 'seo', 'product', 'industry', 'client'] as const;
 
@@ -34,43 +36,62 @@ export default function Insights() {
         </Button>
       </div>
 
-      {/* Type Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {filterTypes.map((type) => (
-          <Button
-            key={type}
-            variant={activeFilter === type ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveFilter(type)}
-            className="capitalize"
-          >
-            {type}
-            {type !== 'all' && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {insights.filter((i) => i.type === type).length}
-              </Badge>
-            )}
-          </Button>
-        ))}
-      </div>
+      {/* Main Tabs */}
+      <Tabs defaultValue="news" className="w-full">
+        <TabsList className="bg-muted/50">
+          <TabsTrigger value="news" className="gap-2">
+            Market News
+            <Badge variant="secondary" className="bg-primary/10 text-primary text-xs">
+              Live
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="insights">Internal Insights</TabsTrigger>
+        </TabsList>
 
-      {/* Insights Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredInsights.map((insight) => (
-          <InsightCard key={insight.id} insight={insight} />
-        ))}
-      </div>
+        <TabsContent value="news" className="mt-6">
+          <MarketNews />
+        </TabsContent>
 
-      {/* Empty State */}
-      {filteredInsights.length === 0 && (
-        <div className="text-center py-12">
-          <Lightbulb className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">No insights found</h3>
-          <p className="text-muted-foreground">
-            Try adjusting your filters or check back later.
-          </p>
-        </div>
-      )}
+        <TabsContent value="insights" className="mt-6 space-y-6">
+          {/* Type Filters */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {filterTypes.map((type) => (
+              <Button
+                key={type}
+                variant={activeFilter === type ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter(type)}
+                className="capitalize"
+              >
+                {type}
+                {type !== 'all' && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    {insights.filter((i) => i.type === type).length}
+                  </Badge>
+                )}
+              </Button>
+            ))}
+          </div>
+
+          {/* Insights Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredInsights.map((insight) => (
+              <InsightCard key={insight.id} insight={insight} />
+            ))}
+          </div>
+
+          {/* Empty State */}
+          {filteredInsights.length === 0 && (
+            <div className="text-center py-12">
+              <Lightbulb className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">No insights found</h3>
+              <p className="text-muted-foreground">
+                Try adjusting your filters or check back later.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface NewsArticle {
@@ -20,13 +20,13 @@ interface UseDashboardNewsResult {
   refetch: () => Promise<void>;
 }
 
-export function useDashboardNews(competitors?: string[]): UseDashboardNewsResult {
+export function useDashboardNews(competitors?: string[], industry?: string): UseDashboardNewsResult {
   const [industryNews, setIndustryNews] = useState<NewsArticle[]>([]);
   const [competitorNews, setCompetitorNews] = useState<NewsArticle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchNews = async () => {
+  const fetchNews = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -34,7 +34,7 @@ export function useDashboardNews(competitors?: string[]): UseDashboardNewsResult
       // Fetch both types in parallel
       const [industryResponse, competitorResponse] = await Promise.all([
         supabase.functions.invoke('dashboard-news', {
-          body: { type: 'industry' }
+          body: { type: 'industry', industry }
         }),
         supabase.functions.invoke('dashboard-news', {
           body: { type: 'competitor', competitors }
@@ -58,11 +58,11 @@ export function useDashboardNews(competitors?: string[]): UseDashboardNewsResult
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [competitors?.join(','), industry]);
 
   useEffect(() => {
     fetchNews();
-  }, []);
+  }, [fetchNews]);
 
   return {
     industryNews,

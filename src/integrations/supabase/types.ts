@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      client_configs: {
+        Row: {
+          client_id: string
+          competitors: string[] | null
+          created_at: string
+          google_analytics_property_id: string | null
+          hubspot_portal_id: string | null
+          id: string
+          industry: string | null
+          linkedin_organization_id: string | null
+          market_news_keywords: string[] | null
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          client_id: string
+          competitors?: string[] | null
+          created_at?: string
+          google_analytics_property_id?: string | null
+          hubspot_portal_id?: string | null
+          id?: string
+          industry?: string | null
+          linkedin_organization_id?: string | null
+          market_news_keywords?: string[] | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          client_id?: string
+          competitors?: string[] | null
+          created_at?: string
+          google_analytics_property_id?: string | null
+          hubspot_portal_id?: string | null
+          id?: string
+          industry?: string | null
+          linkedin_organization_id?: string | null
+          market_news_keywords?: string[] | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           color: string

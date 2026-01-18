@@ -13,21 +13,14 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useState, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
-interface Client {
-  id: string;
-  name: string;
-  color: string;
-}
+import { useClient } from '@/contexts/ClientContext';
 
 const colorClasses: Record<string, string> = {
   red: 'bg-red-500',
@@ -56,44 +49,7 @@ const bottomNavItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [currentClient, setCurrentClient] = useState<Client | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchClients = async () => {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name, color')
-        .order('name');
-      
-      if (!error && data) {
-        setClients(data);
-        if (data.length > 0) {
-          setCurrentClient(data[0]);
-        }
-      }
-      setIsLoading(false);
-    };
-
-    fetchClients();
-
-    // Subscribe to realtime changes
-    const channel = supabase
-      .channel('clients-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'clients' },
-        () => {
-          fetchClients();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  const { clients, currentClient, setCurrentClient, isLoading } = useClient();
 
   const getColorClass = (color: string) => colorClasses[color] || 'bg-blue-500';
 

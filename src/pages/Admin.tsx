@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Users, CreditCard, Link, Shield, ChevronRight, Building2, Pencil, Trash2, Plus, Loader2 } from 'lucide-react';
+import { Settings, Users, CreditCard, Link, Shield, ChevronRight, Building2, Pencil, Trash2, Plus, Loader2, Cog } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { ClientConfigDialog } from '@/components/admin/ClientConfigDialog';
+import { useClient } from '@/contexts/ClientContext';
 
 interface Client {
   id: string;
@@ -49,6 +51,7 @@ const auditLog = [
 ];
 
 export default function Admin() {
+  const { refetchClients, refetchConfig } = useClient();
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -57,6 +60,7 @@ export default function Admin() {
   const [clientColor, setClientColor] = useState('blue');
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [configClient, setConfigClient] = useState<Client | null>(null);
 
   // Fetch clients from database
   useEffect(() => {
@@ -122,6 +126,7 @@ export default function Admin() {
         setClients([...clients, data].sort((a, b) => a.name.localeCompare(b.name)));
         toast.success(`Client "${trimmedName}" created`);
         setIsDialogOpen(false);
+        refetchClients();
       }
     } else if (editingClient) {
       const { error } = await supabase
@@ -140,6 +145,7 @@ export default function Admin() {
         );
         toast.success(`Client "${trimmedName}" updated`);
         setIsDialogOpen(false);
+        refetchClients();
       }
     }
 
@@ -158,7 +164,12 @@ export default function Admin() {
     } else {
       setClients(clients.filter(c => c.id !== client.id));
       toast.success(`Client "${client.name}" deleted`);
+      refetchClients();
     }
+  };
+
+  const openConfigDialog = (client: Client) => {
+    setConfigClient(client);
   };
 
   const getColorClass = (color: string) => {
@@ -210,10 +221,13 @@ export default function Admin() {
                 <span className="font-medium">{client.name}</span>
               </div>
               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(client)}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openConfigDialog(client)} title="Configure">
+                  <Cog className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(client)} title="Edit">
                   <Pencil className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(client)}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(client)} title="Delete">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
@@ -424,6 +438,17 @@ export default function Admin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Client Config Dialog */}
+      {configClient && (
+        <ClientConfigDialog
+          open={!!configClient}
+          onOpenChange={(open) => !open && setConfigClient(null)}
+          clientId={configClient.id}
+          clientName={configClient.name}
+          onSaved={refetchConfig}
+        />
+      )}
     </div>
   );
 }

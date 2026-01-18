@@ -6,13 +6,18 @@ import { LinkedInWidget } from '@/components/dashboard/LinkedInWidget';
 import { BlogPostsWidget } from '@/components/dashboard/BlogPostsWidget';
 import { kpis, recommendations } from '@/data/mockData';
 import { Zap } from 'lucide-react';
+import { useClient } from '@/contexts/ClientContext';
 
 export default function Dashboard() {
+  const { currentClient, clientConfig } = useClient();
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-foreground">
+          {currentClient ? `${currentClient.name} Dashboard` : 'Dashboard'}
+        </h1>
         <p className="text-muted-foreground mt-1">
           Your marketing command center. Here's what matters most.
         </p>
@@ -27,7 +32,10 @@ export default function Dashboard() {
 
       {/* Market Intelligence - News Carousels */}
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-        <NewsCarousel />
+        <NewsCarousel 
+          competitors={clientConfig?.competitors} 
+          industry={clientConfig?.industry}
+        />
       </div>
 
       {/* Main Content Grid */}

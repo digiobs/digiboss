@@ -81,9 +81,9 @@ export interface Asset {
 
 // Workspaces
 export const workspaces: Workspace[] = [
-  { id: '1', name: 'TechVenture Inc.' },
-  { id: '2', name: 'GrowthLabs Agency' },
-  { id: '3', name: 'Nexus Solutions' },
+  { id: '1', name: 'Adechotech' },
+  { id: '2', name: 'Agro-Bio' },
+  { id: '3', name: 'AlibeeZ' },
 ];
 
 // KPIs
@@ -242,7 +242,7 @@ export const insights: Insight[] = [
   {
     id: '4',
     title: 'Key client expanding to new market',
-    summary: 'TechCorp announced expansion into APAC region. Current contract up for renewal in Q2.',
+    summary: 'IMV Technologies announced expansion into APAC region. Current contract up for renewal in Q2.',
     content: 'Client intelligence briefing...',
     type: 'client',
     severity: 'opportunity',
@@ -262,8 +262,8 @@ export const leads: Lead[] = [
   {
     id: '1',
     name: 'Sarah Chen',
-    company: 'Innovate Corp',
-    email: 'sarah.chen@innovatecorp.com',
+    company: 'Bioseb',
+    email: 'sarah.chen@bioseb.com',
     score: 92,
     stage: 'qualified',
     source: 'LinkedIn Ads',
@@ -277,8 +277,8 @@ export const leads: Lead[] = [
   {
     id: '2',
     name: 'Marcus Johnson',
-    company: 'Scale Dynamics',
-    email: 'mjohnson@scaledyn.io',
+    company: 'BlueSpine',
+    email: 'mjohnson@bluespine.io',
     score: 87,
     stage: 'contacted',
     source: 'Content Download',
@@ -292,8 +292,8 @@ export const leads: Lead[] = [
   {
     id: '3',
     name: 'Emily Watson',
-    company: 'Growth Partners',
-    email: 'e.watson@growthpartners.co',
+    company: 'Board4care',
+    email: 'e.watson@board4care.co',
     score: 78,
     stage: 'new',
     source: 'Webinar',
@@ -307,8 +307,8 @@ export const leads: Lead[] = [
   {
     id: '4',
     name: 'David Kim',
-    company: 'NextGen Solutions',
-    email: 'dkim@nextgensol.com',
+    company: 'Centaur Clinical',
+    email: 'dkim@centaurclinical.com',
     score: 71,
     stage: 'qualified',
     source: 'Referral',
@@ -322,8 +322,8 @@ export const leads: Lead[] = [
   {
     id: '5',
     name: 'Lisa Park',
-    company: 'Velocity Labs',
-    email: 'lisa@velocitylabs.io',
+    company: 'Spark Lasers',
+    email: 'lisa@sparklasers.io',
     score: 65,
     stage: 'proposal',
     source: 'Google Ads',

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { InteractiveDashboardPreview } from '@/components/landing/InteractiveDashboardPreview';
 
 const features = [
   {
@@ -195,28 +196,8 @@ export default function Landing() {
 
           {/* Hero Image/Dashboard Preview */}
           <div className="mt-16 relative">
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10 pointer-events-none" />
-            <div className="rounded-xl border border-border shadow-2xl overflow-hidden bg-card">
-              <div className="bg-sidebar p-3 flex items-center gap-2">
-                <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                </div>
-                <div className="flex-1 text-center">
-                  <span className="text-xs text-sidebar-foreground/60">DigiObs Dashboard</span>
-                </div>
-              </div>
-              <div className="aspect-[16/9] bg-gradient-to-br from-sidebar via-sidebar to-primary/20 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                    <Sparkles className="w-10 h-10 text-primary" />
-                  </div>
-                  <p className="text-sidebar-foreground font-medium">Interactive Dashboard Preview</p>
-                  <p className="text-sidebar-foreground/60 text-sm mt-1">Your command center awaits</p>
-                </div>
-              </div>
-            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10 pointer-events-none h-32 bottom-0 top-auto" />
+            <InteractiveDashboardPreview />
           </div>
         </div>
       </section>

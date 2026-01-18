@@ -2,3 +2,6 @@ project_id = "cdidlnlytaomnpoirwuz"
 
 [functions.market-news]
 verify_jwt = false
+
+[functions.google-search-console]
+verify_jwt = false

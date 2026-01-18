@@ -1,0 +1,76 @@
+import { useState } from 'react';
+import { InsightCard } from '@/components/insights/InsightCard';
+import { insights } from '@/data/mockData';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Lightbulb, Filter } from 'lucide-react';
+
+const filterTypes = ['all', 'competitor', 'seo', 'product', 'industry', 'client'] as const;
+
+export default function Insights() {
+  const [activeFilter, setActiveFilter] = useState<(typeof filterTypes)[number]>('all');
+
+  const filteredInsights =
+    activeFilter === 'all'
+      ? insights
+      : insights.filter((insight) => insight.type === activeFilter);
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Lightbulb className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Insights</h1>
+          </div>
+          <p className="text-muted-foreground mt-1">
+            Market intelligence, competitive monitoring, and AI-detected opportunities.
+          </p>
+        </div>
+        <Button variant="outline" className="gap-2">
+          <Filter className="w-4 h-4" />
+          Filters
+        </Button>
+      </div>
+
+      {/* Type Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {filterTypes.map((type) => (
+          <Button
+            key={type}
+            variant={activeFilter === type ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveFilter(type)}
+            className="capitalize"
+          >
+            {type}
+            {type !== 'all' && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {insights.filter((i) => i.type === type).length}
+              </Badge>
+            )}
+          </Button>
+        ))}
+      </div>
+
+      {/* Insights Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredInsights.map((insight) => (
+          <InsightCard key={insight.id} insight={insight} />
+        ))}
+      </div>
+
+      {/* Empty State */}
+      {filteredInsights.length === 0 && (
+        <div className="text-center py-12">
+          <Lightbulb className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">No insights found</h3>
+          <p className="text-muted-foreground">
+            Try adjusting your filters or check back later.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

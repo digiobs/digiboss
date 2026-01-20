@@ -38,25 +38,23 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      {/* Pre-auth login route */}
+      {/* Public landing page */}
+      <Route path="/" element={<Landing />} />
+      
+      {/* Pre-auth login route - redirects to dashboard if already authenticated */}
       <Route 
         path="/login" 
-        element={isPreAuthenticated ? <Navigate to="/" replace /> : <PreLogin />} 
+        element={isPreAuthenticated ? <Navigate to="/dashboard" replace /> : <PreLogin />} 
       />
       
-      {/* All other routes require pre-authentication */}
-      <Route path="/" element={
-        <PreAuthGuard>
-          <Landing />
-        </PreAuthGuard>
-      } />
+      {/* Auth route requires pre-authentication */}
       <Route path="/auth" element={
         <PreAuthGuard>
           <Auth />
         </PreAuthGuard>
       } />
       
-      {/* App routes with layout */}
+      {/* App routes with layout - all require pre-authentication */}
       <Route element={
         <PreAuthGuard>
           <AppLayout />

@@ -38,6 +38,7 @@ export interface Insight {
   createdAt: string;
   soWhat: string;
   recommendedActions: string[];
+  imageUrl?: string;
 }
 
 export interface Lead {
@@ -206,6 +207,7 @@ export const insights: Insight[] = [
       'Accelerate AI feature beta launch',
       'Prepare comparison content for website',
     ],
+    imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=225&fit=crop',
   },
   {
     id: '2',
@@ -222,6 +224,7 @@ export const insights: Insight[] = [
       'Add more case studies to key pages',
       'Review and update outdated content',
     ],
+    imageUrl: 'https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=400&h=225&fit=crop',
   },
   {
     id: '3',
@@ -238,6 +241,7 @@ export const insights: Insight[] = [
       'Create mid-funnel content for consideration stage',
       'Implement lead scoring decay for stale leads',
     ],
+    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=225&fit=crop',
   },
   {
     id: '4',
@@ -254,6 +258,7 @@ export const insights: Insight[] = [
       'Schedule QBR with expanded agenda',
       'Draft proposal for regional support package',
     ],
+    imageUrl: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=400&h=225&fit=crop',
   },
 ];
 

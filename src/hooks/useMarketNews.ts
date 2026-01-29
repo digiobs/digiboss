@@ -9,6 +9,7 @@ export interface NewsArticle {
   timestamp: string;
   category: string;
   citations: string[];
+  imageUrl?: string;
 }
 
 interface MarketNewsConfig {

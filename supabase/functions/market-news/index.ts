@@ -14,6 +14,7 @@ interface NewsArticle {
   timestamp: string;
   category: string;
   citations: string[];
+  imageUrl?: string;
 }
 
 // Cache duration in hours
@@ -113,11 +114,11 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: `You are a market intelligence analyst specializing in ${industry || 'business'}. Provide 5 recent news articles about the requested topic. For each article, provide a title, a 2-3 sentence summary explaining the significance, the source name, and categorize it appropriately. Format your response as a JSON array.` 
+            content: `You are a market intelligence analyst specializing in ${industry || 'business'}. Provide 5 recent news articles about the requested topic. For each article, provide a title, a 2-3 sentence summary explaining the significance, the source name, a thumbnail image URL if available, and categorize it appropriately. Format your response as a JSON array.` 
           },
           { 
             role: 'user', 
-            content: `Find the latest news about: ${searchQuery}. Return exactly 5 news items as a JSON array with objects containing: title, summary, source, category. Only return the JSON array, no other text.` 
+            content: `Find the latest news about: ${searchQuery}. Return exactly 5 news items as a JSON array with objects containing: title, summary, source, category, imageUrl (a relevant image URL from the source if available, otherwise null). Only return the JSON array, no other text.` 
           }
         ],
         search_recency_filter: 'week',
@@ -166,6 +167,7 @@ serve(async (req) => {
           timestamp: new Date().toISOString(),
           category: item.category || category || 'industry',
           citations: citations.slice(index * 2, index * 2 + 2) || [],
+          imageUrl: item.imageUrl || item.image_url || item.image || null,
         }));
       }
     } catch (parseError) {

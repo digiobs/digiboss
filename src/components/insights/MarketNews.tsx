@@ -10,6 +10,7 @@ import {
   Building2,
   Users,
   Sparkles,
+  ImageOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMarketNews, NewsArticle } from '@/hooks/useMarketNews';
 import { cn } from '@/lib/utils';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 const defaultCategories = [
   { id: 'marketing', label: 'Marketing', icon: TrendingUp },
@@ -40,40 +42,62 @@ interface NewsCardProps {
 
 function NewsCard({ article }: NewsCardProps) {
   const timeAgo = formatDistanceToNow(new Date(article.timestamp), { addSuffix: true });
+  const [imageError, setImageError] = useState(false);
+  
+  const hasValidImage = article.imageUrl && !imageError;
   
   return (
-    <div className="group p-4 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-md transition-all cursor-pointer">
-      <div className="flex items-start gap-3">
-        <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center shrink-0', categoryColors[article.category] || categoryColors.industry)}>
-          <Newspaper className="w-5 h-5" />
+    <div className="group rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-md transition-all cursor-pointer overflow-hidden">
+      {/* Thumbnail */}
+      {hasValidImage ? (
+        <div className="relative w-full">
+          <AspectRatio ratio={16 / 9}>
+            <img 
+              src={article.imageUrl} 
+              alt={article.title}
+              className="w-full h-full object-cover"
+              onError={() => setImageError(true)}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          </AspectRatio>
         </div>
-        
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-            {article.title}
-          </h3>
-          
-          <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">
-            {article.summary}
-          </p>
-          
-          <div className="flex items-center gap-3 mt-3">
-            <Badge variant="secondary" className={cn('text-xs', categoryColors[article.category])}>
-              {article.category}
-            </Badge>
-            <span className="text-xs text-muted-foreground">{article.source}</span>
-            <span className="text-xs text-muted-foreground">•</span>
-            <span className="text-xs text-muted-foreground">{timeAgo}</span>
-          </div>
-          
-          {article.citations && article.citations.length > 0 && (
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs text-muted-foreground">
-                {article.citations.length} sources
-              </span>
-              <ExternalLink className="w-3 h-3 text-muted-foreground" />
+      ) : null}
+      
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          {!hasValidImage && (
+            <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center shrink-0', categoryColors[article.category] || categoryColors.industry)}>
+              <Newspaper className="w-5 h-5" />
             </div>
           )}
+          
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+              {article.title}
+            </h3>
+            
+            <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">
+              {article.summary}
+            </p>
+            
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
+              <Badge variant="secondary" className={cn('text-xs', categoryColors[article.category])}>
+                {article.category}
+              </Badge>
+              <span className="text-xs text-muted-foreground">{article.source}</span>
+              <span className="text-xs text-muted-foreground">•</span>
+              <span className="text-xs text-muted-foreground">{timeAgo}</span>
+            </div>
+            
+            {article.citations && article.citations.length > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs text-muted-foreground">
+                  {article.citations.length} sources
+                </span>
+                <ExternalLink className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -82,9 +106,9 @@ function NewsCard({ article }: NewsCardProps) {
 
 function NewsCardSkeleton() {
   return (
-    <div className="p-4 rounded-xl border border-border bg-card">
-      <div className="flex items-start gap-3">
-        <Skeleton className="w-10 h-10 rounded-lg" />
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <Skeleton className="w-full aspect-video" />
+      <div className="p-4">
         <div className="flex-1 space-y-2">
           <Skeleton className="h-5 w-full" />
           <Skeleton className="h-4 w-3/4" />

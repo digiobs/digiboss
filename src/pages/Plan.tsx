@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Calendar, LayoutGrid, List, Plus, Sparkles } from 'lucide-react';
+import { NextBestActionsColumn } from '@/components/plan/NextBestActionsColumn';
+import { NextBestAction } from '@/data/dashboardData';
 import {
   DndContext,
   DragEndEvent,
@@ -56,6 +58,9 @@ export default function Plan() {
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  
+  // Next Best Actions state
+  const [selectedAction, setSelectedAction] = useState<NextBestAction | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -296,35 +301,48 @@ export default function Plan() {
         </div>
       </div>
 
-      {/* Kanban View */}
+      {/* Kanban View with Next Best Actions Column */}
       {viewMode === 'kanban' && (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid grid-cols-4 gap-4">
-            {taskColumns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                id={column.id}
-                title={column.title}
-                color={column.color}
-                tasks={getTasksByStatus(column.id)}
-                onTaskClick={handleTaskClick}
-              />
-            ))}
+        <div className="grid grid-cols-5 gap-4">
+          {/* Next Best Actions Column */}
+          <div className="col-span-1 h-[600px]">
+            <NextBestActionsColumn
+              onActionSelect={setSelectedAction}
+              selectedActionId={selectedAction?.id}
+            />
           </div>
-          <DragOverlay>
-            {activeTask ? (
-              <div className="opacity-90">
-                <DraggableTaskCard task={activeTask} onClick={() => {}} />
+
+          {/* Kanban Columns */}
+          <div className="col-span-4">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="grid grid-cols-4 gap-4">
+                {taskColumns.map((column) => (
+                  <KanbanColumn
+                    key={column.id}
+                    id={column.id}
+                    title={column.title}
+                    color={column.color}
+                    tasks={getTasksByStatus(column.id)}
+                    onTaskClick={handleTaskClick}
+                  />
+                ))}
               </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+              <DragOverlay>
+                {activeTask ? (
+                  <div className="opacity-90">
+                    <DraggableTaskCard task={activeTask} onClick={() => {}} />
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          </div>
+        </div>
       )}
 
       {/* List View */}

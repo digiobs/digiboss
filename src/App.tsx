@@ -55,6 +55,9 @@ const AppRoutes = () => {
         </PreAuthGuard>
       } />
       
+      {/* Redirect old dashboard route to home */}
+      <Route path="/dashboard" element={<Navigate to="/home" replace />} />
+      
       {/* App routes with layout - all require pre-authentication */}
       <Route element={
         <PreAuthGuard>

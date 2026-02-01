@@ -10,7 +10,7 @@ import { PreAuthProvider, usePreAuth } from "@/contexts/PreAuthContext";
 import Landing from "@/pages/Landing";
 import Auth from "@/pages/Auth";
 import PreLogin from "@/pages/PreLogin";
-import Dashboard from "@/pages/Dashboard";
+import Home from "@/pages/Home";
 import Insights from "@/pages/Insights";
 import Prospects from "@/pages/Prospects";
 import Plan from "@/pages/Plan";
@@ -45,7 +45,7 @@ const AppRoutes = () => {
       {/* Pre-auth login route - redirects to dashboard if already authenticated */}
       <Route 
         path="/login" 
-        element={isPreAuthenticated ? <Navigate to="/dashboard" replace /> : <PreLogin />} 
+        element={isPreAuthenticated ? <Navigate to="/home" replace /> : <PreLogin />} 
       />
       
       {/* Auth route requires pre-authentication */}
@@ -61,7 +61,7 @@ const AppRoutes = () => {
           <AppLayout />
         </PreAuthGuard>
       }>
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/home" element={<Home />} />
         <Route path="/insights" element={<Insights />} />
         <Route path="/prospects" element={<Prospects />} />
         <Route path="/plan" element={<Plan />} />

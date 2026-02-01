@@ -19,6 +19,7 @@ import Assets from "@/pages/Assets";
 import Reporting from "@/pages/Reporting";
 import Chat from "@/pages/Chat";
 import Admin from "@/pages/Admin";
+import Followup from "@/pages/Followup";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -68,6 +69,7 @@ const AppRoutes = () => {
         <Route path="/insights" element={<Insights />} />
         <Route path="/prospects" element={<Prospects />} />
         <Route path="/plan" element={<Plan />} />
+        <Route path="/followup" element={<Followup />} />
         <Route path="/content" element={<ContentCreator />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/reporting" element={<Reporting />} />

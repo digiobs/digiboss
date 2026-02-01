@@ -35,7 +35,7 @@ const colorClasses: Record<string, string> = {
 };
 
 const navItems = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/home', icon: LayoutDashboard, label: 'Home' },
   { path: '/insights', icon: Lightbulb, label: 'Insights' },
   { path: '/prospects', icon: Users, label: 'Prospects' },
   { path: '/plan', icon: Calendar, label: 'Plan' },

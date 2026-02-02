@@ -216,27 +216,48 @@ export function OpportunityCard({
             <Sparkles className="w-3.5 h-3.5" />
             Generate Draft
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => onCreateTask(opportunity)}
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => onSchedule(opportunity)}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => onSaveToBacklog(opportunity)}
-          >
-            <Bookmark className="w-3.5 h-3.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onCreateTask(opportunity)}
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Create task in Plan</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onSchedule(opportunity)}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Schedule content</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onSaveToBacklog(opportunity)}
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Save to backlog</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </CardContent>
     </Card>

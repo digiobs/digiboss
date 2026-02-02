@@ -57,6 +57,8 @@ export interface ContentItem {
   updatedAt: string;
   // Performance metrics (for published content)
   performance?: ContentPerformance;
+  // Linking to Plan
+  linkedTaskId?: string;
 }
 
 export interface ContentPerformance {

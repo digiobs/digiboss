@@ -11,7 +11,8 @@ import {
   Linkedin,
   Layout,
   Plus,
-  Database
+  Database,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,12 +36,15 @@ import {
   ContentStatus,
   contentTypeLabels
 } from '@/types/content';
+import { Task } from '@/types/tasks';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useNavigate } from 'react-router-dom';
+import { dispatchContentTaskCreated } from '@/hooks/useContentPlanLink';
 
 type MainTab = 'opportunities' | 'studio' | 'workflow' | 'feedback';
 type WorkflowView = 'kanban' | 'calendar';
@@ -54,6 +58,8 @@ const contentTypeIcons: Record<string, React.ElementType> = {
 };
 
 export default function ContentCreator() {
+  const navigate = useNavigate();
+  
   // Main state
   const [activeTab, setActiveTab] = useState<MainTab>('opportunities');
   const [workflowView, setWorkflowView] = useState<WorkflowView>('kanban');
@@ -129,7 +135,42 @@ export default function ContentCreator() {
   };
 
   const handleCreateTask = (opp: ContentOpportunity) => {
-    toast.success(`Task created: ${opp.suggestedTitle}`);
+    const newTask: Task = {
+      id: `content-opp-${Date.now()}`,
+      title: `Create: ${opp.suggestedTitle}`,
+      description: `${opp.suggestedAngle}\n\nWhy now:\n${opp.whyNow.map(w => `• ${w}`).join('\n')}`,
+      status: 'backlog',
+      priority: opp.opportunityScore >= 80 ? 'high' : opp.opportunityScore >= 60 ? 'medium' : 'low',
+      assignee: null,
+      dueDate: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tags: [contentTypeLabels[opp.contentType], opp.funnelStage, 'content'],
+      subtasks: [
+        { id: `s-${Date.now()}-1`, title: 'Draft content', completed: false },
+        { id: `s-${Date.now()}-2`, title: 'Review & approve', completed: false },
+        { id: `s-${Date.now()}-3`, title: 'Schedule/publish', completed: false },
+      ],
+      comments: [],
+      linkedContentId: opp.id,
+      linkedContentType: 'opportunity',
+      sourceModule: 'content-creator',
+    };
+    
+    dispatchContentTaskCreated(newTask);
+    toast.success(
+      <div className="flex items-center gap-2">
+        <span>Task created in Plan</span>
+        <Button 
+          variant="link" 
+          size="sm" 
+          className="p-0 h-auto text-primary" 
+          onClick={() => navigate('/plan')}
+        >
+          View <ExternalLink className="w-3 h-3 ml-1" />
+        </Button>
+      </div>
+    );
   };
 
   const handleSchedule = (opp: ContentOpportunity) => {

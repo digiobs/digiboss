@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Sparkles, Clock, GripVertical } from 'lucide-react';
+import { Sparkles, Clock, GripVertical, PenTool } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Task } from '@/types/tasks';
@@ -59,13 +59,21 @@ export function DraggableTaskCard({ task, onClick }: DraggableTaskCardProps) {
         </button>
 
         <div className="flex-1 min-w-0" onClick={onClick}>
-          {/* AI Badge */}
-          {task.aiGenerated && (
-            <div className="flex items-center gap-1 mb-2">
-              <Sparkles className="w-3 h-3 text-primary" />
-              <span className="text-[10px] text-primary font-medium">AI Suggested</span>
-            </div>
-          )}
+          {/* Source badges */}
+          <div className="flex items-center gap-1 mb-2 flex-wrap">
+            {task.aiGenerated && (
+              <div className="flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-primary" />
+                <span className="text-[10px] text-primary font-medium">AI</span>
+              </div>
+            )}
+            {task.sourceModule === 'content-creator' && (
+              <div className="flex items-center gap-1">
+                <PenTool className="w-3 h-3 text-violet-500" />
+                <span className="text-[10px] text-violet-500 font-medium">Content</span>
+              </div>
+            )}
+          </div>
           
           {/* Title */}
           <p className="text-sm font-medium mb-2 group-hover:text-primary transition-colors">

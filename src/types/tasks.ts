@@ -32,6 +32,10 @@ export interface Task {
   linkedCampaign?: string;
   estimatedHours?: number;
   aiGenerated?: boolean;
+  // Content Creator linking
+  linkedContentId?: string;
+  linkedContentType?: 'opportunity' | 'content-item';
+  sourceModule?: 'content-creator' | 'insights' | 'followup';
 }
 
 export const mockTasks: Task[] = [

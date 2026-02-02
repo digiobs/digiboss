@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Send,
   AlertCircle,
+  PenTool,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +47,7 @@ import {
 } from '@/components/ui/select';
 import { Task, TaskStatus, TaskPriority, taskColumns } from '@/types/tasks';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface TaskDetailPanelProps {
   task: Task | null;
@@ -67,6 +70,7 @@ const statusColors: Record<TaskStatus, string> = {
 };
 
 export function TaskDetailPanel({ task, open, onOpenChange, onUpdateTask }: TaskDetailPanelProps) {
+  const navigate = useNavigate();
   const [newComment, setNewComment] = useState('');
   const [localTask, setLocalTask] = useState<Task | null>(task);
 
@@ -133,11 +137,17 @@ export function TaskDetailPanel({ task, open, onOpenChange, onUpdateTask }: Task
         <SheetHeader className="p-6 pb-4 border-b border-border">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 {localTask.aiGenerated && (
                   <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary">
                     <Sparkles className="w-3 h-3" />
                     AI Generated
+                  </Badge>
+                )}
+                {localTask.sourceModule === 'content-creator' && (
+                  <Badge variant="secondary" className="gap-1 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                    <PenTool className="w-3 h-3" />
+                    From Content Creator
                   </Badge>
                 )}
                 <Badge variant="secondary" className={priorityColors[localTask.priority]}>
@@ -280,6 +290,28 @@ export function TaskDetailPanel({ task, open, onOpenChange, onUpdateTask }: Task
                   <Badge variant="outline" className="text-xs">
                     {localTask.linkedCampaign}
                   </Badge>
+                </div>
+              )}
+
+              {/* Linked Content */}
+              {localTask.linkedContentId && localTask.sourceModule === 'content-creator' && (
+                <div className="col-span-2">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <PenTool className="w-3.5 h-3.5" />
+                    Linked Content
+                  </h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => {
+                      onOpenChange(false);
+                      navigate('/content');
+                    }}
+                  >
+                    Open in Content Creator
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
                 </div>
               )}
             </div>

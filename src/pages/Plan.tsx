@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Calendar, LayoutGrid, List, Plus, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar, LayoutGrid, List, Plus, Sparkles, PenTool } from 'lucide-react';
 import { NextBestActionsColumn } from '@/components/plan/NextBestActionsColumn';
 import { NextBestAction } from '@/data/dashboardData';
 import {
@@ -26,6 +26,8 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { subscribeToContentTasks, CONTENT_TASK_CREATED_EVENT } from '@/hooks/useContentPlanLink';
+import { useNavigate } from 'react-router-dom';
 
 interface AISuggestion {
   title: string;
@@ -45,6 +47,7 @@ const priorityColors = {
 };
 
 export default function Plan() {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -69,6 +72,14 @@ export default function Plan() {
       },
     })
   );
+
+  // Listen for tasks created from Content Creator
+  useEffect(() => {
+    const unsubscribe = subscribeToContentTasks((newTask: Task) => {
+      setTasks(prev => [newTask, ...prev]);
+    });
+    return unsubscribe;
+  }, []);
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);

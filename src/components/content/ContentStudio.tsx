@@ -4,7 +4,6 @@ import {
   Save,
   Send,
   Download,
-  Eye,
   FileText,
   Quote,
   Video,
@@ -14,7 +13,8 @@ import {
   Search,
   Tag,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,9 +28,10 @@ import { cn } from '@/lib/utils';
 import { 
   ContentOpportunity, 
   ContentType, 
-  contentTypeLabels 
 } from '@/types/content';
 import { contentTemplates } from '@/data/contentData';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ContentStudioProps {
   opportunity?: ContentOpportunity;
@@ -100,10 +101,66 @@ export function ContentStudio({
   };
 
   const handleGenerateWithAI = async () => {
+    // Only generate for blog posts
+    if (contentType !== 'blog-post') {
+      toast.info('AI generation is currently available for blog posts only');
+      return;
+    }
+
+    const title = content.title || opportunity?.suggestedTitle || '';
+    if (!title.trim()) {
+      toast.error('Please enter a title first');
+      return;
+    }
+
     setIsGenerating(true);
-    // Simulate AI generation
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsGenerating(false);
+
+    try {
+      const keywords = opportunity?.evidenceLinks
+        .filter(e => e.type === 'keyword')
+        .map(e => e.label) || [];
+
+      const { data, error } = await supabase.functions.invoke('generate-blog-content', {
+        body: {
+          title,
+          keywords,
+          brandTone: mockBrandTone,
+          context: opportunity?.whyNow?.join('. ') || '',
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to generate content');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      const generated = data?.content;
+      if (generated) {
+        setContent(prev => ({
+          ...prev,
+          metaDescription: generated.metaDescription || prev.metaDescription || '',
+          introduction: generated.introduction || prev.introduction || '',
+          body: generated.body || prev.body || '',
+          conclusion: generated.conclusion || prev.conclusion || '',
+          callToAction: generated.callToAction || prev.callToAction || '',
+        }));
+
+        if (data?.citations?.length > 0) {
+          toast.success(`Content generated with ${data.citations.length} sources`);
+        } else {
+          toast.success('Content generated successfully');
+        }
+      }
+    } catch (error) {
+      console.error('Error generating content:', error);
+      const message = error instanceof Error ? error.message : 'Failed to generate content';
+      toast.error(message);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (!template) {
@@ -155,15 +212,21 @@ export function ContentStudio({
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-3xl mx-auto space-y-6">
             {/* AI Generate Button */}
-            <Button 
-              variant="outline" 
-              className="w-full gap-2 h-12 border-dashed"
-              onClick={handleGenerateWithAI}
-              disabled={isGenerating}
-            >
-              <Sparkles className={cn("w-4 h-4", isGenerating && "animate-pulse")} />
-              {isGenerating ? 'Generating...' : 'Generate with AI'}
-            </Button>
+            {contentType === 'blog-post' && (
+              <Button 
+                variant="outline" 
+                className="w-full gap-2 h-12 border-dashed border-primary/30 hover:bg-primary/5 hover:border-primary/50"
+                onClick={handleGenerateWithAI}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4 text-primary" />
+                )}
+                {isGenerating ? 'Generating with Perplexity AI...' : 'Generate with AI'}
+              </Button>
+            )}
 
             {/* Template Sections */}
             {template.sections.map((section) => (

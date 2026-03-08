@@ -22,7 +22,7 @@ export async function getTasks(folderId: string): Promise<WrikeTask[]> {
   const result = await callWrikeProxy({
     action: 'getTasks',
     folderId,
-    fields: ['customFields', 'dates', 'status', 'effortAllocation'],
+    fields: ['customFields', 'effortAllocation'],
   });
   return (result.data || []).map(parseCustomFields);
 }

@@ -88,6 +88,127 @@ export type Database = {
         }
         Relationships: []
       }
+      content_metrics: {
+        Row: {
+          avg_time_on_page: number | null
+          avg_watch_duration: number | null
+          bounce_rate: number | null
+          click_rate: number | null
+          comments: number | null
+          content_id: string
+          engagement_rate: number | null
+          id: string
+          impressions: number | null
+          likes: number | null
+          measured_at: string | null
+          open_rate: number | null
+          retention_rate: number | null
+          sends: number | null
+          shares: number | null
+          top_traffic_source: string | null
+          unsubscribes: number | null
+          views: number | null
+        }
+        Insert: {
+          avg_time_on_page?: number | null
+          avg_watch_duration?: number | null
+          bounce_rate?: number | null
+          click_rate?: number | null
+          comments?: number | null
+          content_id: string
+          engagement_rate?: number | null
+          id?: string
+          impressions?: number | null
+          likes?: number | null
+          measured_at?: string | null
+          open_rate?: number | null
+          retention_rate?: number | null
+          sends?: number | null
+          shares?: number | null
+          top_traffic_source?: string | null
+          unsubscribes?: number | null
+          views?: number | null
+        }
+        Update: {
+          avg_time_on_page?: number | null
+          avg_watch_duration?: number | null
+          bounce_rate?: number | null
+          click_rate?: number | null
+          comments?: number | null
+          content_id?: string
+          engagement_rate?: number | null
+          id?: string
+          impressions?: number | null
+          likes?: number | null
+          measured_at?: string | null
+          open_rate?: number | null
+          retention_rate?: number | null
+          sends?: number | null
+          shares?: number | null
+          top_traffic_source?: string | null
+          unsubscribes?: number | null
+          views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_metrics_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "contents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contents: {
+        Row: {
+          body: string | null
+          channel: string
+          client_id: string
+          created_at: string | null
+          id: string
+          published_at: string
+          source_url: string | null
+          status: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          body?: string | null
+          channel: string
+          client_id: string
+          created_at?: string | null
+          id?: string
+          published_at: string
+          source_url?: string | null
+          status?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          body?: string | null
+          channel?: string
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          published_at?: string
+          source_url?: string | null
+          status?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       news_cache: {
         Row: {
           articles: Json

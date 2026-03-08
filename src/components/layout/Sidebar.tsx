@@ -6,6 +6,7 @@ import {
   Calendar,
   PenTool,
   FolderOpen,
+  Newspaper,
   BarChart3,
   MessageSquare,
   Settings,

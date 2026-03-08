@@ -9,6 +9,7 @@ import { ContentsKPIStrip } from '@/components/contents/ContentsKPIStrip';
 import { ContentCard } from '@/components/contents/ContentCard';
 import { ContentDetailDrawer } from '@/components/contents/ContentDetailDrawer';
 import { ContentsSummaryCharts } from '@/components/contents/ContentsSummaryCharts';
+import { NBASection } from '@/components/contents/NBASection';
 
 type ChannelFilter = Channel | 'all';
 type PeriodFilter = '7' | '30' | '90';

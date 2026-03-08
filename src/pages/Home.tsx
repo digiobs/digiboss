@@ -1,54 +1,35 @@
-import { useState } from 'react';
-import { HomeKPIStrip } from '@/components/home/HomeKPIStrip';
-import { HomeWeeklySummary } from '@/components/home/HomeWeeklySummary';
-import { HomeNextBestActions } from '@/components/home/HomeNextBestActions';
-import { HomePlanSnapshot } from '@/components/home/HomePlanSnapshot';
-import { SignalsPanel } from '@/components/home/SignalsPanel';
-import { ContentPipelinePanel } from '@/components/home/ContentPipelinePanel';
-import { DataHealthWidget } from '@/components/home/DataHealthWidget';
-import { type NextBestAction } from '@/data/dashboardData';
+import { HomeGreeting } from '@/components/home/HomeGreeting';
+import { HomeAlertBar } from '@/components/home/HomeAlertBar';
+import { HomeKPICards } from '@/components/home/HomeKPICards';
+import { HomeNBASection } from '@/components/home/HomeNBASection';
+import { HomeCalendarWeek } from '@/components/home/HomeCalendarWeek';
+import { HomeClientHealth } from '@/components/home/HomeClientHealth';
+import { HomeActivityFeed } from '@/components/home/HomeActivityFeed';
 
 export default function Home() {
-  const [selectedAction, setSelectedAction] = useState<NextBestAction | null>(null);
-
-  const highlightedActionIds = selectedAction ? [selectedAction.id] : [];
-
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Home</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          Your marketing cockpit: priorities, plan, and performance at a glance.
-        </p>
-      </div>
+      {/* Greeting */}
+      <HomeGreeting />
 
-      {/* KPI Strip - Full Width */}
-      <HomeKPIStrip />
+      {/* Alert Bar */}
+      <HomeAlertBar />
 
-      {/* What Changed This Week - Full Width */}
-      <HomeWeeklySummary />
+      {/* KPIs */}
+      <HomeKPICards />
 
-      {/* 3-Column Plan Cockpit */}
+      {/* 2-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Column 1: Next Best Actions (Primary) */}
-        <div className="lg:col-span-5">
-          <HomeNextBestActions
-            selectedAction={selectedAction}
-            onSelectAction={setSelectedAction}
-          />
+        {/* Left: NBA + Calendar (60%) */}
+        <div className="lg:col-span-7 space-y-6">
+          <HomeNBASection />
+          <HomeCalendarWeek />
         </div>
 
-        {/* Column 2: Plan Snapshot */}
-        <div className="lg:col-span-4">
-          <HomePlanSnapshot highlightedActionIds={highlightedActionIds} />
-        </div>
-
-        {/* Column 3: Supporting Panels */}
-        <div className="lg:col-span-3 space-y-4">
-          <SignalsPanel />
-          <ContentPipelinePanel />
-          <DataHealthWidget />
+        {/* Right: Health + Feed (40%) */}
+        <div className="lg:col-span-5 space-y-6">
+          <HomeClientHealth />
+          <HomeActivityFeed />
         </div>
       </div>
     </div>

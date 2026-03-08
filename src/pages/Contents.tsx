@@ -108,6 +108,9 @@ export default function Contents() {
         )}
       </div>
 
+      {/* Next Best Actions */}
+      <NBASection clientId={effectiveClientId} />
+
       {/* Summary charts */}
       {contents.length > 0 && (
         <ContentsSummaryCharts contents={contents} isLoading={isLoading} />

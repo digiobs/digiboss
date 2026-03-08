@@ -49,13 +49,13 @@ serve(async (req) => {
         url = `${WRIKE_BASE}/folders/${folderId}/folders?project=true`;
         break;
       case 'getTasks':
-        url = `${WRIKE_BASE}/folders/${folderId}/tasks?fields=[${(fields || ['customFields', 'dates', 'status', 'effortAllocation']).map((f: string) => `"${f}"`).join(',')}]&pageSize=100`;
+        url = `${WRIKE_BASE}/folders/${folderId}/tasks?fields=[${(fields || ['customFields', 'effortAllocation']).map((f: string) => `"${f}"`).join(',')}]&pageSize=100`;
         break;
       case 'getAllTasks': {
         // Get tasks from a space with pagination
         let allTasks: unknown[] = [];
         let nextPageToken: string | undefined;
-        let pageUrl = `${WRIKE_BASE}/folders/${folderId}/tasks?fields=[${(fields || ['customFields', 'dates', 'status', 'effortAllocation']).map((f: string) => `"${f}"`).join(',')}]&pageSize=100`;
+        let pageUrl = `${WRIKE_BASE}/folders/${folderId}/tasks?fields=[${(fields || ['customFields', 'effortAllocation']).map((f: string) => `"${f}"`).join(',')}]&pageSize=100`;
         
         do {
           const pageUrlWithToken = nextPageToken ? `${pageUrl}&nextPageToken=${nextPageToken}` : pageUrl;

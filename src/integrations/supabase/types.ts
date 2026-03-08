@@ -159,6 +159,68 @@ export type Database = {
           },
         ]
       }
+      content_recommendations: {
+        Row: {
+          brief: Json | null
+          channel: string
+          client_id: string
+          context_tags: string[] | null
+          converted_at: string | null
+          created_at: string | null
+          dismissed_at: string | null
+          generated_at: string | null
+          id: string
+          priority_score: number
+          rationale: string
+          score_breakdown: Json | null
+          status: string | null
+          supporting_metrics: Json | null
+          title: string
+        }
+        Insert: {
+          brief?: Json | null
+          channel: string
+          client_id: string
+          context_tags?: string[] | null
+          converted_at?: string | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          generated_at?: string | null
+          id?: string
+          priority_score: number
+          rationale: string
+          score_breakdown?: Json | null
+          status?: string | null
+          supporting_metrics?: Json | null
+          title: string
+        }
+        Update: {
+          brief?: Json | null
+          channel?: string
+          client_id?: string
+          context_tags?: string[] | null
+          converted_at?: string | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          generated_at?: string | null
+          id?: string
+          priority_score?: number
+          rationale?: string
+          score_breakdown?: Json | null
+          status?: string | null
+          supporting_metrics?: Json | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_recommendations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contents: {
         Row: {
           body: string | null

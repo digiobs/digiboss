@@ -41,6 +41,7 @@ const navItems = [
   { path: '/prospects', icon: Users, label: 'Prospects' },
   { path: '/plan', icon: Calendar, label: 'Plan' },
   { path: '/content', icon: PenTool, label: 'Content Creator' },
+  { path: '/contents', icon: Newspaper, label: 'Contenus' },
   { path: '/assets', icon: FolderOpen, label: 'Assets' },
   { path: '/reporting', icon: BarChart3, label: 'Reporting' },
   { path: '/chat', icon: MessageSquare, label: 'Talk to DigiObs' },

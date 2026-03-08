@@ -1,6 +1,7 @@
 import { FileText, TrendingUp, Eye, MousePointerClick, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { contentPerformanceData, sessionsTimeSeries } from '@/data/analyticsData';
+import { useReportingMetrics } from '@/hooks/useReportingMetrics';
 import {
   ChartContainer,
   ChartTooltip,
@@ -14,13 +15,18 @@ const chartConfig = {
 };
 
 export function ContentPerformanceSection() {
+  const { getMetric, hasData } = useReportingMetrics(['website', 'conversion']);
+  const liveSessions = getMetric('impressions', 0);
+  const liveEvents = getMetric('ad_clicks', 0);
+  const liveConversions = getMetric('conversions', 0);
+
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <FileText className="w-5 h-5 text-primary" />
           <h2 className="font-semibold">Content Performance</h2>
-          <Badge variant="secondary" className="text-xs">What drives outcomes</Badge>
+          <Badge variant="secondary" className="text-xs">{hasData ? 'Live blend' : 'What drives outcomes'}</Badge>
         </div>
       </div>
 
@@ -32,7 +38,7 @@ export function ContentPerformanceSection() {
               <h3 className="text-sm font-medium text-muted-foreground">Content Sessions</h3>
               <div className="flex items-center gap-1 text-emerald-600">
                 <TrendingUp className="w-3.5 h-3.5" />
-                <span className="text-xs font-medium">+15.2%</span>
+                <span className="text-xs font-medium">{hasData ? `${Math.round(liveSessions).toLocaleString()} sessions` : '+15.2%'}</span>
               </div>
             </div>
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
@@ -67,6 +73,11 @@ export function ContentPerformanceSection() {
           {/* Right: Top Pages Table */}
           <div className="lg:col-span-2">
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Top Pages by Performance</h3>
+            {hasData && (
+              <p className="text-xs text-muted-foreground mb-3">
+                Synced totals: {Math.round(liveEvents).toLocaleString()} events, {Math.round(liveConversions).toLocaleString()} conversions.
+              </p>
+            )}
             <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

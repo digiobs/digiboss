@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Client {
@@ -6,6 +6,13 @@ export interface Client {
   name: string;
   color: string;
 }
+
+export const ALL_CLIENTS_ID = '__all_clients__';
+export const ALL_CLIENTS_CLIENT: Client = {
+  id: ALL_CLIENTS_ID,
+  name: 'All clients',
+  color: 'blue',
+};
 
 export interface ClientConfig {
   id: string;
@@ -23,6 +30,7 @@ interface ClientContextType {
   clients: Client[];
   currentClient: Client | null;
   setCurrentClient: (client: Client | null) => void;
+  isAllClientsSelected: boolean;
   clientConfig: ClientConfig | null;
   isLoading: boolean;
   refetchClients: () => Promise<void>;
@@ -33,27 +41,59 @@ const ClientContext = createContext<ClientContextType | undefined>(undefined);
 
 export function ClientProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<Client[]>([]);
-  const [currentClient, setCurrentClient] = useState<Client | null>(null);
+  const [currentClientId, setCurrentClientId] = useState<string | null>(null);
   const [clientConfig, setClientConfig] = useState<ClientConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isAllClientsSelected = currentClientId === ALL_CLIENTS_ID;
+
+  const currentClient = useMemo(
+    () => {
+      if (currentClientId === ALL_CLIENTS_ID) return ALL_CLIENTS_CLIENT;
+      return clients.find((c) => c.id === currentClientId) ?? null;
+    },
+    [clients, currentClientId]
+  );
+
+  const setCurrentClient = (client: Client | null) => {
+    setCurrentClientId(client?.id ?? null);
+  };
 
   const fetchClients = async () => {
-    const { data, error } = await supabase
+    const colorMissing = (message: string) => message.toLowerCase().includes('column clients.color does not exist');
+    let { data, error } = await supabase
       .from('clients')
       .select('id, name, color')
       .order('name');
-    
+
+    if (error && colorMissing(error.message)) {
+      const fallback = await supabase
+        .from('clients')
+        .select('id, name')
+        .order('name');
+      data = fallback.data as Array<{ id: string; name: string; color?: string }> | null;
+      error = fallback.error;
+    }
+
     if (!error && data) {
-      setClients(data);
-      if (data.length > 0 && !currentClient) {
-        setCurrentClient(data[0]);
-      }
+      const normalized: Client[] = (data as Array<{ id: string; name: string; color?: string }>).map((c) => ({
+        id: c.id,
+        name: c.name,
+        color: c.color ?? 'blue',
+      }));
+      setClients(normalized);
+      setCurrentClientId((prev) => {
+        if (prev === ALL_CLIENTS_ID) return prev;
+        const selectedStillExists = prev != null && normalized.some((client) => client.id === prev);
+        return selectedStillExists ? prev : normalized[0]?.id ?? null;
+      });
+    } else if (error) {
+      console.error('Error fetching clients:', error);
     }
     setIsLoading(false);
   };
 
   const fetchClientConfig = async () => {
-    if (!currentClient) {
+    if (!currentClient || isAllClientsSelected) {
       setClientConfig(null);
       return;
     }
@@ -110,6 +150,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         clients,
         currentClient,
         setCurrentClient,
+        isAllClientsSelected,
         clientConfig,
         isLoading,
         refetchClients: fetchClients,

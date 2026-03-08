@@ -43,6 +43,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 import { useNavigate } from 'react-router-dom';
 import { dispatchContentTaskCreated } from '@/hooks/useContentPlanLink';
 
@@ -255,6 +256,7 @@ export default function ContentCreator() {
           New Content
         </Button>
       </div>
+      <TabDataStatusBanner tab="content" />
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MainTab)}>

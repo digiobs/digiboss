@@ -15,6 +15,7 @@ import Insights from "@/pages/Insights";
 import Prospects from "@/pages/Prospects";
 import Plan from "@/pages/Plan";
 import ContentCreator from "@/pages/ContentCreator";
+import Contenus from "@/pages/Contenus";
 import Assets from "@/pages/Assets";
 import Reporting from "@/pages/Reporting";
 import Chat from "@/pages/Chat";
@@ -40,7 +41,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public landing page */}
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={isPreAuthenticated ? <Navigate to="/home" replace /> : <Landing />} />
       
       {/* Pre-auth login route - redirects to dashboard if already authenticated */}
       <Route 
@@ -69,6 +70,7 @@ const AppRoutes = () => {
         <Route path="/prospects" element={<Prospects />} />
         <Route path="/plan" element={<Plan />} />
         <Route path="/content" element={<ContentCreator />} />
+        <Route path="/contenus" element={<Contenus />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/reporting" element={<Reporting />} />
         <Route path="/chat" element={<Chat />} />

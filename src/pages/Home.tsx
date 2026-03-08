@@ -7,6 +7,7 @@ import { SignalsPanel } from '@/components/home/SignalsPanel';
 import { ContentPipelinePanel } from '@/components/home/ContentPipelinePanel';
 import { DataHealthWidget } from '@/components/home/DataHealthWidget';
 import { type NextBestAction } from '@/data/dashboardData';
+import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 
 export default function Home() {
   const [selectedAction, setSelectedAction] = useState<NextBestAction | null>(null);
@@ -22,6 +23,7 @@ export default function Home() {
           Your marketing cockpit: priorities, plan, and performance at a glance.
         </p>
       </div>
+      <TabDataStatusBanner tab="home" />
 
       {/* KPI Strip - Full Width */}
       <HomeKPIStrip />

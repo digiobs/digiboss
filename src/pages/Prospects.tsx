@@ -1,9 +1,13 @@
 import { useState, useMemo } from 'react';
 import { LeadTable } from '@/components/prospects/LeadTable';
 import { leads as mockLeads } from '@/data/mockData';
+import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
+import { useSupabaseProspectLeads } from '@/hooks/useSupabaseTabData';
+import { useClient } from '@/contexts/ClientContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Users, Search, Filter, Plus, Download } from 'lucide-react';
+import { Users, Search, Filter, Plus, Download, RefreshCw } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -16,8 +20,24 @@ export default function Prospects() {
   const [searchTerm, setSearchTerm] = useState('');
   const [stageFilter, setStageFilter] = useState('all');
   const [sortBy, setSortBy] = useState('score-desc');
+  const [syncingLemlist, setSyncingLemlist] = useState(false);
+  const { currentClient, isAllClientsSelected } = useClient();
+  const { data: leads, refetch } = useSupabaseProspectLeads(mockLeads);
 
-  const leads = mockLeads;
+  const syncLemlistLeads = async () => {
+    if (!currentClient?.id) return;
+    setSyncingLemlist(true);
+    try {
+      const payload = isAllClientsSelected ? { limit: 50 } : { limit: 50, clientId: currentClient.id };
+      const { error } = await supabase.functions.invoke('lemlist-sync', { body: payload });
+      if (error) throw error;
+      await refetch();
+    } catch (error) {
+      console.error('lemlist sync failed:', error);
+    } finally {
+      setSyncingLemlist(false);
+    }
+  };
 
   // Filter and sort leads
   const filteredLeads = useMemo(() => {
@@ -76,6 +96,10 @@ export default function Prospects() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={syncLemlistLeads} disabled={syncingLemlist}>
+            <RefreshCw className={`w-4 h-4 ${syncingLemlist ? 'animate-spin' : ''}`} />
+            {syncingLemlist ? 'Syncing Lemlist...' : 'Sync Lemlist'}
+          </Button>
           <Button variant="outline" className="gap-2">
             <Download className="w-4 h-4" />
             Export
@@ -86,6 +110,7 @@ export default function Prospects() {
           </Button>
         </div>
       </div>
+      <TabDataStatusBanner tab="prospects" />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">

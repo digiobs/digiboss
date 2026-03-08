@@ -2,9 +2,11 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Lightbulb,
+  Newspaper,
   Users,
   Calendar,
   PenTool,
+  BookOpen,
   FolderOpen,
   BarChart3,
   MessageSquare,
@@ -21,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useClient } from '@/contexts/ClientContext';
+import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
 
 const colorClasses: Record<string, string> = {
   red: 'bg-red-500',
@@ -37,9 +39,11 @@ const colorClasses: Record<string, string> = {
 const navItems = [
   { path: '/home', icon: LayoutDashboard, label: 'Home' },
   { path: '/insights', icon: Lightbulb, label: 'Insights' },
+  { path: '/insights?view=veille', icon: Newspaper, label: 'Veille' },
   { path: '/prospects', icon: Users, label: 'Prospects' },
   { path: '/plan', icon: Calendar, label: 'Plan' },
   { path: '/content', icon: PenTool, label: 'Content Creator' },
+  { path: '/contenus', icon: BookOpen, label: 'Contenus' },
   { path: '/assets', icon: FolderOpen, label: 'Assets' },
   { path: '/reporting', icon: BarChart3, label: 'Reporting' },
   { path: '/chat', icon: MessageSquare, label: 'Talk to DigiObs' },
@@ -85,6 +89,18 @@ export function Sidebar() {
           <DropdownMenuContent align="start" className="w-56 p-0">
             <ScrollArea className="max-h-[400px]">
               <div className="p-1">
+                <DropdownMenuItem
+                  onClick={() => setCurrentClient(ALL_CLIENTS_CLIENT)}
+                  className={cn(
+                    'flex items-center gap-2',
+                    currentClient?.id === ALL_CLIENTS_ID && 'bg-accent'
+                  )}
+                >
+                  <div className="w-5 h-5 rounded bg-slate-500 flex items-center justify-center shrink-0">
+                    <Building2 className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="truncate">All clients</span>
+                </DropdownMenuItem>
                 {clients.map((client) => (
                   <DropdownMenuItem
                     key={client.id}
@@ -109,7 +125,10 @@ export function Sidebar() {
       {/* Main Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isVeilleLink = item.path.startsWith('/insights?view=veille');
+          const isActive = isVeilleLink
+            ? location.pathname === '/insights' && new URLSearchParams(location.search).get('view') === 'veille'
+            : location.pathname === item.path;
           const Icon = item.icon;
           
           return (

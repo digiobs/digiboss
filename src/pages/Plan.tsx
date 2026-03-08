@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, LayoutGrid, List, Plus, Sparkles, PenTool } from 'lucide-react';
+import { Calendar, LayoutGrid, List, Plus, Sparkles, PenTool, RefreshCcw } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -20,10 +20,12 @@ import { CreateTaskDialog } from '@/components/plan/CreateTaskDialog';
 import { AISuggestionsDialog } from '@/components/plan/AISuggestionsDialog';
 import { KanbanColumn } from '@/components/plan/KanbanColumn';
 import { DraggableTaskCard } from '@/components/plan/DraggableTaskCard';
+import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useSupabasePlanTasks } from '@/hooks/useSupabaseTabData';
 import { subscribeToContentTasks, CONTENT_TASK_CREATED_EVENT } from '@/hooks/useContentPlanLink';
 import { useNavigate } from 'react-router-dom';
 
@@ -44,10 +46,18 @@ const priorityColors = {
   low: 'impact-low',
 };
 
+const statusToWrikeStep: Record<TaskStatus, string> = {
+  backlog: 'Backlog',
+  doing: 'In Progress',
+  review: 'Review',
+  done: 'Done',
+};
+
 export default function Plan() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const { data: dbTasks, loading: tasksLoading } = useSupabasePlanTasks(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>(dbTasks);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -59,6 +69,7 @@ export default function Plan() {
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [wrikeMatching, setWrikeMatching] = useState(false);
   
 
   const sensors = useSensors(
@@ -76,6 +87,10 @@ export default function Plan() {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    setTasks(dbTasks);
+  }, [dbTasks]);
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -139,14 +154,15 @@ export default function Plan() {
       } else {
         setAiSuggestions([]);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('AI suggestions error:', error);
-      if (error.message?.includes('429') || error.message?.includes('Rate limit')) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('429') || errorMessage.includes('Rate limit')) {
         setAiError('Rate limit exceeded. Please try again in a moment.');
-      } else if (error.message?.includes('402') || error.message?.includes('Payment')) {
+      } else if (errorMessage.includes('402') || errorMessage.includes('Payment')) {
         setAiError('AI credits exhausted. Please add funds to continue.');
       } else {
-        setAiError(error.message || 'Failed to get AI suggestions');
+        setAiError(errorMessage || 'Failed to get AI suggestions');
       }
     } finally {
       setAiLoading(false);
@@ -173,6 +189,56 @@ export default function Plan() {
 
     setTasks((prev) => [...newTasks, ...prev]);
     toast.success(`Added ${suggestions.length} AI-suggested task${suggestions.length > 1 ? 's' : ''} to your plan!`);
+  };
+
+  const runWrikeAutoMatch = async () => {
+    setWrikeMatching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('wrike-auto-match', {
+        body: {},
+      });
+      if (error) {
+        throw new Error(error.message || 'Failed to run Wrike auto-match');
+      }
+
+      const updates = Array.isArray(data?.updates) ? (data.updates as Array<Record<string, unknown>>) : [];
+      if (updates.length === 0) {
+        toast.info(data?.message || 'No new Wrike match found.');
+        setWrikeMatching(false);
+        return;
+      }
+
+      const updatesByTaskId = new Map(
+        updates.map((u) => [
+          String(u.id ?? ''),
+          {
+            wrikeTaskId: typeof u.wrike_task_id === 'string' ? u.wrike_task_id : undefined,
+            wrikeStepId: typeof u.wrike_step_id === 'string' ? u.wrike_step_id : undefined,
+            wrikeProjectId: typeof u.wrike_project_id === 'string' ? u.wrike_project_id : undefined,
+            wrikePermalink: typeof u.wrike_permalink === 'string' ? u.wrike_permalink : undefined,
+          },
+        ]),
+      );
+
+      setTasks((prev) =>
+        prev.map((task) => {
+          const match = updatesByTaskId.get(task.id);
+          if (!match) return task;
+          return {
+            ...task,
+            ...match,
+          };
+        }),
+      );
+
+      toast.success(`Wrike auto-match done: ${updates.length} task(s) linked.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('wrike auto-match error:', error);
+      toast.error(message || 'Failed to run Wrike auto-match');
+    } finally {
+      setWrikeMatching(false);
+    }
   };
 
   const getTasksByStatus = (status: TaskStatus) => 
@@ -250,6 +316,8 @@ export default function Plan() {
     }
   };
 
+  const wrikeMatchedCount = tasks.filter((t) => t.wrikeTaskId || t.wrikeStepId).length;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
@@ -264,6 +332,10 @@ export default function Plan() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={runWrikeAutoMatch} disabled={wrikeMatching}>
+            <RefreshCcw className={cn('w-4 h-4', wrikeMatching && 'animate-spin')} />
+            Auto-match Wrike
+          </Button>
           <Button variant="outline" className="gap-2" onClick={fetchAISuggestions} disabled={aiLoading}>
             <Sparkles className={cn("w-4 h-4", aiLoading && "animate-pulse")} />
             AI Suggest Plan
@@ -274,6 +346,7 @@ export default function Plan() {
           </Button>
         </div>
       </div>
+      <TabDataStatusBanner tab="plan" />
 
       {/* View Toggle */}
       <div className="flex items-center gap-2">
@@ -308,8 +381,26 @@ export default function Plan() {
         </div>
       </div>
 
+      <div className="bg-card rounded-lg border border-border p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Wrike Match Coverage</p>
+            <p className="text-xs text-muted-foreground">
+              Matched tasks for selected client: {wrikeMatchedCount}/{tasks.length || 0}
+            </p>
+          </div>
+          <Badge variant="secondary">
+            {tasks.length > 0 ? Math.round((wrikeMatchedCount / tasks.length) * 100) : 0}% matched
+          </Badge>
+        </div>
+      </div>
+
       {/* Kanban View with Next Best Actions Column */}
       {viewMode === 'kanban' && (
+        <>
+        {tasksLoading && (
+          <div className="text-xs text-muted-foreground">Loading tasks from Supabase...</div>
+        )}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -337,26 +428,29 @@ export default function Plan() {
             ) : null}
           </DragOverlay>
         </DndContext>
+        </>
       )}
 
       {/* List View */}
       {viewMode === 'list' && (
         <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-5">Task</div>
+          <div className="grid grid-cols-14 gap-4 px-4 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="col-span-4">Task</div>
             <div className="col-span-2">Status</div>
             <div className="col-span-1">Priority</div>
+            <div className="col-span-2">Wrike Step</div>
+            <div className="col-span-2">Wrike Task</div>
             <div className="col-span-2">Assignee</div>
-            <div className="col-span-2">Due Date</div>
+            <div className="col-span-1">Due Date</div>
           </div>
           <div className="divide-y divide-border">
             {tasks.map((task) => (
               <div
                 key={task.id}
                 onClick={() => handleTaskClick(task)}
-                className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/30 cursor-pointer transition-colors items-center"
+                className="grid grid-cols-14 gap-4 px-4 py-3 hover:bg-muted/30 cursor-pointer transition-colors items-center"
               >
-                <div className="col-span-5 flex items-center gap-3">
+                <div className="col-span-4 flex items-center gap-3">
                   {task.aiGenerated && (
                     <Sparkles className="w-4 h-4 text-primary shrink-0" />
                   )}
@@ -389,6 +483,28 @@ export default function Plan() {
                     {task.priority}
                   </Badge>
                 </div>
+                <div className="col-span-2 text-sm text-muted-foreground">
+                  {task.wrikeStepId || statusToWrikeStep[task.status] || 'NA'}
+                </div>
+                <div className="col-span-2 text-sm text-muted-foreground">
+                  {task.wrikeTaskId ? (
+                    task.wrikePermalink ? (
+                      <a
+                        href={task.wrikePermalink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {task.wrikeTaskId}
+                      </a>
+                    ) : (
+                      task.wrikeTaskId
+                    )
+                  ) : (
+                    'NA'
+                  )}
+                </div>
                 <div className="col-span-2">
                   {task.assignee ? (
                     <div className="flex items-center gap-2">
@@ -401,7 +517,7 @@ export default function Plan() {
                     <span className="text-sm text-muted-foreground">Unassigned</span>
                   )}
                 </div>
-                <div className="col-span-2 text-sm text-muted-foreground">
+                <div className="col-span-1 text-sm text-muted-foreground">
                   {task.dueDate ? format(new Date(task.dueDate), 'MMM d, yyyy') : '—'}
                 </div>
               </div>

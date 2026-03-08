@@ -33,12 +33,14 @@ interface MeetingsTableProps {
   meetings: Meeting[];
   searchQuery: string;
   onMeetingClick: (meeting: Meeting) => void;
+  onConnectTldv?: () => void;
+  syncingTldv?: boolean;
 }
 
 type SortField = 'date' | 'title' | 'nbaCount' | 'participants';
 type SortDirection = 'asc' | 'desc';
 
-export function MeetingsTable({ meetings, searchQuery, onMeetingClick }: MeetingsTableProps) {
+export function MeetingsTable({ meetings, searchQuery, onMeetingClick, onConnectTldv, syncingTldv = false }: MeetingsTableProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -110,7 +112,9 @@ export function MeetingsTable({ meetings, searchQuery, onMeetingClick }: Meeting
             : 'Connect tl;dv to unlock meeting intelligence.'}
         </p>
         {!searchQuery && (
-          <Button variant="outline">Connect tl;dv</Button>
+          <Button variant="outline" onClick={onConnectTldv} disabled={!onConnectTldv || syncingTldv}>
+            {syncingTldv ? 'Syncing…' : 'Connect tl;dv'}
+          </Button>
         )}
       </div>
     );

@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { aiInsights, aiActions } from '@/data/analyticsData';
 import { cn } from '@/lib/utils';
+import { useReportingMetrics } from '@/hooks/useReportingMetrics';
 
 const impactColors = {
   high: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
@@ -19,8 +20,55 @@ const effortLabels = {
 };
 
 export function AIInsightsPanel() {
-  const changes = aiInsights.filter(i => i.type === 'change');
-  const impacts = aiInsights.filter(i => i.type === 'impact');
+  const { getMetric, hasData } = useReportingMetrics(['website', 'paid', 'conversion', 'acquisition']);
+  const changes = hasData
+    ? [
+        {
+          type: 'change' as const,
+          title: `Traffic synced: ${Math.round(getMetric('impressions', 0)).toLocaleString()} impressions`,
+          description: 'Latest reporting sync reflects current multichannel visibility.',
+        },
+        {
+          type: 'change' as const,
+          title: `Paid synced: ${Math.round(getMetric('ad_clicks', 0)).toLocaleString()} clicks`,
+          description: 'Paid performance is now computed from reporting_kpis and connector ingestions.',
+        },
+      ]
+    : aiInsights.filter(i => i.type === 'change');
+  const impacts = hasData
+    ? [
+        {
+          type: 'impact' as const,
+          title: `Conversion rate at ${getMetric('conv_rate', 0).toFixed(2)}%`,
+          description: 'Funnel health is calculated from synced clicks/conversions across current period.',
+        },
+        {
+          type: 'impact' as const,
+          title: `Average SEO position ${getMetric('avg_position', 0).toFixed(2)}`,
+          description: 'SEO trends are now fed from acquisition metrics in Supabase.',
+        },
+      ]
+    : aiInsights.filter(i => i.type === 'impact');
+  const actionsToShow = hasData
+    ? [
+        {
+          type: 'action' as const,
+          title: 'Run reporting sync weekly',
+          description: 'Keep reporting_kpis fresh for all tabs and client scopes.',
+          impact: 'high' as const,
+          confidence: 96,
+          effort: 'S' as const,
+        },
+        {
+          type: 'action' as const,
+          title: 'Connect missing paid/social accounts',
+          description: 'Replace remaining NA metrics by completing provider mappings.',
+          impact: 'medium' as const,
+          confidence: 84,
+          effort: 'M' as const,
+        },
+      ]
+    : aiActions;
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden lg:sticky lg:top-20">
@@ -31,7 +79,9 @@ export function AIInsightsPanel() {
           </div>
           <div>
             <h2 className="font-semibold">AI Insights</h2>
-            <p className="text-xs text-muted-foreground">Updated with current filters</p>
+            <p className="text-xs text-muted-foreground">
+              {hasData ? 'Updated from live reporting sync' : 'Updated with current filters'}
+            </p>
           </div>
         </div>
       </div>
@@ -80,7 +130,7 @@ export function AIInsightsPanel() {
             <h3 className="text-sm font-semibold">Next Best Actions</h3>
           </div>
           <div className="space-y-3">
-            {aiActions.map((action, index) => (
+            {actionsToShow.map((action, index) => (
               <div 
                 key={index} 
                 className={cn(

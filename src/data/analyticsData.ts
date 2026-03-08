@@ -374,8 +374,8 @@ export const googleAdsTimeSeries: TimeSeriesData[] = [
 export const linkedInAdsStatus = {
   connected: false,
   lastSync: null,
-  error: 'Dataset connection error: Unable to fetch data from LinkedIn Ads API',
-  errorCode: 'LI_API_401',
+  error: 'Not available - LinkedIn Ads API data source is disconnected',
+  errorCode: 'LI_DATA_NA',
 };
 
 // AI Insights

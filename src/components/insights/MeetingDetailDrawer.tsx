@@ -159,7 +159,17 @@ export function MeetingDetailDrawer({ meeting, open, onClose }: MeetingDetailDra
                   </>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <p className="text-muted-foreground">Video not available</p>
+                    <div className="text-center space-y-3">
+                      <p className="text-muted-foreground">Preview not available</p>
+                      {meeting.videoUrl && (
+                        <Button size="sm" variant="outline" asChild>
+                          <a href={meeting.videoUrl} target="_blank" rel="noreferrer">
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Open recording
+                          </a>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -167,34 +177,40 @@ export function MeetingDetailDrawer({ meeting, open, onClose }: MeetingDetailDra
               {/* Highlights / Chapters */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-foreground">Highlights</h3>
-                <div className="space-y-2">
-                  {meeting.highlights.map((highlight) => (
-                    <button
-                      key={highlight.id}
-                      onClick={() => handleSeekTo(highlight.timestamp)}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <Badge
-                        variant="outline"
-                        className={
-                          highlight.type === 'decision'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0'
-                            : highlight.type === 'problem'
-                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0'
-                            : highlight.type === 'opportunity'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-0'
-                            : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0'
-                        }
+                {meeting.highlights.length === 0 ? (
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                    No highlights extracted yet for this meeting.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {meeting.highlights.map((highlight) => (
+                      <button
+                        key={highlight.id}
+                        onClick={() => handleSeekTo(highlight.timestamp)}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
                       >
-                        {formatTimestamp(highlight.timestamp)}
-                      </Badge>
-                      <span className="flex-1 text-sm font-medium">
-                        {highlight.title}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                  ))}
-                </div>
+                        <Badge
+                          variant="outline"
+                          className={
+                            highlight.type === 'decision'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0'
+                              : highlight.type === 'problem'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0'
+                              : highlight.type === 'opportunity'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-0'
+                              : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0'
+                          }
+                        >
+                          {formatTimestamp(highlight.timestamp)}
+                        </Badge>
+                        <span className="flex-1 text-sm font-medium">
+                          {highlight.title}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Participants */}
@@ -262,6 +278,14 @@ export function MeetingDetailDrawer({ meeting, open, onClose }: MeetingDetailDra
 
             {/* AI Summary Tab */}
             <TabsContent value="summary" className="p-6 space-y-6 mt-0">
+              {meeting.aiSummary.decisions.length === 0 &&
+                meeting.aiSummary.problems.length === 0 &&
+                meeting.aiSummary.opportunities.length === 0 &&
+                meeting.aiSummary.actionItems.length === 0 && (
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                    No AI summary available yet for this meeting.
+                  </div>
+                )}
               {/* Decisions */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2">

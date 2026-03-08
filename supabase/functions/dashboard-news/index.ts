@@ -183,16 +183,32 @@ Format as JSON array with fields: title, summary, source, url`;
       const jsonMatch = content.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        articles = parsed.map((article: any, index: number) => ({
+        articles = parsed.map((article: unknown, index: number) => {
+          const row = article && typeof article === "object" ? (article as Record<string, unknown>) : {};
+          return {
           id: `${type}-${Date.now()}-${index}`,
-          title: article.title || "Untitled",
-          summary: article.summary || article.description || "",
-          source: article.source || "Unknown",
-          imageUrl: article.imageUrl || article.image_url || article.image || getDefaultImage(type, index),
-          url: article.url || article.link || citations[index] || "#",
+          title: typeof row.title === "string" ? row.title : "Untitled",
+          summary:
+            typeof row.summary === "string"
+              ? row.summary
+              : typeof row.description === "string"
+                ? row.description
+                : "",
+          source: typeof row.source === "string" ? row.source : "Unknown",
+          imageUrl:
+            (typeof row.imageUrl === "string" ? row.imageUrl : null) ??
+            (typeof row.image_url === "string" ? row.image_url : null) ??
+            (typeof row.image === "string" ? row.image : null) ??
+            getDefaultImage(type, index),
+          url:
+            (typeof row.url === "string" ? row.url : null) ??
+            (typeof row.link === "string" ? row.link : null) ??
+            citations[index] ??
+            "#",
           timestamp: new Date().toISOString(),
           category: type as 'industry' | 'competitor',
-        }));
+        };
+      });
       }
     } catch (parseError) {
       console.error("Failed to parse Perplexity response:", parseError);

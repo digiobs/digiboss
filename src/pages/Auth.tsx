@@ -26,13 +26,13 @@ export default function Auth() {
     // Check if already logged in
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        navigate('/dashboard');
+        navigate('/home');
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        navigate('/dashboard');
+        navigate('/home');
       }
     });
 
@@ -78,13 +78,13 @@ export default function Auth() {
         }
 
         toast.success('Welcome back!');
-        navigate('/dashboard');
+        navigate('/home');
       } else {
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
+            emailRedirectTo: `${window.location.origin}/home`,
           },
         });
 

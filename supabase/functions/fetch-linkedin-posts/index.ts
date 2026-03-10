@@ -102,6 +102,21 @@ function asNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeApiKey(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const unquoted =
+    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1).trim()
+      : trimmed;
+  return unquoted.length > 0 ? unquoted : null;
+}
+
 function mapPost(item: Record<string, unknown>): SupermetricsLinkedInPost | null {
   const profile = safeString(item.profile);
   const updateUrl = safeString(item.update_url);
@@ -126,12 +141,62 @@ function mapPost(item: Record<string, unknown>): SupermetricsLinkedInPost | null
   };
 }
 
+function parseArrayFormat(rows: unknown[]): Record<string, unknown>[] {
+  if (!Array.isArray(rows) || rows.length < 2) return [];
+  const headerRow = rows[0];
+  if (!Array.isArray(headerRow)) return [];
+  const headers = headerRow.map((value) => String(value));
+  return rows
+    .slice(1)
+    .filter((row) => Array.isArray(row))
+    .map((row) => {
+      const record: Record<string, unknown> = {};
+      headers.forEach((key, index) => {
+        record[key] = (row as unknown[])[index] ?? null;
+      });
+      return record;
+    });
+}
+
+function extractRows(payload: unknown): Record<string, unknown>[] {
+  const objectPayload = asObject(payload);
+  const possibleRows = asArray(
+    asObject(payload)?.["data"] ??
+      asObject(payload)?.["rows"] ??
+      asObject(objectPayload?.["data"])?.["rows"] ??
+      asObject(objectPayload?.["data"])?.["data"] ??
+      objectPayload?.["results"] ??
+      payload,
+  );
+
+  if (possibleRows.length > 0 && Array.isArray(possibleRows[0])) {
+    return parseArrayFormat(possibleRows);
+  }
+
+  return possibleRows
+    .map((value) => asObject(value))
+    .filter((value): value is Record<string, unknown> => Boolean(value));
+}
+
+function extractScheduleId(payload: unknown): string | null {
+  const obj = asObject(payload);
+  const nestedData = asObject(obj?.data);
+  return (
+    safeString(obj?.schedule_id) ??
+    safeString(obj?.scheduleId) ??
+    safeString(nestedData?.schedule_id) ??
+    safeString(nestedData?.scheduleId) ??
+    null
+  );
+}
+
 async function fetchFromSupermetrics(params: {
   apiKey: string;
   accountIds: string[];
   dateRangeType: string;
 }): Promise<SupermetricsLinkedInPost[]> {
-  const apiUrl = Deno.env.get("SUPERMETRICS_API_URL") ?? "https://api.supermetrics.com/enterprise/v2/query/data";
+  const baseUrl = Deno.env.get("SUPERMETRICS_API_URL") ?? "https://api.supermetrics.com/enterprise/v2";
+  const dataUrl = `${baseUrl.replace(/\/$/, "")}/query/data/json`;
   const dsAccounts = params.accountIds.join(",");
   const fields = [
     "profile",
@@ -160,26 +225,79 @@ async function fetchFromSupermetrics(params: {
     format: "json",
   };
 
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.apiKey}`,
-      "x-api-key": params.apiKey,
-    },
-    body: JSON.stringify(payload),
-  });
+  const authHeaderAttempts: Array<Record<string, string>> = [
+    { Authorization: `Bearer ${params.apiKey}` },
+    { "x-api-key": params.apiKey },
+    { Authorization: params.apiKey },
+  ];
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Supermetrics API error ${response.status}: ${text.slice(0, 240)}`);
+  let json: unknown = null;
+  let lastError = "Unknown Supermetrics error";
+  for (const authHeaders of authHeaderAttempts) {
+    const response = await fetch(dataUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      lastError = `Supermetrics API error ${response.status}: ${text.slice(0, 240)}`;
+      continue;
+    }
+
+    json = await response.json();
+    lastError = "";
+    break;
+  }
+  if (lastError) throw new Error(lastError);
+
+  let rows = extractRows(json);
+
+  if (rows.length === 0) {
+    const scheduleId = extractScheduleId(json);
+    if (scheduleId) {
+      const resultBase = `${baseUrl.replace(/\/$/, "")}/query/results`;
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await sleep(5000);
+        const resultQuery = encodeURIComponent(JSON.stringify({ schedule_id: scheduleId }));
+        let resultResponse: Response | null = null;
+        let resultError = "";
+        for (const authHeaders of authHeaderAttempts) {
+          const attempt = await fetch(`${resultBase}?json=${resultQuery}`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              ...authHeaders,
+            },
+          });
+          if (attempt.ok) {
+            resultResponse = attempt;
+            resultError = "";
+            break;
+          }
+          const txt = await attempt.text();
+          resultError = `Supermetrics results error ${attempt.status}: ${txt.slice(0, 240)}`;
+        }
+
+        if (!resultResponse) {
+          throw new Error(resultError || "Supermetrics results fetch failed");
+        }
+        const resultJson = await resultResponse.json();
+        const status = safeString(asObject(resultJson)?.status ?? asObject(asObject(resultJson)?.data)?.status);
+        rows = extractRows(resultJson);
+        if (rows.length > 0) break;
+        if (status && ["failed", "error", "cancelled"].includes(status.toLowerCase())) {
+          throw new Error(`Supermetrics async query failed with status ${status}`);
+        }
+      }
+    }
   }
 
-  const json = await response.json();
-  const rows = asArray(asObject(json)?.["data"] ?? asObject(json)?.["rows"] ?? json);
   return rows
-    .map((value) => asObject(value))
-    .filter((value): value is Record<string, unknown> => Boolean(value))
     .map(mapPost)
     .filter((value): value is SupermetricsLinkedInPost => Boolean(value));
 }
@@ -195,7 +313,9 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const clientId = safeString(body?.clientId);
     const dateRangeType = safeString(body?.dateRangeType) ?? "last_90_days";
-    const apiKey = Deno.env.get("SUPERMETRICS_API_KEY") ?? Deno.env.get("SUPERMETRICS_API_TOKEN");
+    const apiKey = normalizeApiKey(
+      Deno.env.get("SUPERMETRICS_API_KEY") ?? Deno.env.get("SUPERMETRICS_API_TOKEN"),
+    );
 
     runId = await startIntegrationRun(supabase, {
       provider: "supermetrics",
@@ -225,6 +345,7 @@ serve(async (req) => {
 
     let posts: SupermetricsLinkedInPost[] = SAMPLE_POSTS;
     let usedLiveApi = false;
+    let liveFetchError: string | null = null;
     if (apiKey) {
       try {
         posts = await fetchFromSupermetrics({
@@ -234,6 +355,7 @@ serve(async (req) => {
         });
         usedLiveApi = true;
       } catch (apiError) {
+        liveFetchError = apiError instanceof Error ? apiError.message : "Unknown live fetch error";
         console.error("Supermetrics live fetch failed, falling back to sample posts:", apiError);
       }
     }
@@ -340,6 +462,7 @@ serve(async (req) => {
         posts_processed: posts.length,
         posts_upserted: upserted,
         usedLiveApi,
+        liveFetchError,
         skippedNoClient,
         contentUpsertErrors,
         metricUpsertErrors,

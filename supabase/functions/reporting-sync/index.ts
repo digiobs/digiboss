@@ -17,6 +17,13 @@ type ReportingKpiRow = {
   period_end: string;
 };
 
+const METRIC_KEY_ALIASES: Record<string, string> = {
+  ad_clicks: "clicks",
+  click: "clicks",
+  ad_spend: "cost",
+  spend: "cost",
+};
+
 function toNumber(value: unknown): number {
   if (typeof value === "number") return value;
   if (typeof value === "string") {
@@ -24,6 +31,12 @@ function toNumber(value: unknown): number {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
+}
+
+function canonicalMetricKey(value: unknown): string | null {
+  const key = safeString(value)?.toLowerCase();
+  if (!key) return null;
+  return METRIC_KEY_ALIASES[key] ?? key;
 }
 
 serve(async (req) => {
@@ -88,7 +101,7 @@ serve(async (req) => {
     const metricByClient = new Map<string, Record<string, number>>();
     for (const row of smRows ?? []) {
       const id = safeString(row.client_id);
-      const metricKey = safeString(row.metric_key);
+      const metricKey = canonicalMetricKey(row.metric_key);
       if (!id || !metricKey) continue;
       const current = metricByClient.get(id) ?? {};
       current[metricKey] = (current[metricKey] ?? 0) + toNumber(row.metric_value);

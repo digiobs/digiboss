@@ -16,6 +16,8 @@ export interface Deliverable {
   filename: string | null;
   period: string | null;
   tags: string[] | null;
+  sharepoint_url: string | null;
+  onedrive_path: string | null;
   created_at: string;
   clients?: { name: string } | null;
 }
@@ -30,7 +32,7 @@ export function useDeliverables(options?: { type?: string; clientId?: string | n
     queryFn: async () => {
       let query = supabase
         .from('deliverables')
-        .select('id,client_id,type,title,description,status,skill_name,channel,sub_type,notion_url,filename,period,tags,created_at,clients(name)')
+        .select('id,client_id,type,title,description,status,skill_name,channel,sub_type,notion_url,sharepoint_url,onedrive_path,filename,period,tags,created_at,clients(name)')
         .order('created_at', { ascending: false })
         .limit(200);
 

@@ -20,7 +20,7 @@ export default function Insights() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentClient, isAllClientsSelected, clientConfig } = useClient();
   const { context: veilleContext, loading: veilleLoading, error: veilleError } = useVeilleContext();
-  const { meetings, error: meetingsError, projectUrl, refetch } = useSupabaseMeetings();
+  const { loading: meetingsLoading, meetings, error: meetingsError, projectUrl, refetch } = useSupabaseMeetings();
   const performanceInsights: [] = [];
   const externalInsights: [] = [];
   const opsInsights: [] = [];
@@ -128,12 +128,17 @@ export default function Insights() {
                   ? `Showing all meetings (${meetings.length})`
                   : `Showing meetings for ${currentClient?.name ?? 'selected client'} (${meetings.length})`}
               </p>
+              {meetingsLoading && (
+                <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground animate-pulse">
+                  Loading meetings…
+                </div>
+              )}
               {meetingsError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                   Meetings query error: {meetingsError}
                 </div>
               )}
-              {!meetingsError && meetings.length === 0 && (
+              {!meetingsLoading && !meetingsError && meetings.length === 0 && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   No meetings found for this client. Try syncing tl;dv or selecting a different client.
                 </div>

@@ -7,6 +7,7 @@ import { SignalsPanel } from "@/components/home/SignalsPanel";
 import { ContentPipelinePanel } from "@/components/home/ContentPipelinePanel";
 import { DataHealthWidget } from "@/components/home/DataHealthWidget";
 import { type NextBestAction, dashboardKPIs } from "@/data/dashboardData";
+import { useHomeReportingKpis } from "@/hooks/useHomeData";
 import { TabDataStatusBanner } from "@/components/data/TabDataStatusBanner";
 import { ALL_CLIENTS_ID, useClient } from "@/contexts/ClientContext";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,13 @@ export default function Home() {
   const [generateSignal, setGenerateSignal] = useState(0);
   const [isGeneratingActions, setIsGeneratingActions] = useState(false);
   const highlightedActionIds = selectedAction ? [selectedAction.id] : [];
-  const heroKpis = useMemo(() => dashboardKPIs.slice(0, 3), []);
+  const { data: reportingData } = useHomeReportingKpis(selectedClientId);
+  const heroKpis = useMemo(() => {
+    if (reportingData?.hasData && reportingData.heroKpis.length > 0) {
+      return reportingData.heroKpis;
+    }
+    return dashboardKPIs.slice(0, 3);
+  }, [reportingData]);
   const selectedClient = clients.find((client) => client.id === selectedClientId);
   const aiScopeLabel = selectedClientId === ALL_CLIENTS_ID ? "global" : selectedClient?.name ?? "client";
   const aiContext = `Home dashboard generation scope: ${aiScopeLabel}. Prioritize high-impact opportunities for this scope.`;
@@ -114,7 +121,7 @@ export default function Home() {
           <CardTitle className="text-base">Performance Overview</CardTitle>
         </CardHeader>
         <CardContent>
-          <HomeKPIStrip />
+          <HomeKPIStrip reportingKpis={reportingData?.stripKpis} />
         </CardContent>
       </Card>
 

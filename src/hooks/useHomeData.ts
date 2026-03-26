@@ -1,6 +1,112 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useClient } from '@/contexts/ClientContext';
+import type { KPIData } from '@/data/analyticsData';
+import type { DashboardKPI } from '@/data/dashboardData';
+
+type ReportingRow = {
+  section: string;
+  metric_key: string;
+  label: string;
+  value: number | null;
+  unit: string | null;
+  period_end: string | null;
+};
+
+function formatKpiValue(value: number, unit: string | null): string {
+  if (unit === 'currency') return `EUR ${Math.round(value).toLocaleString()}`;
+  if (unit === 'percent') return `${value.toFixed(1)}%`;
+  if (unit === 'ratio') return value.toFixed(2);
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return Math.round(value).toLocaleString();
+}
+
+function toKpiCategory(section: string): KPIData['category'] {
+  if (section === 'website') return 'website';
+  if (section === 'activation') return 'activation';
+  if (section === 'conversion' || section === 'leads') return 'conversion';
+  if (section === 'paid') return 'paid';
+  if (section === 'social') return 'social';
+  return 'acquisition';
+}
+
+function toDashboardCategory(section: string): DashboardKPI['category'] {
+  if (section === 'website') return 'traffic';
+  if (section === 'conversion' || section === 'leads') return 'leads';
+  if (section === 'paid') return 'paid';
+  if (section === 'social') return 'engagement';
+  return 'seo';
+}
+
+/** Fetches real KPIs from reporting_kpis, returns KPIData[] for the KPI strip and DashboardKPI[] for hero cards */
+export function useHomeReportingKpis(clientId?: string) {
+  return useQuery({
+    queryKey: ['home-reporting-kpis', clientId],
+    queryFn: async () => {
+      let query = supabase
+        .from('reporting_kpis')
+        .select('section,metric_key,label,value,unit,period_end')
+        .order('period_end', { ascending: false })
+        .limit(200);
+      if (clientId && clientId !== 'all-clients') {
+        query = query.eq('client_id', clientId);
+      }
+      const { data, error } = await query;
+      if (error) {
+        console.error('home reporting_kpis error:', error);
+        return { stripKpis: [] as KPIData[], heroKpis: [] as DashboardKPI[], hasData: false };
+      }
+      const rows = (data ?? []) as ReportingRow[];
+      if (!rows.length) {
+        return { stripKpis: [] as KPIData[], heroKpis: [] as DashboardKPI[], hasData: false };
+      }
+
+      // Deduplicate: keep latest per section:metric_key
+      const unique = new Map<string, ReportingRow>();
+      rows.forEach((r) => {
+        const key = `${r.section}:${r.metric_key}`;
+        if (!unique.has(key)) unique.set(key, r);
+      });
+
+      const stripKpis: KPIData[] = Array.from(unique.values()).map((r) => ({
+        label: r.label,
+        value: formatKpiValue(r.value ?? 0, r.unit),
+        delta: 0,
+        deltaLabel: r.period_end ? `as of ${r.period_end}` : 'latest sync',
+        category: toKpiCategory(r.section),
+      }));
+
+      // Hero KPIs: pick key metrics for the 3-card summary
+      const heroMetrics = ['sessions', 'conversions', 'li_impressions', 'ad_spend', 'seo_clicks', 'new_leads'];
+      const heroRows = heroMetrics
+        .map((mk) => {
+          for (const [, row] of unique) {
+            if (row.metric_key === mk) return row;
+          }
+          return null;
+        })
+        .filter((r): r is ReportingRow => r !== null)
+        .slice(0, 3);
+
+      // If we don't have the preferred metrics, take the first 3
+      const finalHero = heroRows.length >= 3 ? heroRows : Array.from(unique.values()).slice(0, 3);
+
+      const heroKpis: DashboardKPI[] = finalHero.map((r, idx) => ({
+        id: `hero-${r.metric_key}-${idx}`,
+        label: r.label,
+        value: formatKpiValue(r.value ?? 0, r.unit),
+        delta: 0,
+        deltaLabel: r.period_end ? `as of ${r.period_end}` : 'latest sync',
+        trend: 'neutral' as const,
+        sparklineData: [0],
+        category: toDashboardCategory(r.section),
+      }));
+
+      return { stripKpis, heroKpis, hasData: true };
+    },
+  });
+}
 
 export function useAlerts() {
   const { clients } = useClient();

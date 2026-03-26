@@ -2,12 +2,16 @@ import { HomeKPICard } from './HomeKPICard';
 import { dashboardKPIs } from '@/data/dashboardData';
 import { Button } from '@/components/ui/button';
 import { Plug, BarChart3 } from 'lucide-react';
+import type { KPIData } from '@/data/analyticsData';
 
 interface HomeKPIStripProps {
   isEmpty?: boolean;
+  reportingKpis?: KPIData[];
 }
 
-export function HomeKPIStrip({ isEmpty = false }: HomeKPIStripProps) {
+export function HomeKPIStrip({ isEmpty = false, reportingKpis }: HomeKPIStripProps) {
+  const hasRealData = reportingKpis && reportingKpis.length > 0;
+
   if (isEmpty) {
     return (
       <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
@@ -24,6 +28,32 @@ export function HomeKPIStrip({ isEmpty = false }: HomeKPIStripProps) {
             Connect integrations
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  if (hasRealData) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        {reportingKpis.map((kpi, idx) => (
+          <HomeKPICard
+            key={`real-${idx}`}
+            kpi={{
+              id: `real-${idx}`,
+              label: kpi.label,
+              value: String(kpi.value),
+              delta: kpi.delta,
+              deltaLabel: kpi.deltaLabel,
+              trend: kpi.delta > 0 ? 'up' : kpi.delta < 0 ? 'down' : 'neutral',
+              sparklineData: [0],
+              category: kpi.category === 'website' ? 'traffic'
+                : kpi.category === 'conversion' ? 'leads'
+                : kpi.category === 'paid' ? 'paid'
+                : kpi.category === 'social' ? 'engagement'
+                : 'seo',
+            }}
+          />
+        ))}
       </div>
     );
   }

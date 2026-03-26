@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
+import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useDeliverables, type Deliverable } from '@/hooks/useDeliverables';
 
@@ -56,22 +56,14 @@ const statusColors: Record<string, string> = {
 };
 
 export default function Deliverables() {
-  const { clients } = useClient();
+  const { clients, currentClient, setCurrentClient, isAllClientsSelected } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const [selectedClientId, setSelectedClientId] = useState<string>(
-    isAdmin ? ALL_CLIENTS_ID : (clients[0]?.id ?? ALL_CLIENTS_ID)
-  );
+  const selectedClientId = currentClient?.id ?? ALL_CLIENTS_ID;
   const [selectedType, setSelectedType] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (!isAdmin && selectedClientId === ALL_CLIENTS_ID && clients.length > 0) {
-      setSelectedClientId(clients[0].id);
-    }
-  }, [isAdmin, clients, selectedClientId]);
-
-  const clientFilter = selectedClientId === ALL_CLIENTS_ID ? null : selectedClientId;
+  const clientFilter = isAllClientsSelected ? null : (currentClient?.id ?? null);
   const { data: deliverables = [], isLoading, refetch } = useDeliverables({ clientId: clientFilter, type: selectedType });
 
   const handleRefresh = async () => {
@@ -155,7 +147,13 @@ export default function Deliverables() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+        <Select
+          value={selectedClientId}
+          onValueChange={(id) => {
+            const c = id === ALL_CLIENTS_ID ? ALL_CLIENTS_CLIENT : clients.find((cl) => cl.id === id) ?? null;
+            setCurrentClient(c);
+          }}
+        >
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Client" />
           </SelectTrigger>

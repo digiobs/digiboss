@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Award,
@@ -46,7 +46,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TabDataStatusBanner } from "@/components/data/TabDataStatusBanner";
 import { supabase } from "@/integrations/supabase/client";
-import { ALL_CLIENTS_ID, useClient } from "@/contexts/ClientContext";
+import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from "@/contexts/ClientContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -179,23 +179,15 @@ function asObject(value: unknown): Record<string, unknown> {
 
 export default function Contenus() {
   const queryClient = useQueryClient();
-  const { clients, currentClient } = useClient();
+  const { clients, currentClient, setCurrentClient, isAllClientsSelected } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const [selectedClientId, setSelectedClientId] = useState<string>(
-    isAdmin ? ALL_CLIENTS_ID : (clients[0]?.id ?? ALL_CLIENTS_ID)
-  );
+  const selectedClientId = currentClient?.id ?? ALL_CLIENTS_ID;
   const [syncing, setSyncing] = useState(false);
-
-  useEffect(() => {
-    if (!isAdmin && selectedClientId === ALL_CLIENTS_ID && clients.length > 0) {
-      setSelectedClientId(clients[0].id);
-    }
-  }, [isAdmin, clients, selectedClientId]);
 
   const syncLinkedIn = async () => {
     setSyncing(true);
     try {
-      const payload = selectedClientId === ALL_CLIENTS_ID ? {} : { clientId: selectedClientId };
+      const payload = isAllClientsSelected ? {} : { clientId: selectedClientId };
       const { error } = await supabase.functions.invoke('fetch-linkedin-posts', { body: payload });
       if (error) throw error;
       toast.success('Content data synced');
@@ -217,7 +209,7 @@ export default function Contenus() {
   const [dismissAnimatingIds, setDismissAnimatingIds] = useState<string[]>([]);
   const [postponedLocal, setPostponedLocal] = useState<RecommendationRow[]>([]);
 
-  const activeClientId = selectedClientId === ALL_CLIENTS_ID ? null : selectedClientId;
+  const activeClientId = isAllClientsSelected ? null : (currentClient?.id ?? null);
 
   const range = useMemo(() => {
     const end = new Date();
@@ -515,7 +507,13 @@ export default function Contenus() {
               {syncing ? 'Syncing...' : 'Sync Contenus'}
             </Button>
           )}
-          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+          <Select
+            value={selectedClientId}
+            onValueChange={(id) => {
+              const c = id === ALL_CLIENTS_ID ? ALL_CLIENTS_CLIENT : clients.find((cl) => cl.id === id) ?? null;
+              setCurrentClient(c);
+            }}
+          >
             <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Client" />
             </SelectTrigger>

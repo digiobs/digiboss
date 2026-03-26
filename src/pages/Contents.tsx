@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FileText, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useClient } from '@/contexts/ClientContext';
+import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useContents, type Channel } from '@/hooks/useContents';
 import { ContentsKPIStrip } from '@/components/contents/ContentsKPIStrip';
@@ -16,22 +16,14 @@ type ChannelFilter = Channel | 'all';
 type PeriodFilter = '7' | '30' | '90';
 
 export default function Contents() {
-  const { clients, currentClient, setCurrentClient } = useClient();
+  const { clients, currentClient, setCurrentClient, isAllClientsSelected } = useClient();
   const { isAdmin } = useVisibilityMode();
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [period, setPeriod] = useState<PeriodFilter>('30');
-  const [selectedClientId, setSelectedClientId] = useState<string | 'all'>(
-    isAdmin ? 'all' : (clients[0]?.id ?? 'all')
-  );
+  const selectedClientId = currentClient?.id ?? ALL_CLIENTS_ID;
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isAdmin && selectedClientId === 'all' && clients.length > 0) {
-      setSelectedClientId(clients[0].id);
-    }
-  }, [isAdmin, clients, selectedClientId]);
-
-  const effectiveClientId = selectedClientId === 'all' ? null : selectedClientId;
+  const effectiveClientId = isAllClientsSelected ? null : (currentClient?.id ?? null);
 
   const { data: contents = [], isLoading } = useContents({
     clientId: effectiveClientId,
@@ -49,12 +41,18 @@ export default function Contents() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Client selector */}
-          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+          <Select
+            value={selectedClientId}
+            onValueChange={(id) => {
+              const c = id === ALL_CLIENTS_ID ? ALL_CLIENTS_CLIENT : clients.find((cl) => cl.id === id) ?? null;
+              setCurrentClient(c);
+            }}
+          >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Client" />
             </SelectTrigger>
             <SelectContent>
-              {isAdmin && <SelectItem value="all">Admin (tous les clients)</SelectItem>}
+              {isAdmin && <SelectItem value={ALL_CLIENTS_ID}>Admin (tous les clients)</SelectItem>}
               {clients.map(c => (
                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
@@ -111,7 +109,7 @@ export default function Contents() {
             <ContentCard
               key={c.id}
               content={c}
-              showClient={selectedClientId === 'all'}
+              showClient={isAllClientsSelected}
               onViewDetails={setDetailId}
             />
           ))

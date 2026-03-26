@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LayoutGrid, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
+import { useClient } from '@/contexts/ClientContext';
 import { useWrikeTasks } from '@/hooks/useWrikeTasks';
 import { WrikeKanban } from '@/components/plan/WrikeKanban';
 import { VisibilityToggle } from '@/components/plan/VisibilityToggle';
@@ -20,7 +21,10 @@ const statusToWrikeStep: Record<TaskStatus, string> = {
 
 export default function Plan() {
   const { mode, toggle, isAdmin } = useVisibilityMode();
-  const { data: tasks = [], isLoading, error } = useWrikeTasks();
+  const { currentClient, isAllClientsSelected } = useClient();
+  const { data: tasks = [], isLoading, error } = useWrikeTasks({
+    clientId: isAllClientsSelected ? undefined : currentClient?.id,
+  });
   const [syncing, setSyncing] = useState(false);
 
   const syncWrike = async () => {

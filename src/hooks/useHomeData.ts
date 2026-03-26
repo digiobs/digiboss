@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useClient } from '@/contexts/ClientContext';
+import { ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
 import type { KPIData } from '@/data/analyticsData';
 import type { DashboardKPI } from '@/data/dashboardData';
 
@@ -51,7 +51,7 @@ export function useHomeReportingKpis(clientId?: string) {
           .select('section,metric_key,label,value,unit,period_end')
           .order('period_end', { ascending: false })
           .limit(200);
-        if (clientId && clientId !== 'all-clients') {
+        if (clientId && clientId !== ALL_CLIENTS_ID) {
           (query as any).eq('client_id', clientId);
         }
         const { data, error } = await query;

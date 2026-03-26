@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { HomeKPIStrip } from "@/components/home/HomeKPIStrip";
 import { HomeWeeklySummary } from "@/components/home/HomeWeeklySummary";
 import { HomeNextBestActions } from "@/components/home/HomeNextBestActions";
@@ -9,7 +9,7 @@ import { DataHealthWidget } from "@/components/home/DataHealthWidget";
 import { type NextBestAction, dashboardKPIs } from "@/data/dashboardData";
 import { useHomeReportingKpis } from "@/hooks/useHomeData";
 import { TabDataStatusBanner } from "@/components/data/TabDataStatusBanner";
-import { ALL_CLIENTS_ID, useClient } from "@/contexts/ClientContext";
+import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from "@/contexts/ClientContext";
 import { useVisibilityMode } from "@/hooks/useVisibilityMode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,20 +20,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export default function Home() {
-  const { clients } = useClient();
+  const { clients, currentClient, setCurrentClient, isAllClientsSelected } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const [selectedClientId, setSelectedClientId] = useState<string>(
-    isAdmin ? ALL_CLIENTS_ID : (clients[0]?.id ?? ALL_CLIENTS_ID)
-  );
+  const selectedClientId = currentClient?.id ?? ALL_CLIENTS_ID;
   const [syncing, setSyncing] = useState(false);
   const [selectedAction, setSelectedAction] = useState<NextBestAction | null>(null);
-
-  // Auto-select first client for non-admin users
-  useEffect(() => {
-    if (!isAdmin && selectedClientId === ALL_CLIENTS_ID && clients.length > 0) {
-      setSelectedClientId(clients[0].id);
-    }
-  }, [isAdmin, clients, selectedClientId]);
   const [generateSignal, setGenerateSignal] = useState(0);
   const [isGeneratingActions, setIsGeneratingActions] = useState(false);
   const highlightedActionIds = selectedAction ? [selectedAction.id] : [];
@@ -42,7 +33,7 @@ export default function Home() {
   const syncDashboard = async () => {
     setSyncing(true);
     try {
-      const payload = selectedClientId === ALL_CLIENTS_ID ? {} : { clientId: selectedClientId };
+      const payload = isAllClientsSelected ? {} : { clientId: selectedClientId };
       const { error } = await supabase.functions.invoke('dashboard-news', { body: payload });
       if (error) throw error;
       toast.success('Dashboard data synced');
@@ -62,7 +53,7 @@ export default function Home() {
     return dashboardKPIs.slice(0, 3);
   }, [reportingData]);
   const selectedClient = clients.find((client) => client.id === selectedClientId);
-  const aiScopeLabel = selectedClientId === ALL_CLIENTS_ID ? "global" : selectedClient?.name ?? "client";
+  const aiScopeLabel = isAllClientsSelected ? "global" : selectedClient?.name ?? "client";
   const aiContext = `Home dashboard generation scope: ${aiScopeLabel}. Prioritize high-impact opportunities for this scope.`;
 
   return (
@@ -90,7 +81,13 @@ export default function Home() {
                 {syncing ? 'Syncing...' : 'Sync Data'}
               </Button>
             )}
-            <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+            <Select
+              value={selectedClientId}
+              onValueChange={(id) => {
+                const c = id === ALL_CLIENTS_ID ? ALL_CLIENTS_CLIENT : clients.find((cl) => cl.id === id) ?? null;
+                setCurrentClient(c);
+              }}
+            >
               <SelectTrigger className="w-[220px] bg-background">
                 <SelectValue placeholder="Client" />
               </SelectTrigger>
@@ -142,7 +139,7 @@ export default function Home() {
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Badge variant="outline" className="gap-1">
             <LayoutDashboard className="h-3 w-3" />
-            {selectedClientId === ALL_CLIENTS_ID ? "Global view" : selectedClient?.name ?? "Client"}
+            {isAllClientsSelected ? "Global view" : selectedClient?.name ?? "Client"}
           </Badge>
           <Badge variant="outline" className="gap-1">
             <ArrowUpRight className="h-3 w-3" />

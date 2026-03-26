@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -39,7 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
+import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useVeilleItems } from '@/hooks/useVeilleItems';
 import { supabase } from '@/integrations/supabase/client';
@@ -75,27 +75,19 @@ function getSeverityConfig(severity: string) {
 }
 
 export default function Veille() {
-  const { clients } = useClient();
+  const { clients, currentClient, setCurrentClient, isAllClientsSelected } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const [selectedClientId, setSelectedClientId] = useState<string>(
-    isAdmin ? ALL_CLIENTS_ID : (clients[0]?.id ?? ALL_CLIENTS_ID)
-  );
+  const selectedClientId = currentClient?.id ?? ALL_CLIENTS_ID;
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
-  useEffect(() => {
-    if (!isAdmin && selectedClientId === ALL_CLIENTS_ID && clients.length > 0) {
-      setSelectedClientId(clients[0].id);
-    }
-  }, [isAdmin, clients, selectedClientId]);
-
   const syncMarketNews = async () => {
     setSyncing(true);
     try {
-      const payload = selectedClientId === ALL_CLIENTS_ID ? {} : { clientId: selectedClientId };
+      const payload = isAllClientsSelected ? {} : { clientId: selectedClientId };
       const { error } = await supabase.functions.invoke('market-news', { body: payload });
       if (error) throw error;
       toast.success('Veille data synced');
@@ -108,7 +100,7 @@ export default function Veille() {
     }
   };
 
-  const clientFilter = selectedClientId === ALL_CLIENTS_ID ? null : selectedClientId;
+  const clientFilter = isAllClientsSelected ? null : selectedClientId;
   const { data: items = [], isLoading } = useVeilleItems({
     clientId: clientFilter,
     skill: selectedSkill,
@@ -195,7 +187,13 @@ export default function Veille() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+        <Select
+          value={selectedClientId}
+          onValueChange={(id) => {
+            const c = id === ALL_CLIENTS_ID ? ALL_CLIENTS_CLIENT : clients.find((cl) => cl.id === id) ?? null;
+            setCurrentClient(c);
+          }}
+        >
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Client" />
           </SelectTrigger>

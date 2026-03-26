@@ -359,7 +359,7 @@ export function useClientTaskHealth() {
         return acc;
       }, {});
 
-      return Object.values(grouped).map((client) => {
+      return Object.values(grouped).map((client: ClientGroup) => {
         let health = 'green';
         if (client.overdue >= 3) health = 'red';
         else if (client.overdue >= 1) health = 'yellow';

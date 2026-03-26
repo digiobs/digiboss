@@ -56,9 +56,9 @@ export function HomeNBASection() {
     }
   };
 
-  const handleAction = (action: Record<string, unknown>) => {
+  const handleAction = (action: any) => {
     if (action.wrike_url) {
-      window.open(action.wrike_url, '_blank');
+      window.open(action.wrike_url as string, '_blank');
     }
   };
 
@@ -90,9 +90,9 @@ export function HomeNBASection() {
         </div>
       ) : (
         <div className="space-y-3">
-          {actions.map((task: Record<string, unknown>) => {
+          {actions.map((task: any) => {
             const priorityScore = task.priority === 'high' ? 85 : task.priority === 'medium' ? 55 : 30;
-            const dueDate = task.due_date ? new Date(task.due_date).toLocaleDateString('fr-FR') : 'Sans date';
+            const dueDate = task.due_date ? new Date(task.due_date as string).toLocaleDateString('fr-FR') : 'Sans date';
 
             return (
               <div

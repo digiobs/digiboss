@@ -39,8 +39,8 @@ export function HomeClientHealth() {
   const isLoading = healthLoading || taskLoading;
 
   // Merge health scores with task health data
-  const mergedData = (scores || []).map((score: Record<string, unknown>) => {
-    const taskData = taskHealth?.find((th: Record<string, unknown>) => th.client_id === score.client_id);
+  const mergedData = ((scores || []) as any[]).map((score: any) => {
+    const taskData = (taskHealth as any[])?.find((th: any) => th.client_id === score.client_id);
     return {
       ...score,
       taskHealth,
@@ -81,7 +81,7 @@ export function HomeClientHealth() {
         </p>
       ) : (
         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-          {mergedData.map((s: Record<string, unknown>) => {
+          {mergedData.map((s: any) => {
             const breakdown = (s.score_breakdown as Record<string, number>) || {};
 
             return (

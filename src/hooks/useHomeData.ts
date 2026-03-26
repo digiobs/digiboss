@@ -59,7 +59,7 @@ export function useHomeReportingKpis(clientId?: string) {
           console.error('home reporting_kpis error:', error);
           return { stripKpis: [] as KPIData[], heroKpis: [] as DashboardKPI[], hasData: false };
         }
-        const rows = (data ?? []) as ReportingRow[];
+        const rows = ((data ?? []) as unknown) as ReportingRow[];
         if (!rows.length) {
           return { stripKpis: [] as KPIData[], heroKpis: [] as DashboardKPI[], hasData: false };
       }
@@ -341,7 +341,7 @@ export function useClientTaskHealth() {
         in_progress: number;
         done: number;
       };
-      const grouped = (data ?? []).reduce((acc: Record<string, ClientGroup>, task) => {
+      const grouped = ((data ?? []) as any[]).reduce((acc: Record<string, ClientGroup>, task: any) => {
         const clientId = task.client_id;
         if (!acc[clientId]) {
           acc[clientId] = {

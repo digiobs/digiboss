@@ -39,6 +39,7 @@ type TldvRow = {
   transcript_status?: string | null;
   ai_summary_json?: Record<string, unknown> | null;
   highlights_json?: unknown[] | null;
+  thumbnail_url?: string | null;
 };
 
 function toNumber(value: number | string | null | undefined): number {
@@ -247,7 +248,7 @@ function mapTldvRowToMeeting(row: TldvRow): Meeting {
     date: row.happened_at ?? new Date().toISOString(),
     duration: Math.max(1, Math.round(durationSeconds / 60)),
     videoUrl: row.meeting_url ?? undefined,
-    thumbnailUrl: undefined,
+    thumbnailUrl: row.thumbnail_url ?? undefined,
     transcriptStatus:
       row.transcript_status === "processing"
         ? "processing"
@@ -300,7 +301,7 @@ export function useSupabaseMeetings() {
         let query = (supabase as any)
           .from("tldv_meetings")
           .select(
-            "id,name,happened_at,duration_seconds,organizer_name,organizer_email,meeting_url,participants_count,raw,client_id,transcript_text,transcript_segments,transcript_status,ai_summary_json,highlights_json",
+            "id,name,happened_at,duration_seconds,organizer_name,organizer_email,meeting_url,participants_count,raw,client_id,transcript_text,transcript_segments,transcript_status,ai_summary_json,highlights_json,thumbnail_url",
           )
           .order("happened_at", { ascending: false })
           .limit(200);

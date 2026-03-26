@@ -16,6 +16,7 @@ type MeetingRow = {
   client_id: string | null;
   meeting_url: string | null;
   raw: Record<string, unknown> | null;
+  thumbnail_url: string | null;
 };
 
 type TranscriptSegment = {
@@ -216,6 +217,31 @@ async function fetchJsonFromPaths(
   };
 }
 
+function extractThumbnailUrl(payload: unknown): string | null {
+  const root = asObject(payload);
+  if (!root) return null;
+  // Try common thumbnail field names in tldv API responses
+  const candidates = [
+    root["thumbnailUrl"],
+    root["thumbnail_url"],
+    root["thumbnail"],
+    root["imageUrl"],
+    root["image_url"],
+    root["coverImageUrl"],
+    root["preview_url"],
+    asObject(root["data"])?.["thumbnailUrl"],
+    asObject(root["data"])?.["thumbnail"],
+    asObject(root["meeting"])?.["thumbnailUrl"],
+    asObject(root["meeting"])?.["thumbnail"],
+    asObject(root["extraProperties"])?.["thumbnailUrl"],
+    asObject(root["extraProperties"])?.["thumbnail"],
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.startsWith("http")) return candidate;
+  }
+  return null;
+}
+
 function inferHighlightType(text: string): StoredHighlight["type"] {
   const lower = text.toLowerCase();
   if (/(decid|approved|validation|validated)/.test(lower)) return "decision";
@@ -301,7 +327,7 @@ serve(async (req) => {
 
     let query = supabase
       .from("tldv_meetings")
-      .select("id,client_id,meeting_url,raw")
+      .select("id,client_id,meeting_url,raw,thumbnail_url")
       .order("happened_at", { ascending: false })
       .limit(limit);
     if (clientId) query = query.eq("client_id", clientId);
@@ -345,14 +371,22 @@ serve(async (req) => {
 
       let transcriptSource: string | null = null;
       let transcriptError: string | null = null;
+      let thumbnailUrl: string | null = meeting.thumbnail_url ?? null;
       if (TLDV_API_KEY) {
-        const fetchedTranscript = await fetchJsonFromPaths(meeting.id, TLDV_API_KEY, [
-          `/meetings/${meeting.id}/transcript`,
+        // Fetch meeting detail first (has thumbnail), also try transcript endpoint
+        const fetchedDetail = await fetchJsonFromPaths(meeting.id, TLDV_API_KEY, [
           `/meetings/${meeting.id}`,
         ]);
-        transcriptSource = fetchedTranscript.source;
+        if (fetchedDetail.payload) {
+          thumbnailUrl = extractThumbnailUrl(fetchedDetail.payload) ?? thumbnailUrl;
+        }
+
+        const fetchedTranscript = await fetchJsonFromPaths(meeting.id, TLDV_API_KEY, [
+          `/meetings/${meeting.id}/transcript`,
+        ]);
+        transcriptSource = fetchedTranscript.source ?? fetchedDetail.source;
         transcriptError = fetchedTranscript.error;
-        const candidates = extractSegmentCandidates(fetchedTranscript.payload);
+        const candidates = extractSegmentCandidates(fetchedTranscript.payload ?? fetchedDetail.payload);
         segments = normalizeSegments(candidates, meeting.id);
 
         const fetchedHighlights = await fetchJsonFromPaths(meeting.id, TLDV_API_KEY, [
@@ -430,6 +464,7 @@ serve(async (req) => {
         transcript_source: transcriptSource,
         transcript_error: transcriptError,
         transcript_synced_at: new Date().toISOString(),
+        thumbnail_url: thumbnailUrl,
       });
       diagnostics.push({
         meetingId: meeting.id,
@@ -452,6 +487,7 @@ serve(async (req) => {
             transcript_source: update.transcript_source,
             transcript_error: update.transcript_error,
             transcript_synced_at: update.transcript_synced_at,
+            thumbnail_url: update.thumbnail_url ?? null,
           })
           .eq("id", id);
         if (updateError) {

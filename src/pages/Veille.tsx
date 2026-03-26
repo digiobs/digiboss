@@ -18,6 +18,7 @@ import {
   Megaphone,
   MessageCircle,
   Scale,
+  RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useVeilleItems } from '@/hooks/useVeilleItems';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 // Severity config
@@ -72,11 +76,29 @@ function getSeverityConfig(severity: string) {
 
 export default function Veille() {
   const { clients } = useClient();
+  const { isAdmin } = useVisibilityMode();
   const [selectedClientId, setSelectedClientId] = useState<string>(ALL_CLIENTS_ID);
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  const syncMarketNews = async () => {
+    setSyncing(true);
+    try {
+      const payload = selectedClientId === ALL_CLIENTS_ID ? {} : { clientId: selectedClientId };
+      const { error } = await supabase.functions.invoke('market-news', { body: payload });
+      if (error) throw error;
+      toast.success('Veille data synced');
+      window.location.reload();
+    } catch (error) {
+      console.error('market-news sync failed:', error);
+      toast.error('Sync veille failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const clientFilter = selectedClientId === ALL_CLIENTS_ID ? null : selectedClientId;
   const { data: items = [], isLoading } = useVeilleItems({
@@ -109,14 +131,22 @@ export default function Veille() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <Newspaper className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Veille</h1>
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Newspaper className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Veille</h1>
+          </div>
+          <p className="text-muted-foreground mt-1">
+            Signaux marche, alertes concurrentielles et opportunites detectes par les skills DigiObs.
+          </p>
         </div>
-        <p className="text-muted-foreground mt-1">
-          Signaux marche, alertes concurrentielles et opportunites detectes par les skills DigiObs.
-        </p>
+        {isAdmin && (
+          <Button variant="outline" className="gap-2" onClick={syncMarketNews} disabled={syncing}>
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync Veille'}
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}

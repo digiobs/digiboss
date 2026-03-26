@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Video, BarChart3, Newspaper } from 'lucide-react';
+import { Video, BarChart3, Newspaper, RefreshCw } from 'lucide-react';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
+import { Button } from '@/components/ui/button';
 import { InsightsTopBar } from '@/components/insights/InsightsTopBar';
 import { MeetingInsightsHeader } from '@/components/insights/MeetingInsightsHeader';
 import { MeetingsTable } from '@/components/insights/MeetingsTable';
@@ -19,6 +21,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 export default function Insights() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentClient, isAllClientsSelected, clientConfig } = useClient();
+  const { isAdmin } = useVisibilityMode();
   const { context: veilleContext, loading: veilleLoading, error: veilleError } = useVeilleContext();
   const { loading: meetingsLoading, meetings, error: meetingsError, projectUrl, refetch } = useSupabaseMeetings();
   const performanceInsights: [] = [];
@@ -100,6 +103,13 @@ export default function Insights() {
           <p className="text-muted-foreground mt-1">
             Meeting intelligence, transcripts, and market research in one place.
           </p>
+        </div>
+        {isAdmin && (
+          <Button variant="outline" className="gap-2" onClick={handleSyncTldv} disabled={syncingTldv}>
+            <RefreshCw className={`w-4 h-4 ${syncingTldv ? 'animate-spin' : ''}`} />
+            {syncingTldv ? 'Syncing tl;dv...' : 'Sync tl;dv'}
+          </Button>
+        )}
         </div>
       </div>
       <TabDataStatusBanner tab="insights" />

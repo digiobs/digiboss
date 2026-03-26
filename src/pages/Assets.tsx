@@ -8,7 +8,9 @@ import { useSupabaseAssets } from '@/hooks/useSupabaseTabData';
 import { useDeliverables } from '@/hooks/useDeliverables';
 import { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/contexts/ClientContext';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Import asset illustrations
 import assetLogo from '@/assets/illustrations/asset-logo.jpg';
@@ -82,6 +84,24 @@ export default function Assets() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const { data: resolvedAssets } = useSupabaseAssets(assets);
   const { currentClient, isAllClientsSelected } = useClient();
+  const { isAdmin } = useVisibilityMode();
+  const [syncingAssets, setSyncingAssets] = useState(false);
+
+  const syncAllAssets = async () => {
+    setSyncingAssets(true);
+    try {
+      const payload = isAllClientsSelected ? { refresh: true } : { clientId: currentClient?.id, refresh: true };
+      const { error } = await supabase.functions.invoke('figma-projects', { body: payload });
+      if (error) throw error;
+      toast.success('Assets synced');
+      window.location.reload();
+    } catch (err) {
+      console.error('assets sync failed:', err);
+      toast.error('Assets sync failed');
+    } finally {
+      setSyncingAssets(false);
+    }
+  };
 
   // Brand guidelines from client fiches
   const [brandGuidelines, setBrandGuidelines] = useState<BrandGuidelines | null>(null);
@@ -302,10 +322,18 @@ export default function Assets() {
             {isAllClientsSelected ? 'all clients' : currentClient?.name ?? 'selected client'}.
           </p>
         </div>
-        <Button className="gap-2">
-          <Plus className="w-4 h-4" />
-          Upload Asset
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button variant="outline" className="gap-2" onClick={syncAllAssets} disabled={syncingAssets}>
+              <RefreshCw className={`w-4 h-4 ${syncingAssets ? 'animate-spin' : ''}`} />
+              {syncingAssets ? 'Syncing...' : 'Sync Assets'}
+            </Button>
+          )}
+          <Button className="gap-2">
+            <Plus className="w-4 h-4" />
+            Upload Asset
+          </Button>
+        </div>
       </div>
       <TabDataStatusBanner tab="assets" />
 

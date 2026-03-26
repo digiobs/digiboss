@@ -21,6 +21,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { useVisibilityMode } from "@/hooks/useVisibilityMode";
 import {
   Bar,
   BarChart,
@@ -179,7 +180,25 @@ function asObject(value: unknown): Record<string, unknown> {
 export default function Contenus() {
   const queryClient = useQueryClient();
   const { clients, currentClient } = useClient();
+  const { isAdmin } = useVisibilityMode();
   const [selectedClientId, setSelectedClientId] = useState<string>(ALL_CLIENTS_ID);
+  const [syncing, setSyncing] = useState(false);
+
+  const syncLinkedIn = async () => {
+    setSyncing(true);
+    try {
+      const payload = selectedClientId === ALL_CLIENTS_ID ? {} : { clientId: selectedClientId };
+      const { error } = await supabase.functions.invoke('fetch-linkedin-posts', { body: payload });
+      if (error) throw error;
+      toast.success('Content data synced');
+      queryClient.invalidateQueries({ queryKey: ["contenus"] });
+    } catch (err) {
+      console.error('content sync failed:', err);
+      toast.error('Content sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
   const [rangePreset, setRangePreset] = useState<RangePreset>("30d");
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
@@ -482,6 +501,12 @@ export default function Contenus() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {isAdmin && (
+            <Button variant="outline" className="gap-2" onClick={syncLinkedIn} disabled={syncing}>
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Contenus'}
+            </Button>
+          )}
           <Select value={selectedClientId} onValueChange={setSelectedClientId}>
             <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Client" />

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { 
-  PenTool, 
-  Sparkles, 
-  LayoutGrid, 
-  Calendar, 
+import {
+  PenTool,
+  Sparkles,
+  LayoutGrid,
+  Calendar,
   BarChart3,
   FileText,
   Quote,
@@ -12,11 +12,14 @@ import {
   Layout,
   Plus,
   Database,
-  ExternalLink
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
+import { supabase } from '@/integrations/supabase/client';
 import { OpportunityCard } from '@/components/content/OpportunityCard';
 import { OpportunityFilters, SortOption } from '@/components/content/OpportunityFilters';
 import { ContentStudio } from '@/components/content/ContentStudio';
@@ -60,7 +63,24 @@ const contentTypeIcons: Record<string, React.ElementType> = {
 
 export default function ContentCreator() {
   const navigate = useNavigate();
-  
+  const { isAdmin } = useVisibilityMode();
+  const [syncing, setSyncing] = useState(false);
+
+  const syncContent = async () => {
+    setSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke('ai-suggest-tasks', { body: {} });
+      if (error) throw error;
+      toast.success('Content suggestions synced');
+      window.location.reload();
+    } catch (err) {
+      console.error('content sync failed:', err);
+      toast.error('Content sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Main state
   const [activeTab, setActiveTab] = useState<MainTab>('opportunities');
   const [workflowView, setWorkflowView] = useState<WorkflowView>('kanban');
@@ -251,10 +271,18 @@ export default function ContentCreator() {
             AI-powered content opportunities ranked by impact. Create what matters most.
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setTypePickerOpen(true)}>
-          <Plus className="w-4 h-4" />
-          New Content
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button variant="outline" className="gap-2" onClick={syncContent} disabled={syncing}>
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Content'}
+            </Button>
+          )}
+          <Button className="gap-2" onClick={() => setTypePickerOpen(true)}>
+            <Plus className="w-4 h-4" />
+            New Content
+          </Button>
+        </div>
       </div>
       <TabDataStatusBanner tab="content" />
 

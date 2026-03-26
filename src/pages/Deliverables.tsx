@@ -12,6 +12,7 @@ import {
   Newspaper,
   Zap,
   Layers,
+  RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useDeliverables, type Deliverable } from '@/hooks/useDeliverables';
 
 const typeConfig: Record<string, { label: string; icon: typeof FileText; className: string }> = {
@@ -55,12 +57,20 @@ const statusColors: Record<string, string> = {
 
 export default function Deliverables() {
   const { clients } = useClient();
+  const { isAdmin } = useVisibilityMode();
   const [selectedClientId, setSelectedClientId] = useState<string>(ALL_CLIENTS_ID);
   const [selectedType, setSelectedType] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const clientFilter = selectedClientId === ALL_CLIENTS_ID ? null : selectedClientId;
-  const { data: deliverables = [], isLoading } = useDeliverables({ clientId: clientFilter, type: selectedType });
+  const { data: deliverables = [], isLoading, refetch } = useDeliverables({ clientId: clientFilter, type: selectedType });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   const filtered = useMemo(() => {
     if (!search.trim()) return deliverables;
@@ -92,14 +102,22 @@ export default function Deliverables() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <FileCheck className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Livrables</h1>
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <FileCheck className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Livrables</h1>
+          </div>
+          <p className="text-muted-foreground mt-1">
+            Tous les outputs produits par les skills DigiObs — rapports, audits, contenus, analyses.
+          </p>
         </div>
-        <p className="text-muted-foreground mt-1">
-          Tous les outputs produits par les skills DigiObs — rapports, audits, contenus, analyses.
-        </p>
+        {isAdmin && (
+          <Button variant="outline" className="gap-2" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh Data'}
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}

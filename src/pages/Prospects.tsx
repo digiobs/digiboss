@@ -4,6 +4,7 @@ import { leads as mockLeads } from '@/data/mockData';
 import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 import { useSupabaseProspectLeads } from '@/hooks/useSupabaseTabData';
 import { useClient } from '@/contexts/ClientContext';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ export default function Prospects() {
   const [sortBy, setSortBy] = useState('score-desc');
   const [syncingLemlist, setSyncingLemlist] = useState(false);
   const { currentClient, isAllClientsSelected } = useClient();
+  const { isAdmin } = useVisibilityMode();
   const { data: leads, refetch } = useSupabaseProspectLeads(mockLeads);
 
   const syncLemlistLeads = async () => {
@@ -96,10 +98,12 @@ export default function Prospects() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2" onClick={syncLemlistLeads} disabled={syncingLemlist}>
-            <RefreshCw className={`w-4 h-4 ${syncingLemlist ? 'animate-spin' : ''}`} />
-            {syncingLemlist ? 'Syncing Lemlist...' : 'Sync Lemlist'}
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" className="gap-2" onClick={syncLemlistLeads} disabled={syncingLemlist}>
+              <RefreshCw className={`w-4 h-4 ${syncingLemlist ? 'animate-spin' : ''}`} />
+              {syncingLemlist ? 'Syncing Lemlist...' : 'Sync Lemlist'}
+            </Button>
+          )}
           <Button variant="outline" className="gap-2">
             <Download className="w-4 h-4" />
             Export

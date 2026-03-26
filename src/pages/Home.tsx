@@ -10,20 +10,42 @@ import { type NextBestAction, dashboardKPIs } from "@/data/dashboardData";
 import { useHomeReportingKpis } from "@/hooks/useHomeData";
 import { TabDataStatusBanner } from "@/components/data/TabDataStatusBanner";
 import { ALL_CLIENTS_ID, useClient } from "@/contexts/ClientContext";
+import { useVisibilityMode } from "@/hooks/useVisibilityMode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpRight, CalendarDays, LayoutDashboard, Sparkles, Zap } from "lucide-react";
+import { ArrowUpRight, CalendarDays, LayoutDashboard, RefreshCw, Sparkles, Zap } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export default function Home() {
   const { clients } = useClient();
+  const { isAdmin } = useVisibilityMode();
   const [selectedClientId, setSelectedClientId] = useState<string>(ALL_CLIENTS_ID);
+  const [syncing, setSyncing] = useState(false);
   const [selectedAction, setSelectedAction] = useState<NextBestAction | null>(null);
   const [generateSignal, setGenerateSignal] = useState(0);
   const [isGeneratingActions, setIsGeneratingActions] = useState(false);
   const highlightedActionIds = selectedAction ? [selectedAction.id] : [];
   const { data: reportingData } = useHomeReportingKpis(selectedClientId);
+
+  const syncDashboard = async () => {
+    setSyncing(true);
+    try {
+      const payload = selectedClientId === ALL_CLIENTS_ID ? {} : { clientId: selectedClientId };
+      const { error } = await supabase.functions.invoke('dashboard-news', { body: payload });
+      if (error) throw error;
+      toast.success('Dashboard data synced');
+      window.location.reload();
+    } catch (error) {
+      console.error('dashboard sync failed:', error);
+      toast.error('Dashboard sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const heroKpis = useMemo(() => {
     if (reportingData?.hasData && reportingData.heroKpis.length > 0) {
       return reportingData.heroKpis;
@@ -53,6 +75,12 @@ export default function Home() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {isAdmin && (
+              <Button variant="outline" size="sm" className="gap-2" onClick={syncDashboard} disabled={syncing}>
+                <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync Data'}
+              </Button>
+            )}
             <Select value={selectedClientId} onValueChange={setSelectedClientId}>
               <SelectTrigger className="w-[220px] bg-background">
                 <SelectValue placeholder="Client" />

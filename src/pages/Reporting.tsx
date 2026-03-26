@@ -17,6 +17,7 @@ import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useClient } from '@/contexts/ClientContext';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useReportingKpis } from '@/hooks/useReportingKpis';
 
 type ReportingSection =
@@ -47,6 +48,7 @@ export default function Reporting() {
   const [searchParams] = useSearchParams();
   const [syncing, setSyncing] = useState(false);
   const { currentClient, isAllClientsSelected } = useClient();
+  const { isAdmin } = useVisibilityMode();
   const { data: kpiData } = useReportingKpis();
 
   const activeSection = useMemo<ReportingSection>(() => {
@@ -87,12 +89,14 @@ export default function Reporting() {
       <div className="mb-4">
         <TabDataStatusBanner tab="reporting" />
       </div>
-      <div className="mb-4">
-        <Button variant="outline" className="gap-2" onClick={syncReportingData} disabled={syncing}>
-          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? 'Syncing reporting data...' : 'Sync reporting data'}
-        </Button>
-      </div>
+      {isAdmin && (
+        <div className="mb-4">
+          <Button variant="outline" className="gap-2" onClick={syncReportingData} disabled={syncing}>
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing reporting data...' : 'Sync reporting data'}
+          </Button>
+        </div>
+      )}
 
       {/* Sticky Top Bar */}
       <AnalyticsTopBar 

@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { LayoutGrid, AlertTriangle } from 'lucide-react';
+import { LayoutGrid, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useWrikeTasks } from '@/hooks/useWrikeTasks';
 import { WrikeKanban } from '@/components/plan/WrikeKanban';
 import { VisibilityToggle } from '@/components/plan/VisibilityToggle';
 import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { TaskStatus } from '@/types/tasks';
 
@@ -18,6 +21,22 @@ const statusToWrikeStep: Record<TaskStatus, string> = {
 export default function Plan() {
   const { mode, toggle, isAdmin } = useVisibilityMode();
   const { data: tasks = [], isLoading, error } = useWrikeTasks();
+  const [syncing, setSyncing] = useState(false);
+
+  const syncWrike = async () => {
+    setSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke('wrike-auto-match', { body: {} });
+      if (error) throw error;
+      toast.success('Wrike data synced');
+      window.location.reload();
+    } catch (err) {
+      console.error('wrike sync failed:', err);
+      toast.error('Wrike sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const wrikeMatchedCount = tasks.length;
 
@@ -34,7 +53,15 @@ export default function Plan() {
             Kanban de production de contenu — données Wrike en temps réel.
           </p>
         </div>
-        <VisibilityToggle mode={mode} onToggle={toggle} />
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button variant="outline" className="gap-2" onClick={syncWrike} disabled={syncing}>
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Wrike'}
+            </Button>
+          )}
+          <VisibilityToggle mode={mode} onToggle={toggle} />
+        </div>
       </div>
       <TabDataStatusBanner tab="plan" />
 

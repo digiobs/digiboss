@@ -36,7 +36,7 @@ const STATUS_TO_WRIKE: Record<string, string> = {
 };
 
 async function fetchSupabaseFallback(): Promise<WrikeTask[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('plan_tasks')
     .select('*')
     .not('status', 'eq', 'cancelled')
@@ -44,8 +44,8 @@ async function fetchSupabaseFallback(): Promise<WrikeTask[]> {
 
   if (error || !data) return [];
 
-  return data.map((pt: Record<string, unknown>) => {
-    const client = CLIENT_DISPLAY[pt.client_id] || { name: pt.client_id, sector: 'industrial' };
+  return data.map((pt: any) => {
+    const client = CLIENT_DISPLAY[pt.client_id as string] || { name: pt.client_id, sector: 'industrial' };
     return {
       id: pt.wrike_task_id || pt.id,
       title: pt.title,

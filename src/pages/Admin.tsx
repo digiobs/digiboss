@@ -140,7 +140,7 @@ export default function Admin() {
       const insertPayload = supportsColor
         ? { name: trimmedName, color: clientColor }
         : { name: trimmedName };
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('clients')
         .insert(insertPayload)
         .select()

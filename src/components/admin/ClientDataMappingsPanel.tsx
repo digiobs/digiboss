@@ -140,7 +140,7 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
 
   const fetchMappings = async () => {
     setLoading(true);
-    let query = supabase
+    let query = (supabase as any)
       .from("client_data_mappings")
       .select("*")
       .order("updated_at", { ascending: false });
@@ -162,7 +162,7 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
       return;
     }
 
-    setMappings((data ?? []) as ClientDataMapping[]);
+    setMappings(((data ?? []) as unknown) as ClientDataMapping[]);
     setLoading(false);
   };
 
@@ -289,7 +289,7 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
       is_active: selectedValue ? (existing?.is_active ?? false) : false,
       last_sync_at: new Date().toISOString(),
     };
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("client_data_mappings")
       .upsert(payload, { onConflict: "client_id,provider,connector" });
     if (error) {
@@ -385,7 +385,7 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
 
     setSaving(true);
     if (form.id) {
-      const { error } = await supabase.from("client_data_mappings").update(payload).eq("id", form.id);
+      const { error } = await (supabase as any).from("client_data_mappings").update(payload).eq("id", form.id);
       if (error) {
         toast.error("Failed to update mapping");
         console.error("update mapping error:", error);
@@ -398,7 +398,7 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
       return;
     }
 
-    const { error } = await supabase.from("client_data_mappings").insert(payload);
+    const { error } = await (supabase as any).from("client_data_mappings").insert(payload);
     if (error) {
       toast.error("Failed to create mapping");
       console.error("insert mapping error:", error);
@@ -411,7 +411,7 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("client_data_mappings").delete().eq("id", id);
+    const { error } = await (supabase as any).from("client_data_mappings").delete().eq("id", id);
     if (error) {
       toast.error("Failed to delete mapping");
       console.error("delete mapping error:", error);
@@ -492,7 +492,7 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
       });
     }
 
-    const { error: upsertError } = await supabase
+    const { error: upsertError } = await (supabase as any)
       .from("client_data_mappings")
       .upsert(payloads, { onConflict: "client_id,provider,connector" });
 

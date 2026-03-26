@@ -261,7 +261,21 @@ export default function Veille() {
                             </p>
                             {item.source && (
                               <p className="text-xs text-muted-foreground">
-                                Source: {item.source}
+                                Source:{' '}
+                                {item.source_url ? (
+                                  <a
+                                    href={item.source_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline hover:text-foreground transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {item.source}
+                                    <ExternalLink className="w-3 h-3 inline ml-1 -mt-0.5" />
+                                  </a>
+                                ) : (
+                                  item.source
+                                )}
                               </p>
                             )}
                             {(item.details as Record<string, unknown> | null)?.keywords && (

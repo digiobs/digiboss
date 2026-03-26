@@ -57,7 +57,7 @@ export function useTabDataHealth(tab: AppTabKey) {
       const rowCounts: Record<string, number> = {};
 
       for (const table of requiredTables) {
-        let query = supabase.from(table).select("*", { count: "exact", head: true });
+        let query = (supabase as any).from(table).select("*", { count: "exact", head: true });
         if (currentClient?.id && !isAllClientsSelected && table !== "clients" && table !== "client_configs") {
           query = query.eq("client_id", currentClient.id);
         }

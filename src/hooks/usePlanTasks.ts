@@ -69,7 +69,7 @@ export function usePlanTasks(clientId?: string) {
   return useQuery({
     queryKey: ['plan-tasks', clientId],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from('plan_tasks')
         .select('*')
         .not('status', 'eq', 'cancelled')
@@ -81,7 +81,7 @@ export function usePlanTasks(clientId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []).map(planTaskToWrikeTask);
+      return ((data || []) as any[]).map(planTaskToWrikeTask);
     },
     staleTime: 2 * 60 * 1000,
   });

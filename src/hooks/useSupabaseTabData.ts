@@ -55,7 +55,7 @@ export function useSupabaseProspectLeads(fallback: Lead[]): LoadState<Lead[]> {
         if (mounted) setState({ data: fallback, loading: false, source: "fallback", refetch });
         return;
       }
-      let query = supabase
+      let query = (supabase as any)
         .from("prospect_leads")
         .select("*")
         .order("created_at", { ascending: false });
@@ -122,7 +122,7 @@ export function useSupabasePlanTasks(fallback: Task[]): LoadState<Task[]> {
         if (mounted) setState({ data: fallback, loading: false, source: "fallback", refetch: async () => undefined });
         return;
       }
-      let query = supabase
+      let query = (supabase as any)
         .from("plan_tasks")
         .select("*")
         .order("created_at", { ascending: false });
@@ -198,7 +198,7 @@ export function useSupabaseAssets(fallback: Asset[]): LoadState<Asset[]> {
         if (mounted) setState({ data: fallback, loading: false, source: "fallback", refetch: async () => undefined });
         return;
       }
-      let query = supabase
+      let query = (supabase as any)
         .from("asset_library")
         .select("*")
         .order("updated_at", { ascending: false });

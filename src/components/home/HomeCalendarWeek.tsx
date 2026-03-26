@@ -73,7 +73,7 @@ export function HomeCalendarWeek() {
       ) : (
         <div className="space-y-1">
           {days.map((day) => {
-            const dayEvents = (data?.events ?? []).filter((e: Record<string, unknown>) =>
+            const dayEvents = (data?.events ?? []).filter((e: any) =>
               isSameDay(new Date(e.scheduled_at), day)
             );
             const today = isToday(day);
@@ -95,7 +95,7 @@ export function HomeCalendarWeek() {
                   <p className="text-xs text-muted-foreground italic">Journée libre</p>
                 ) : (
                   <div className="space-y-1">
-                    {dayEvents.map((event: Record<string, unknown>) => {
+                    {dayEvents.map((event: any) => {
                       const cfg = eventTypeConfig[event.event_type] || eventTypeConfig.content_planned;
                       const Icon = cfg.icon;
                       const time = format(new Date(event.scheduled_at), 'HH:mm');

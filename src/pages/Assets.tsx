@@ -106,7 +106,7 @@ export default function Assets() {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('client_brand_guidelines')
         .select('colors,typographies,figma_urls,style_visuel')
         .eq('client_id', currentClient.id)
@@ -146,7 +146,7 @@ export default function Assets() {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('client_configs')
         .select('onedrive_claude_path')
         .eq('client_id', currentClient.id)
@@ -173,7 +173,7 @@ export default function Assets() {
       }
 
       // Fetch folders from cache table
-      let folderQuery = supabase
+      let folderQuery = (supabase as any)
         .from('client_figma_folders')
         .select('id,client_id,file_key,file_name,folder_id,folder_name,folder_type,thumbnail_url')
         .order('page_index', { ascending: true })
@@ -182,8 +182,7 @@ export default function Assets() {
         folderQuery = folderQuery.eq('client_id', currentClient.id);
       }
 
-      // Fetch sync states
-      let syncQuery = supabase
+      let syncQuery = (supabase as any)
         .from('client_figma_sync_state')
         .select('client_id,status,folder_count,file_count,last_synced_at,message');
       if (!isAllClientsSelected) {

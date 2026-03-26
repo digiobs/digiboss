@@ -36,7 +36,7 @@ const STATUS_TO_WRIKE: Record<string, string> = {
 };
 
 async function fetchSupabaseFallback(): Promise<WrikeTask[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('plan_tasks')
     .select('*')
     .not('status', 'eq', 'cancelled')

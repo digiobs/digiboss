@@ -9,6 +9,7 @@ import {
   BookOpen,
   FolderOpen,
   BarChart3,
+  FileCheck,
   MessageSquare,
   Settings,
   ChevronDown,
@@ -46,6 +47,7 @@ const navItems = [
   { path: '/contenus', icon: BookOpen, label: 'Contenus' },
   { path: '/assets', icon: FolderOpen, label: 'Assets' },
   { path: '/reporting', icon: BarChart3, label: 'Reporting' },
+  { path: '/deliverables', icon: FileCheck, label: 'Livrables' },
   { path: '/chat', icon: MessageSquare, label: 'Talk to DigiObs' },
 ];
 

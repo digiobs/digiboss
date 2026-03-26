@@ -6,9 +6,18 @@ import { WrikeKanban } from '@/components/plan/WrikeKanban';
 import { VisibilityToggle } from '@/components/plan/VisibilityToggle';
 import { cn } from '@/lib/utils';
 
+const statusToWrikeStep: Record<TaskStatus, string> = {
+  backlog: 'Backlog',
+  doing: 'In Progress',
+  review: 'Review',
+  done: 'Done',
+};
+
 export default function Plan() {
   const { mode, toggle, isAdmin } = useVisibilityMode();
   const { data: tasks = [], isLoading, error } = useWrikeTasks();
+
+  const wrikeMatchedCount = tasks.filter((t) => t.wrikeTaskId || t.wrikeStepId).length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -25,6 +34,7 @@ export default function Plan() {
         </div>
         <VisibilityToggle mode={mode} onToggle={toggle} />
       </div>
+      <TabDataStatusBanner tab="plan" />
 
       {/* Client mode banner */}
       {!isAdmin && (

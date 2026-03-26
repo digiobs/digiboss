@@ -8,9 +8,12 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:functions": "node ./scripts/smoke-edge-functions.mjs",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build && npm run smoke:functions"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

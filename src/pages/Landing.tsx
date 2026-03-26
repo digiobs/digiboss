@@ -18,6 +18,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { InteractiveDashboardPreview } from '@/components/landing/InteractiveDashboardPreview';
+import { usePreAuth } from '@/contexts/PreAuthContext';
+import { useAuth } from '@/hooks/useAuth';
 
 const features = [
   {
@@ -104,6 +106,12 @@ const integrations = [
 ];
 
 export default function Landing() {
+  const { isPreAuthenticated } = usePreAuth();
+  const { isAuthenticated } = useAuth();
+  const hasDashboardAccess = isPreAuthenticated || isAuthenticated;
+  const authRoute = hasDashboardAccess ? '/home' : '/login';
+  const authLabel = hasDashboardAccess ? 'Go to Dashboard' : 'Sign In';
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -133,10 +141,10 @@ export default function Landing() {
 
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/dashboard">Sign In</Link>
+              <Link to={authRoute}>{authLabel}</Link>
             </Button>
             <Button size="sm" className="gap-2" asChild>
-              <Link to="/dashboard">
+              <Link to={authRoute}>
                 Start Free Trial
                 <ArrowRight className="w-4 h-4" />
               </Link>

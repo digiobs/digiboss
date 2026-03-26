@@ -2,6 +2,7 @@ import { TrendingUp, TrendingDown, Activity, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { sessionsTimeSeries } from '@/data/analyticsData';
+import { useReportingMetrics } from '@/hooks/useReportingMetrics';
 import {
   ChartContainer,
   ChartTooltip,
@@ -15,10 +16,21 @@ const chartConfig = {
 };
 
 export function WebsitePerformanceSection() {
+  const { getMetric, hasData } = useReportingMetrics(['website', 'conversion']);
+  const liveImpressions = getMetric('impressions', 0);
+  const liveConversions = getMetric('conversions', 0);
+  const liveConvRate = getMetric('conv_rate', 0);
+
   const qualityIndicators = [
-    { label: 'Bounce Rate', value: '42.3%', delta: -8.1, isGood: true },
-    { label: 'Avg. Session Duration', value: '2m 34s', delta: -5.3, isGood: false },
-    { label: 'Pages / Session', value: '2.8', delta: 4.2, isGood: true },
+    hasData
+      ? { label: 'Impressions', value: Math.round(liveImpressions).toLocaleString(), delta: 0, isGood: true }
+      : { label: 'Bounce Rate', value: '42.3%', delta: -8.1, isGood: true },
+    hasData
+      ? { label: 'Conversions', value: Math.round(liveConversions).toLocaleString(), delta: 0, isGood: true }
+      : { label: 'Avg. Session Duration', value: '2m 34s', delta: -5.3, isGood: false },
+    hasData
+      ? { label: 'Conv. Rate', value: `${liveConvRate.toFixed(2)}%`, delta: 0, isGood: true }
+      : { label: 'Pages / Session', value: '2.8', delta: 4.2, isGood: true },
   ];
 
   return (
@@ -28,7 +40,7 @@ export function WebsitePerformanceSection() {
           <div className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-primary" />
             <h2 className="font-semibold">Website Performance</h2>
-            <Badge variant="secondary" className="text-xs">Traffic & Engagement</Badge>
+            <Badge variant="secondary" className="text-xs">{hasData ? 'Traffic Live' : 'Traffic & Engagement'}</Badge>
           </div>
         </div>
       </div>

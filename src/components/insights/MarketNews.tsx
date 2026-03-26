@@ -133,13 +133,58 @@ export function MarketNews({ competitors, keywords, industry }: MarketNewsProps)
   const [activeCategory, setActiveCategory] = useState('marketing');
   const { articles, isLoading, error, refetch } = useMarketNews(activeCategory, { competitors, keywords, industry });
 
-  // Add custom competitor category if competitors are configured
+  // Adapt tab labels to current client context.
+  const contextualCategories = useMemo(() => {
+    const firstKeyword = keywords?.[0]?.trim();
+    const secondKeyword = keywords?.[1]?.trim();
+    const industryLabel = industry?.trim();
+
+    return defaultCategories.map((cat) => {
+      if (cat.id === 'marketing') {
+        return {
+          ...cat,
+          label: firstKeyword ? `Marketing: ${firstKeyword}` : cat.label,
+        };
+      }
+      if (cat.id === 'technology') {
+        return {
+          ...cat,
+          label: secondKeyword
+            ? `Technology: ${secondKeyword}`
+            : industryLabel
+              ? `Technology: ${industryLabel}`
+              : cat.label,
+        };
+      }
+      if (cat.id === 'finance') {
+        return {
+          ...cat,
+          label: industryLabel ? `Finance: ${industryLabel}` : cat.label,
+        };
+      }
+      if (cat.id === 'industry') {
+        return {
+          ...cat,
+          label: industryLabel ? `Industry: ${industryLabel}` : cat.label,
+        };
+      }
+      if (cat.id === 'competitor') {
+        return {
+          ...cat,
+          label: competitors && competitors.length > 0 ? `Competitors (${competitors.length})` : cat.label,
+        };
+      }
+      return cat;
+    });
+  }, [competitors, industry, keywords]);
+
+  // Keep competitor tab only when competitors are configured.
   const categories = useMemo(() => {
     if (competitors && competitors.length > 0) {
-      return defaultCategories;
+      return contextualCategories;
     }
-    return defaultCategories.filter(c => c.id !== 'competitor');
-  }, [competitors]);
+    return contextualCategories.filter(c => c.id !== 'competitor');
+  }, [competitors, contextualCategories]);
 
   const handleCategoryChange = (category: string) => {
     setActiveCategory(category);
@@ -182,10 +227,10 @@ export function MarketNews({ competitors, keywords, industry }: MarketNewsProps)
               <TabsTrigger
                 key={cat.id}
                 value={cat.id}
-                className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4"
+                className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 max-w-[220px]"
               >
                 <Icon className="w-3.5 h-3.5" />
-                {cat.label}
+                <span className="truncate">{cat.label}</span>
               </TabsTrigger>
             );
           })}

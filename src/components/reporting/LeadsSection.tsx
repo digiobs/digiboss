@@ -7,9 +7,36 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { leadsData, leadSourceBreakdown } from '@/data/analyticsData';
+import { useSupabaseProspectLeads } from '@/hooks/useSupabaseTabData';
+import { leads as fallbackLeads } from '@/data/mockData';
 
 export function LeadsSection() {
-  const totalLeads = 156;
+  const { data: prospectLeads, source } = useSupabaseProspectLeads(fallbackLeads);
+  const totalLeads = prospectLeads.length;
+  const latestLeads = prospectLeads.slice(0, 4).map((lead, index) => ({
+    id: lead.id,
+    contact: lead.name,
+    source: lead.source,
+    page: lead.company,
+    lastSeen: lead.lastActivity || 'NA',
+    email: lead.email,
+    date: String(index),
+  }));
+  const sourceCounts = Object.entries(
+    prospectLeads.reduce<Record<string, number>>((acc, lead) => {
+      const key = lead.source || 'Unknown';
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {}),
+  )
+    .map(([sourceName, count]) => ({
+      source: sourceName,
+      leads: count,
+      share: totalLeads > 0 ? (count / totalLeads) * 100 : 0,
+    }))
+    .sort((a, b) => b.leads - a.leads);
+  const displayedSourceBreakdown = sourceCounts.length > 0 ? sourceCounts : leadSourceBreakdown;
+  const displayedLatestLeads = latestLeads.length > 0 ? latestLeads : leadsData.slice(0, 4);
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -19,7 +46,7 @@ export function LeadsSection() {
             <Users className="w-5 h-5 text-primary" />
             <h2 className="font-semibold">Leads</h2>
             <Badge variant="secondary" className="text-xs">
-              Sample Data
+              {source === 'supabase' ? 'Live Data' : 'Sample Data'}
             </Badge>
             <TooltipProvider>
               <Tooltip>
@@ -57,7 +84,7 @@ export function LeadsSection() {
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Source → Leads</h3>
             <div className="space-y-2">
-              {leadSourceBreakdown.map((source, index) => (
+              {displayedSourceBreakdown.map((source, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <span className="text-sm">{source.source}</span>
                   <div className="flex items-center gap-2">
@@ -78,7 +105,7 @@ export function LeadsSection() {
           <div className="lg:col-span-1">
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Latest Leads</h3>
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
-              {leadsData.slice(0, 4).map((lead) => (
+              {displayedLatestLeads.map((lead) => (
                 <div key={lead.id} className="p-2 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{lead.contact}</span>

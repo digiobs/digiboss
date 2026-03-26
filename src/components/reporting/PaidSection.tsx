@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { googleAdsKPIs, googleAdsCampaigns, googleAdsTimeSeries, linkedInAdsStatus } from '@/data/analyticsData';
+import { useReportingMetrics } from '@/hooks/useReportingMetrics';
 import {
   ChartContainer,
   ChartTooltip,
@@ -16,15 +17,27 @@ const chartConfig = {
 };
 
 export function PaidSection() {
+  const { getMetric, hasData } = useReportingMetrics(['paid', 'conversion']);
+  const liveClicks = getMetric('ad_clicks', googleAdsKPIs.clicks);
+  const liveImpressions = getMetric('impressions', googleAdsKPIs.impressions);
+  const liveConversions = getMetric('conversions', googleAdsKPIs.conversions);
+  const liveSpend = getMetric('ad_spend', googleAdsKPIs.spend);
+  const liveRoas = getMetric('roas', 0);
+  const liveCtr = liveImpressions > 0 ? (liveClicks / liveImpressions) * 100 : googleAdsKPIs.ctr;
+  const liveConvRate = getMetric('conv_rate', googleAdsKPIs.conversionRate);
+  const liveAvgCpc = liveClicks > 0 ? liveSpend / liveClicks : googleAdsKPIs.avgCpc;
+  const liveCpa = liveConversions > 0 ? liveSpend / liveConversions : googleAdsKPIs.cpa;
+
   const googleKPICards = [
-    { label: 'Clicks', value: googleAdsKPIs.clicks.toLocaleString(), delta: googleAdsKPIs.clicksDelta },
-    { label: 'Impressions', value: googleAdsKPIs.impressions.toLocaleString(), delta: googleAdsKPIs.impressionsDelta },
-    { label: 'CTR', value: `${googleAdsKPIs.ctr}%`, delta: googleAdsKPIs.ctrDelta },
-    { label: 'Conversions', value: googleAdsKPIs.conversions.toString(), delta: googleAdsKPIs.conversionsDelta },
-    { label: 'Conv. Rate', value: `${googleAdsKPIs.conversionRate}%`, delta: googleAdsKPIs.conversionRateDelta },
-    { label: 'Spend', value: `€${googleAdsKPIs.spend.toLocaleString()}`, delta: googleAdsKPIs.spendDelta, invertColor: true },
-    { label: 'Avg. CPC', value: `€${googleAdsKPIs.avgCpc}`, delta: googleAdsKPIs.avgCpcDelta, invertColor: true },
-    { label: 'CPA', value: `€${googleAdsKPIs.cpa.toFixed(0)}`, delta: googleAdsKPIs.cpaDelta, invertColor: true },
+    { label: 'Clicks', value: Math.round(liveClicks).toLocaleString(), delta: 0 },
+    { label: 'Impressions', value: Math.round(liveImpressions).toLocaleString(), delta: 0 },
+    { label: 'CTR', value: `${liveCtr.toFixed(2)}%`, delta: 0 },
+    { label: 'Conversions', value: Math.round(liveConversions).toString(), delta: 0 },
+    { label: 'Conv. Rate', value: `${liveConvRate.toFixed(2)}%`, delta: 0 },
+    { label: 'Spend', value: `€${Math.round(liveSpend).toLocaleString()}`, delta: 0, invertColor: true },
+    { label: 'Avg. CPC', value: `€${liveAvgCpc.toFixed(2)}`, delta: 0, invertColor: true },
+    { label: 'ROAS', value: liveRoas > 0 ? liveRoas.toFixed(2) : 'NA', delta: 0 },
+    { label: 'CPA', value: `€${liveCpa.toFixed(0)}`, delta: 0, invertColor: true },
   ];
 
   return (
@@ -33,6 +46,7 @@ export function PaidSection() {
         <div className="flex items-center gap-2">
           <CreditCard className="w-5 h-5 text-primary" />
           <h2 className="font-semibold">Paid Performance</h2>
+          {hasData && <Badge variant="secondary" className="text-xs">Live data</Badge>}
         </div>
       </div>
 
@@ -46,7 +60,7 @@ export function PaidSection() {
             <Linkedin className="w-4 h-4" />
             LinkedIn Ads
             {!linkedInAdsStatus.connected && (
-              <Badge variant="destructive" className="ml-1 text-xs px-1.5">Error</Badge>
+              <Badge variant="outline" className="ml-1 text-xs px-1.5">NA</Badge>
             )}
           </TabsTrigger>
         </TabsList>
@@ -164,13 +178,13 @@ export function PaidSection() {
             <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center mb-4">
               <AlertCircle className="w-8 h-8 text-red-500" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">Connection Error</h3>
+            <h3 className="text-lg font-semibold mb-2">LinkedIn Ads data not available</h3>
             <p className="text-muted-foreground max-w-md mb-4">
-              Unable to fetch data from LinkedIn Ads API. The data source connection needs to be re-established.
+              Data is currently unavailable for LinkedIn Ads. Reconnect the data source to resume reporting.
             </p>
             <div className="p-3 rounded-lg bg-muted/50 border border-border text-left max-w-md mb-6">
               <p className="text-xs font-mono text-muted-foreground">
-                <span className="text-red-500">Error:</span> {linkedInAdsStatus.error}
+                <span className="text-amber-500">Status:</span> {linkedInAdsStatus.error}
               </p>
               <p className="text-xs font-mono text-muted-foreground mt-1">
                 <span className="text-amber-500">Code:</span> {linkedInAdsStatus.errorCode}

@@ -36,6 +36,11 @@ export interface Task {
   linkedContentId?: string;
   linkedContentType?: 'opportunity' | 'content-item';
   sourceModule?: 'content-creator' | 'insights' | 'followup';
+  // Wrike linkage
+  wrikeTaskId?: string;
+  wrikeStepId?: string;
+  wrikeProjectId?: string;
+  wrikePermalink?: string;
 }
 
 export const mockTasks: Task[] = [

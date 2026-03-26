@@ -2,6 +2,7 @@ import { Globe, MapPin, Monitor, Smartphone, Tablet } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { audienceByCountry, audienceByRegion, audienceByCity, deviceBreakdown } from '@/data/analyticsData';
+import { useReportingMetrics } from '@/hooks/useReportingMetrics';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ChartTooltip } from '@/components/ui/chart';
 
@@ -18,13 +19,16 @@ const deviceIcons = {
 };
 
 export function AudienceSection() {
+  const { getMetric, hasData } = useReportingMetrics(['website']);
+  const liveUsers = getMetric('impressions', 0);
+
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <Globe className="w-5 h-5 text-primary" />
           <h2 className="font-semibold">Audience & Targeting</h2>
-          <Badge variant="secondary" className="text-xs">Who is visiting</Badge>
+          <Badge variant="secondary" className="text-xs">{hasData ? 'Who is visiting (mixed)' : 'Who is visiting'}</Badge>
         </div>
       </div>
 
@@ -32,6 +36,11 @@ export function AudienceSection() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Geography Tables */}
           <div className="lg:col-span-3">
+            {hasData && (
+              <p className="text-xs text-muted-foreground mb-3">
+                Estimated total audience from live traffic: {Math.round(liveUsers).toLocaleString()} users.
+              </p>
+            )}
             <Tabs defaultValue="country">
               <TabsList className="mb-4">
                 <TabsTrigger value="country">By Country</TabsTrigger>

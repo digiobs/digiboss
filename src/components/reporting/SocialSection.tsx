@@ -2,14 +2,20 @@ import { Linkedin, Users, Eye, MousePointerClick, Heart, MessageCircle, Share2, 
 import { Badge } from '@/components/ui/badge';
 import { socialKPIs, bestPosts } from '@/data/analyticsData';
 import { cn } from '@/lib/utils';
+import { useReportingMetrics } from '@/hooks/useReportingMetrics';
 
 export function SocialSection() {
+  const { getMetric, hasData } = useReportingMetrics(['social', 'paid']);
+  const liveFollowers = getMetric('li_followers', socialKPIs.followers);
+  const liveImpressions = getMetric('li_impressions', socialKPIs.impressions);
+  const liveClicks = getMetric('ad_clicks', socialKPIs.clicks);
+
   const kpiCards = [
-    { label: 'Followers', value: socialKPIs.followers.toLocaleString(), icon: Users },
-    { label: 'New Followers', value: `+${socialKPIs.newFollowers}`, delta: socialKPIs.newFollowersDelta, icon: Users },
-    { label: 'Impressions', value: socialKPIs.impressions.toLocaleString(), delta: socialKPIs.impressionsDelta, icon: Eye },
-    { label: 'Engagements', value: socialKPIs.engagements.toLocaleString(), delta: socialKPIs.engagementsDelta, icon: MousePointerClick },
-    { label: 'Clicks', value: socialKPIs.clicks.toLocaleString(), delta: socialKPIs.clicksDelta, icon: MousePointerClick },
+    { label: 'Followers', value: Math.round(liveFollowers).toLocaleString(), icon: Users },
+    { label: 'New Followers', value: hasData ? 'NA' : `+${socialKPIs.newFollowers}`, delta: hasData ? 0 : socialKPIs.newFollowersDelta, icon: Users },
+    { label: 'Impressions', value: Math.round(liveImpressions).toLocaleString(), delta: 0, icon: Eye },
+    { label: 'Engagements', value: hasData ? 'NA' : socialKPIs.engagements.toLocaleString(), delta: hasData ? 0 : socialKPIs.engagementsDelta, icon: MousePointerClick },
+    { label: 'Clicks', value: Math.round(liveClicks).toLocaleString(), delta: 0, icon: MousePointerClick },
     { label: 'Likes', value: socialKPIs.likes.toLocaleString(), delta: socialKPIs.likesDelta, icon: Heart },
   ];
 
@@ -19,7 +25,7 @@ export function SocialSection() {
         <div className="flex items-center gap-2">
           <Linkedin className="w-5 h-5 text-[#0A66C2]" />
           <h2 className="font-semibold">Social Performance</h2>
-          <Badge variant="secondary" className="text-xs">LinkedIn Organic</Badge>
+          <Badge variant="secondary" className="text-xs">{hasData ? 'LinkedIn Live' : 'LinkedIn Organic'}</Badge>
         </div>
       </div>
 

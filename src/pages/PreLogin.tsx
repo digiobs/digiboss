@@ -24,7 +24,7 @@ export default function PreLogin() {
 
     if (preLogin(username, password)) {
       toast.success('Access granted');
-      navigate('/');
+      navigate('/home');
     } else {
       toast.error('Invalid credentials');
     }

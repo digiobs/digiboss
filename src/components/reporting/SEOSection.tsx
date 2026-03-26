@@ -20,6 +20,7 @@ import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { cn } from '@/lib/utils';
 import { useGoogleSearchConsole } from '@/hooks/useGoogleSearchConsole';
 import { format, subDays } from 'date-fns';
+import { useReportingMetrics } from '@/hooks/useReportingMetrics';
 
 const chartConfig = {
   clicks: { label: 'Clicks', color: 'hsl(142, 76%, 36%)' },
@@ -27,6 +28,10 @@ const chartConfig = {
 };
 
 export function SEOSection() {
+  const { getMetric, hasData: hasReportingData } = useReportingMetrics(['acquisition']);
+  const liveSeoClicks = getMetric('seo_clicks', 0);
+  const liveAvgPosition = getMetric('avg_position', 0);
+
   const {
     isConnected,
     isLoading,
@@ -107,7 +112,9 @@ export function SEOSection() {
           <div className="flex items-center gap-2">
             <Search className="w-5 h-5 text-primary" />
             <h2 className="font-semibold">SEO Performance</h2>
-            <Badge variant="secondary" className="text-xs">Visibility & Rankings</Badge>
+            <Badge variant="secondary" className="text-xs">
+              {isConnected ? 'Visibility & Rankings' : hasReportingData ? 'Visibility (Supabase)' : 'Visibility & Rankings'}
+            </Badge>
           </div>
           
           <div className="flex items-center gap-2">
@@ -184,12 +191,18 @@ export function SEOSection() {
                 </div>
               ) : (
                 <div className="p-4 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
-                  <p className="text-sm text-muted-foreground">Domain Authority</p>
+                  <p className="text-sm text-muted-foreground">
+                    {hasReportingData ? 'SEO Clicks (Synced)' : 'Domain Authority'}
+                  </p>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-bold">45</span>
+                    <span className="text-3xl font-bold">
+                      {hasReportingData ? Math.round(liveSeoClicks).toLocaleString() : 45}
+                    </span>
                     <div className="flex items-center text-emerald-600">
                       <TrendingUp className="w-4 h-4" />
-                      <span className="text-sm font-medium">+2 pts</span>
+                      <span className="text-sm font-medium">
+                        {hasReportingData ? `Avg. pos ${liveAvgPosition > 0 ? liveAvgPosition.toFixed(1) : 'NA'}` : '+2 pts'}
+                      </span>
                     </div>
                   </div>
                 </div>

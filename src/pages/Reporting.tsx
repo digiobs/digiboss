@@ -1,4 +1,6 @@
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, RefreshCw } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AnalyticsTopBar } from '@/components/reporting/AnalyticsTopBar';
 import { KPIStrip } from '@/components/reporting/KPIStrip';
 import { WebsitePerformanceSection } from '@/components/reporting/WebsitePerformanceSection';
@@ -10,11 +12,65 @@ import { SEOSection } from '@/components/reporting/SEOSection';
 import { SocialSection } from '@/components/reporting/SocialSection';
 import { PaidSection } from '@/components/reporting/PaidSection';
 import { AIInsightsPanel } from '@/components/reporting/AIInsightsPanel';
-import { kpiStripData } from '@/data/analyticsData';
 import { useDateRange } from '@/contexts/DateRangeContext';
+import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { useClient } from '@/contexts/ClientContext';
+import { useReportingKpis } from '@/hooks/useReportingKpis';
+
+type ReportingSection =
+  | 'all'
+  | 'website'
+  | 'conversions'
+  | 'leads'
+  | 'audience'
+  | 'content'
+  | 'seo'
+  | 'social'
+  | 'paid';
+
+const VALID_SECTIONS = new Set<ReportingSection>([
+  'all',
+  'website',
+  'conversions',
+  'leads',
+  'audience',
+  'content',
+  'seo',
+  'social',
+  'paid',
+]);
 
 export default function Reporting() {
   const { dateRange, setDateRange, compareMode, setCompareMode } = useDateRange();
+  const [searchParams] = useSearchParams();
+  const [syncing, setSyncing] = useState(false);
+  const { currentClient, isAllClientsSelected } = useClient();
+  const { data: kpiData } = useReportingKpis();
+
+  const activeSection = useMemo<ReportingSection>(() => {
+    const raw = (searchParams.get('section') ?? 'all').toLowerCase() as ReportingSection;
+    return VALID_SECTIONS.has(raw) ? raw : 'all';
+  }, [searchParams]);
+
+  const showSection = (section: Exclude<ReportingSection, 'all'>) =>
+    activeSection === 'all' || activeSection === section;
+
+  const syncReportingData = async () => {
+    if (!currentClient?.id) return;
+    setSyncing(true);
+    try {
+      const payload = isAllClientsSelected ? {} : { clientId: currentClient.id };
+      const { error } = await supabase.functions.invoke('reporting-sync', { body: payload });
+      if (error) throw error;
+      window.location.reload();
+    } catch (error) {
+      console.error('reporting sync failed:', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="animate-fade-in">
@@ -27,6 +83,15 @@ export default function Reporting() {
         <p className="text-muted-foreground mt-1">
           Decision-grade insights across traffic, engagement, conversions, and ROI.
         </p>
+      </div>
+      <div className="mb-4">
+        <TabDataStatusBanner tab="reporting" />
+      </div>
+      <div className="mb-4">
+        <Button variant="outline" className="gap-2" onClick={syncReportingData} disabled={syncing}>
+          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? 'Syncing reporting data...' : 'Sync reporting data'}
+        </Button>
       </div>
 
       {/* Sticky Top Bar */}
@@ -42,38 +107,40 @@ export default function Reporting() {
         {/* Main Sections - 3 columns on large screens */}
         <div className="lg:col-span-3 space-y-6">
           {/* 1. At-a-glance KPI Strip */}
-          <section>
+          {activeSection === 'all' && (
+            <section>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               At-a-Glance
             </h2>
             <div className="bg-card rounded-xl border border-border p-4">
-              <KPIStrip data={kpiStripData} showCategories={true} />
+              <KPIStrip data={kpiData} showCategories={true} />
             </div>
-          </section>
+            </section>
+          )}
 
           {/* 2. Website Performance */}
-          <WebsitePerformanceSection />
+          {showSection('website') && <WebsitePerformanceSection />}
 
           {/* 3. Key Events & Conversions */}
-          <KeyEventsConversionsSection />
+          {showSection('conversions') && <KeyEventsConversionsSection />}
 
           {/* 4. Leads (HubSpot) */}
-          <LeadsSection />
+          {showSection('leads') && <LeadsSection />}
 
           {/* 5. Audience & Targeting */}
-          <AudienceSection />
+          {showSection('audience') && <AudienceSection />}
 
           {/* 6. Content Performance */}
-          <ContentPerformanceSection />
+          {showSection('content') && <ContentPerformanceSection />}
 
           {/* 7. SEO Performance */}
-          <SEOSection />
+          {showSection('seo') && <SEOSection />}
 
           {/* 8. Social Performance */}
-          <SocialSection />
+          {showSection('social') && <SocialSection />}
 
           {/* 9. Paid Performance */}
-          <PaidSection />
+          {showSection('paid') && <PaidSection />}
         </div>
 
         {/* AI Insights Panel - 1 column on large screens */}

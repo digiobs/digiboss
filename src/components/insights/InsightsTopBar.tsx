@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useClient } from '@/contexts/ClientContext';
+import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
 import type { InsightsFilters, InsightSourceFilter, InsightThemeFilter, InsightImpactFilter, InsightStatusFilter } from '@/types/insights';
 
 interface InsightsTopBarProps {
@@ -54,7 +54,7 @@ const statusOptions: { value: InsightStatusFilter; label: string }[] = [
 ];
 
 export function InsightsTopBar({ filters, onFiltersChange }: InsightsTopBarProps) {
-  const { currentClient, clients } = useClient();
+  const { currentClient, clients, setCurrentClient } = useClient();
   const [showFilters, setShowFilters] = useState(false);
 
   const handleSearchChange = (value: string) => {
@@ -75,11 +75,22 @@ export function InsightsTopBar({ filters, onFiltersChange }: InsightsTopBarProps
         {/* Workspace selector */}
         <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-muted-foreground" />
-          <Select value={currentClient?.id || ''}>
+          <Select
+            value={currentClient?.id || ''}
+            onValueChange={(value) => {
+              if (value === ALL_CLIENTS_ID) {
+                setCurrentClient(ALL_CLIENTS_CLIENT);
+                return;
+              }
+              const nextClient = clients.find((c) => c.id === value) ?? null;
+              setCurrentClient(nextClient);
+            }}
+          >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select workspace" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={ALL_CLIENTS_ID}>All clients</SelectItem>
               {clients.map((client) => (
                 <SelectItem key={client.id} value={client.id}>
                   {client.name}

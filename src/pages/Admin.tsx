@@ -9,7 +9,12 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { ClientConfigDialog } from '@/components/admin/ClientConfigDialog';
+import { ClientDataMappingsPanel } from '@/components/admin/ClientDataMappingsPanel';
+import { FigmaBrandKitsPanel } from '@/components/admin/FigmaBrandKitsPanel';
+import { IntegrationHealthPanel } from '@/components/admin/IntegrationHealthPanel';
+import { RlsAuditPanel } from '@/components/admin/RlsAuditPanel';
 import { useClient } from '@/contexts/ClientContext';
+import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 
 interface Client {
   id: string;
@@ -53,6 +58,7 @@ const auditLog = [
 export default function Admin() {
   const { refetchClients, refetchConfig } = useClient();
   const [clients, setClients] = useState<Client[]>([]);
+  const [supportsColor, setSupportsColor] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -69,16 +75,34 @@ export default function Admin() {
 
   const fetchClients = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
+    const colorMissing = (message: string) => message.toLowerCase().includes('column clients.color does not exist');
+    let { data, error } = await supabase
       .from('clients')
       .select('id, name')
       .order('name');
+
+    if (error && colorMissing(error.message)) {
+      const fallback = await supabase
+        .from('clients')
+        .select('id, name')
+        .order('name');
+      data = fallback.data as Array<{ id: string; name: string; color?: string }> | null;
+      error = fallback.error;
+      setSupportsColor(false);
+    } else {
+      setSupportsColor(true);
+    }
 
     if (error) {
       toast.error('Failed to load clients');
       console.error('Error fetching clients:', error);
     } else {
-      setClients((data || []) as Client[]);
+      const normalized = ((data || []) as Array<{ id: string; name: string; color?: string }>).map((c) => ({
+        id: c.id,
+        name: c.name,
+        color: c.color ?? 'blue',
+      }));
+      setClients(normalized);
     }
     setIsLoading(false);
   };
@@ -113,9 +137,12 @@ export default function Admin() {
     setIsSaving(true);
 
     if (isCreating) {
-      const { data, error } = await (supabase as any)
+      const insertPayload = supportsColor
+        ? { name: trimmedName, color: clientColor }
+        : { name: trimmedName };
+      const { data, error } = await supabase
         .from('clients')
-        .insert({ name: trimmedName })
+        .insert(insertPayload)
         .select()
         .single();
 
@@ -129,9 +156,12 @@ export default function Admin() {
         refetchClients();
       }
     } else if (editingClient) {
-      const { error } = await (supabase as any)
+      const updatePayload = supportsColor
+        ? { name: trimmedName, color: clientColor }
+        : { name: trimmedName };
+      const { error } = await supabase
         .from('clients')
-        .update({ name: trimmedName })
+        .update(updatePayload)
         .eq('id', editingClient.id);
 
       if (error) {
@@ -188,6 +218,53 @@ export default function Admin() {
           Workspace settings, users, billing, and integrations.
         </p>
       </div>
+      <TabDataStatusBanner tab="admin" />
+
+      <div className="bg-card rounded-xl border border-border p-5 space-y-3">
+        <h2 className="font-semibold">Supabase linking plan</h2>
+        <p className="text-sm text-muted-foreground">
+          Use this checklist to complete data linkage for every tab.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="rounded-lg border border-border p-3">
+            <p className="font-medium">Home</p>
+            <p className="text-muted-foreground">Target table: <code>home_kpis</code></p>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="font-medium">Insights</p>
+            <p className="text-muted-foreground">Target table: <code>insights_items</code></p>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="font-medium">Prospects</p>
+            <p className="text-muted-foreground">Target table: <code>prospect_leads</code></p>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="font-medium">Plan</p>
+            <p className="text-muted-foreground">Target table: <code>plan_tasks</code></p>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="font-medium">Content Creator</p>
+            <p className="text-muted-foreground">Target table: <code>content_items</code></p>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="font-medium">Assets</p>
+            <p className="text-muted-foreground">Target table: <code>asset_library</code></p>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="font-medium">Reporting</p>
+            <p className="text-muted-foreground">Target table: <code>reporting_kpis</code></p>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="font-medium">Chat</p>
+            <p className="text-muted-foreground">Target table: <code>chat_messages</code></p>
+          </div>
+        </div>
+      </div>
+
+      <ClientDataMappingsPanel clients={clients} />
+      <IntegrationHealthPanel clients={clients} />
+      <RlsAuditPanel />
+      <FigmaBrandKitsPanel clients={clients} />
 
       {/* Clients Management */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">

@@ -2,7 +2,7 @@ import { Users, FileText, Eye, UserPlus, HeartPulse } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useHomeKPIs } from '@/hooks/useHomeData';
+import { useHomeKPIs, useHomeKPIsData } from '@/hooks/useHomeData';
 import { cn } from '@/lib/utils';
 
 function formatNum(n: number): string {
@@ -12,15 +12,17 @@ function formatNum(n: number): string {
 }
 
 const kpis = [
-  { key: 'activeClients', label: 'Clients actifs', icon: Users },
-  { key: 'contentsPublished', label: 'Contenus publiés', icon: FileText },
-  { key: 'totalImpressions', label: 'Impressions totales', icon: Eye },
-  { key: 'leads', label: 'Leads générés', icon: UserPlus },
+  { key: 'total_tasks_active', label: 'Tâches actives', icon: Users },
+  { key: 'tasks_due_this_week', label: 'Tâches cette semaine', icon: FileText },
+  { key: 'high_priority_count', label: 'Priorité haute', icon: Eye },
+  { key: 'completed_this_month', label: 'Complétées ce mois', icon: UserPlus },
   { key: 'avgHealthScore', label: 'Score santé moyen', icon: HeartPulse },
 ] as const;
 
 export function HomeKPICards() {
-  const { data, isLoading } = useHomeKPIs();
+  const { data: homeKpis, isLoading: isLoadingKpis } = useHomeKPIsData();
+  const { data: legacyData, isLoading: isLoadingLegacy } = useHomeKPIs();
+  const isLoading = isLoadingKpis || isLoadingLegacy;
 
   if (isLoading) {
     return (
@@ -33,19 +35,19 @@ export function HomeKPICards() {
   }
 
   const values: Record<string, number> = {
-    activeClients: data?.activeClients ?? 0,
-    contentsPublished: data?.contentsPublished ?? 0,
-    totalImpressions: data?.totalImpressions ?? 0,
-    leads: 89, // placeholder — will come from Supermetrics
-    avgHealthScore: data?.avgHealthScore ?? 0,
+    total_tasks_active: (homeKpis as any)?.total_tasks_active ?? 0,
+    tasks_due_this_week: (homeKpis as any)?.tasks_due_this_week ?? 0,
+    high_priority_count: (homeKpis as any)?.high_priority_count ?? 0,
+    completed_this_month: (homeKpis as any)?.completed_this_month ?? 0,
+    avgHealthScore: legacyData?.avgHealthScore ?? 0,
   };
 
   const deltas: Record<string, number> = {
-    activeClients: 0,
-    contentsPublished: data?.contentsDelta ?? 0,
-    totalImpressions: 12,
-    leads: 22,
-    avgHealthScore: 3,
+    total_tasks_active: 0,
+    tasks_due_this_week: 0,
+    high_priority_count: 0,
+    completed_this_month: 0,
+    avgHealthScore: legacyData?.contentsDelta ?? 0,
   };
 
   return (

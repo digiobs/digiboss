@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface Client {
   id: string;
   name: string;
-  color: string;
+  color?: string;
 }
 
 export interface ClientConfig {
@@ -40,13 +40,13 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const fetchClients = async () => {
     const { data, error } = await supabase
       .from('clients')
-      .select('id, name, color')
+      .select('id, name')
       .order('name');
-    
+
     if (!error && data) {
-      setClients(data);
+      setClients(data as Client[]);
       if (data.length > 0 && !currentClient) {
-        setCurrentClient(data[0]);
+        setCurrentClient(data[0] as Client);
       }
     }
     setIsLoading(false);

@@ -10,6 +10,17 @@ import { WRIKE_CLIENTS } from '@/types/wrike';
 import { Search, Filter, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Check if a task is overdue
+const isOverdue = (task: WrikeTask): boolean => {
+  if (!task.dates?.due) return false;
+  const columnId = STATUS_COLUMN_MAP[task.status] || 'proposition';
+  if (columnId === 'publie') return false; // Don't mark as overdue if already published
+  const dueDate = new Date(task.dates.due);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return dueDate < today;
+};
+
 interface WrikeKanbanProps {
   tasks: WrikeTask[];
   isAdmin: boolean;
@@ -51,6 +62,7 @@ export function WrikeKanban({ tasks, isAdmin, isLoading, error }: WrikeKanbanPro
   const [detailOpen, setDetailOpen] = useState(false);
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [canalFilter, setCanalFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Extract unique canals from tasks
@@ -60,16 +72,37 @@ export function WrikeKanban({ tasks, isAdmin, isLoading, error }: WrikeKanbanPro
   const filteredTasks = tasks.filter((t) => {
     if (clientFilter !== 'all' && t.clientName !== clientFilter) return false;
     if (canalFilter !== 'all' && t.canal !== canalFilter) return false;
+    if (priorityFilter !== 'all' && t.importance !== priorityFilter) return false;
     if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
-  // Group tasks by column
-  const getColumnTasks = (columnId: string) =>
-    filteredTasks.filter((t) => {
+  // Group tasks by column and sort by due date (overdue first)
+  const getColumnTasks = (columnId: string) => {
+    const columnTasks = filteredTasks.filter((t) => {
       const mapped = STATUS_COLUMN_MAP[t.status] || 'proposition';
       return mapped === columnId;
     });
+
+    // Sort: overdue first, then by due date ascending, then by title
+    return columnTasks.sort((a, b) => {
+      const aOverdue = isOverdue(a);
+      const bOverdue = isOverdue(b);
+
+      if (aOverdue !== bOverdue) {
+        return aOverdue ? -1 : 1;
+      }
+
+      const aDue = a.dates?.due ? new Date(a.dates.due).getTime() : Infinity;
+      const bDue = b.dates?.due ? new Date(b.dates.due).getTime() : Infinity;
+
+      if (aDue !== bDue) {
+        return aDue - bDue;
+      }
+
+      return a.title.localeCompare(b.title);
+    });
+  };
 
   const handleTaskClick = (task: WrikeTask) => {
     setSelectedTask(task);
@@ -125,6 +158,18 @@ export function WrikeKanban({ tasks, isAdmin, isLoading, error }: WrikeKanbanPro
           </SelectContent>
         </Select>
 
+        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue placeholder="Priorité" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Toutes priorités</SelectItem>
+            <SelectItem value="High">🔴 Haute</SelectItem>
+            <SelectItem value="Normal">🟡 Normale</SelectItem>
+            <SelectItem value="Low">🟢 Basse</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Badge variant="outline" className="text-xs">
           {filteredTasks.length} tâche{filteredTasks.length > 1 ? 's' : ''}
         </Badge>
@@ -164,6 +209,7 @@ export function WrikeKanban({ tasks, isAdmin, isLoading, error }: WrikeKanbanPro
                       key={task.id}
                       task={task}
                       isAdmin={isAdmin}
+                      isOverdue={isOverdue(task)}
                       onClick={() => handleTaskClick(task)}
                     />
                   ))

@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useClientHealthScores } from '@/hooks/useHomeData';
+import { useClientHealthScores, useClientTaskHealth } from '@/hooks/useHomeData';
 import { cn } from '@/lib/utils';
 
 function healthColor(score: number) {
@@ -34,7 +34,19 @@ const scoreLabels: Record<string, string> = {
 };
 
 export function HomeClientHealth() {
-  const { data: scores, isLoading } = useClientHealthScores();
+  const { data: scores, isLoading: healthLoading } = useClientHealthScores();
+  const { data: taskHealth, isLoading: taskLoading } = useClientTaskHealth();
+  const isLoading = healthLoading || taskLoading;
+
+  // Merge health scores with task health data
+  const mergedData = (scores || []).map((score: any) => {
+    const taskData = taskHealth?.find((th: any) => th.client_id === score.client_id);
+    return {
+      ...score,
+      taskHealth,
+      completion_rate: taskData?.completion_rate ?? 0,
+    };
+  });
 
   return (
     <div className="bg-card rounded-xl border border-border p-5">
@@ -48,14 +60,10 @@ export function HomeClientHealth() {
             <Info className="w-4 h-4 text-muted-foreground cursor-help" />
           </TooltipTrigger>
           <TooltipContent className="max-w-xs text-xs">
-            <p className="font-semibold mb-1">Comment c'est calculé :</p>
+            <p className="font-semibold mb-1">Basé sur :</p>
             <ul className="space-y-0.5">
-              <li>Régularité publication (25%)</li>
-              <li>Performances SEO (20%)</li>
-              <li>Engagement LinkedIn (20%)</li>
-              <li>Performance Ads (15%)</li>
-              <li>Génération de leads (10%)</li>
-              <li>Fraîcheur relation (10%)</li>
+              <li>Score de santé global (60%)</li>
+              <li>Taux de complétion des tâches (40%)</li>
             </ul>
           </TooltipContent>
         </Tooltip>
@@ -67,13 +75,13 @@ export function HomeClientHealth() {
             <Skeleton key={i} className="h-16 rounded-lg" />
           ))}
         </div>
-      ) : !scores || scores.length === 0 ? (
+      ) : !mergedData || mergedData.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-6">
           Aucun score de santé disponible
         </p>
       ) : (
         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-          {scores.map((s: any) => {
+          {mergedData.map((s: any) => {
             const breakdown = (s.score_breakdown as Record<string, number>) || {};
 
             return (
@@ -94,6 +102,11 @@ export function HomeClientHealth() {
                       {scoreLabels[key] || key}: {val as number}
                     </Badge>
                   ))}
+                  {s.completion_rate > 0 && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      Tâches: {s.completion_rate}%
+                    </Badge>
+                  )}
                 </div>
               </div>
             );

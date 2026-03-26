@@ -14,7 +14,7 @@ export interface Content {
   source_url: string | null;
   tags: string[];
   status: string;
-  clients?: { name: string; color: string } | null;
+  clients?: { name: string } | null;
   content_metrics?: ContentMetric[];
 }
 
@@ -52,9 +52,9 @@ export function useContents(options: {
       const since = new Date();
       since.setDate(since.getDate() - periodDays);
 
-      let query = supabase
+      let query = (supabase as any)
         .from('contents')
-        .select('*, clients(name, color), content_metrics(*)')
+        .select('*, clients(name), content_metrics(*)')
         .eq('status', 'published')
         .gte('published_at', since.toISOString())
         .order('published_at', { ascending: false })
@@ -79,9 +79,9 @@ export function useContentDetail(contentId: string | null) {
     queryKey: ['content-detail', contentId],
     enabled: !!contentId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('contents')
-        .select('*, clients(name, color), content_metrics(*)')
+        .select('*, clients(name), content_metrics(*)')
         .eq('id', contentId!)
         .single();
       if (error) throw error;

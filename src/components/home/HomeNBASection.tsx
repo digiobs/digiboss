@@ -40,7 +40,7 @@ function PriorityCircle({ score }: { score: number }) {
 }
 
 export function HomeNBASection() {
-  const { data: actions, isLoading, updateStatus } = useHomeNBA();
+  const { data: actions, isLoading } = useHomeNBA();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
@@ -48,9 +48,6 @@ export function HomeNBASection() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await supabase.functions.invoke('generate-recommendations', {
-        body: { type: 'nba' },
-      });
       qc.invalidateQueries({ queryKey: ['home-nba'] });
     } catch {
       // silently fail
@@ -60,8 +57,9 @@ export function HomeNBASection() {
   };
 
   const handleAction = (action: any) => {
-    updateStatus.mutate({ id: action.id, status: 'actioned' });
-    if (action.navigate_to) navigate(action.navigate_to);
+    if (action.wrike_url) {
+      window.open(action.wrike_url, '_blank');
+    }
   };
 
   return (
@@ -87,83 +85,51 @@ export function HomeNBASection() {
         <div className="text-center py-8">
           <Wand2 className="w-10 h-10 text-amber-300 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">
-            Tout est à jour ! Aucune action prioritaire pour le moment.
+            Tout est à jour ! Aucune tâche urgente pour le moment.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {actions.map((action: any) => {
-            const config = actionTypeConfig[action.action_type] || actionTypeConfig.publish_content;
-            const Icon = config.icon;
-            const metrics = action.supporting_metrics as Record<string, unknown> | null;
+          {actions.map((task: any) => {
+            const priorityScore = task.priority === 'high' ? 85 : task.priority === 'medium' ? 55 : 30;
+            const dueDate = task.due_date ? new Date(task.due_date).toLocaleDateString('fr-FR') : 'Sans date';
 
             return (
               <div
-                key={action.id}
+                key={task.id}
                 className="bg-white/80 backdrop-blur-sm rounded-lg border border-amber-100 p-4 space-y-2"
               >
                 <div className="flex items-start gap-3">
-                  <PriorityCircle score={action.priority_score} />
+                  <PriorityCircle score={priorityScore} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      {action.clients && (
+                      {task.clients && (
                         <Badge variant="outline" className="text-xs">
-                          {action.clients.name}
+                          {task.clients.name}
                         </Badge>
                       )}
-                      {action.channel && (
-                        <Badge variant="outline" className={cn('text-xs', channelColors[action.channel])}>
-                          {action.channel}
-                        </Badge>
-                      )}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Badge variant="outline" className={cn('text-xs gap-1', config.color)}>
-                            <Icon className="w-3 h-3" />
-                            {config.label}
-                          </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent>Type d'action</TooltipContent>
-                      </Tooltip>
+                      <Badge variant="outline" className="text-xs">
+                        {task.status}
+                      </Badge>
                     </div>
-                    <p className="font-medium text-sm text-foreground">{action.title}</p>
+                    <p className="font-medium text-sm text-foreground">{task.title}</p>
                     <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                      {action.rationale}
+                      {task.description || 'Pas de description'}
                     </p>
-                    {metrics && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {Object.entries(metrics).map(([key, val]) => (
-                          <span key={key} className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
-                            {key.replace(/_/g, ' ')}: {String(val)}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                        À faire: {dueDate}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-1">
                   <Button
-                    variant="ghost"
                     size="sm"
                     className="text-xs"
-                    onClick={() => updateStatus.mutate({ id: action.id, status: 'dismissed' })}
+                    onClick={() => handleAction(task)}
                   >
-                    <X className="w-3 h-3 mr-1" /> Ignorer
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => updateStatus.mutate({ id: action.id, status: 'postponed' })}
-                  >
-                    <Clock className="w-3 h-3 mr-1" /> Plus tard
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => handleAction(action)}
-                  >
-                    Agir <ArrowRight className="w-3 h-3 ml-1" />
+                    Voir dans Wrike <ArrowRight className="w-3 h-3 ml-1" />
                   </Button>
                 </div>
               </div>

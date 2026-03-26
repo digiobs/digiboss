@@ -7,14 +7,18 @@ import { cn } from '@/lib/utils';
 interface WrikeTaskCardProps {
   task: WrikeTask;
   isAdmin: boolean;
+  isOverdue?: boolean;
   onClick?: () => void;
 }
 
-export function WrikeTaskCard({ task, isAdmin, onClick }: WrikeTaskCardProps) {
+export function WrikeTaskCard({ task, isAdmin, isOverdue, onClick }: WrikeTaskCardProps) {
   return (
     <Card
       onClick={onClick}
-      className="p-3 cursor-pointer hover:shadow-md transition-all border border-border hover:border-primary/30 bg-card"
+      className={cn(
+        'p-3 cursor-pointer hover:shadow-md transition-all border bg-card',
+        isOverdue ? 'border-destructive/80 hover:border-destructive' : 'border-border hover:border-primary/30'
+      )}
     >
       {/* Title */}
       <p className="text-sm font-medium text-foreground leading-tight mb-2 line-clamp-2">

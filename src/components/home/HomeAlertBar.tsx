@@ -1,18 +1,29 @@
 import { AlertTriangle, Info, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useAlerts, useDismissAlert } from '@/hooks/useHomeData';
+import { useAlerts, useDismissAlert, useOverdueTasks } from '@/hooks/useHomeData';
 import { cn } from '@/lib/utils';
 
 export function HomeAlertBar() {
-  const { data: alerts, isLoading } = useAlerts();
+  const { data: alerts, isLoading: alertsLoading } = useAlerts();
+  const { data: overdueTasks, isLoading: tasksLoading } = useOverdueTasks();
   const dismiss = useDismissAlert();
+  const isLoading = alertsLoading || tasksLoading;
 
-  if (isLoading || !alerts || alerts.length === 0) return null;
+  // Create alert from overdue tasks if any
+  const overdueAlert = (overdueTasks && overdueTasks.length > 0) ? [{
+    id: 'overdue-tasks',
+    message: `${overdueTasks.length} tâche${overdueTasks.length > 1 ? 's' : ''} en retard`,
+    type: 'critical',
+  }] : [];
+
+  const allAlerts = [...(alerts || []), ...overdueAlert];
+
+  if (isLoading || !allAlerts || allAlerts.length === 0) return null;
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-      {alerts.map((alert: any) => {
+      {allAlerts.map((alert: any) => {
         const isCritical = alert.type === 'critical';
         return (
           <div
@@ -35,14 +46,16 @@ export function HomeAlertBar() {
                 {alert.clients.name}
               </Badge>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100"
-              onClick={() => dismiss.mutate(alert.id)}
-            >
-              <X className="w-3 h-3" />
-            </Button>
+            {alert.id !== 'overdue-tasks' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100"
+                onClick={() => dismiss.mutate(alert.id)}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            )}
           </div>
         );
       })}

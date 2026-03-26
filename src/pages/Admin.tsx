@@ -14,7 +14,7 @@ import { useClient } from '@/contexts/ClientContext';
 interface Client {
   id: string;
   name: string;
-  color: string;
+  color?: string;
 }
 
 const colorOptions = [
@@ -71,14 +71,14 @@ export default function Admin() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('clients')
-      .select('id, name, color')
+      .select('id, name')
       .order('name');
-    
+
     if (error) {
       toast.error('Failed to load clients');
       console.error('Error fetching clients:', error);
     } else {
-      setClients(data || []);
+      setClients((data || []) as Client[]);
     }
     setIsLoading(false);
   };
@@ -113,9 +113,9 @@ export default function Admin() {
     setIsSaving(true);
 
     if (isCreating) {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('clients')
-        .insert({ name: trimmedName, color: clientColor })
+        .insert({ name: trimmedName })
         .select()
         .single();
 
@@ -123,15 +123,15 @@ export default function Admin() {
         toast.error('Failed to create client');
         console.error('Error creating client:', error);
       } else if (data) {
-        setClients([...clients, data].sort((a, b) => a.name.localeCompare(b.name)));
+        setClients([...clients, data as Client].sort((a, b) => a.name.localeCompare(b.name)));
         toast.success(`Client "${trimmedName}" created`);
         setIsDialogOpen(false);
         refetchClients();
       }
     } else if (editingClient) {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('clients')
-        .update({ name: trimmedName, color: clientColor })
+        .update({ name: trimmedName })
         .eq('id', editingClient.id);
 
       if (error) {
@@ -140,7 +140,7 @@ export default function Admin() {
       } else {
         setClients(
           clients
-            .map(c => c.id === editingClient.id ? { ...c, name: trimmedName, color: clientColor } : c)
+            .map(c => c.id === editingClient.id ? { ...c, name: trimmedName } : c)
             .sort((a, b) => a.name.localeCompare(b.name))
         );
         toast.success(`Client "${trimmedName}" updated`);

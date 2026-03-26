@@ -298,7 +298,7 @@ export function useSupabaseMeetings() {
       setLoading(true);
 
       try {
-        let query = (supabase as any)
+        let query = supabase
           .from("tldv_meetings")
           .select(
             "id,name,happened_at,duration_seconds,organizer_name,organizer_email,meeting_url,participants_count,raw,client_id,transcript_text,transcript_segments,transcript_status,ai_summary_json,highlights_json,thumbnail_url",

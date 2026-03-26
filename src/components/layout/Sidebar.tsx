@@ -8,7 +8,6 @@ import {
   PenTool,
   BookOpen,
   FolderOpen,
-  Newspaper,
   BarChart3,
   MessageSquare,
   Settings,

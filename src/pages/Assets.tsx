@@ -232,7 +232,7 @@ export default function Assets() {
         return;
       }
       // Re-read from DB after refresh
-      let folderQuery = supabase
+      let folderQuery = (supabase as any)
         .from('client_figma_folders')
         .select('id,client_id,file_key,file_name,folder_id,folder_name,folder_type,thumbnail_url')
         .order('page_index', { ascending: true })
@@ -240,7 +240,7 @@ export default function Assets() {
       if (!isAllClientsSelected) {
         folderQuery = folderQuery.eq('client_id', currentClient.id);
       }
-      let syncQuery = supabase
+      let syncQuery = (supabase as any)
         .from('client_figma_sync_state')
         .select('client_id,status,folder_count,file_count,last_synced_at,message');
       if (!isAllClientsSelected) {

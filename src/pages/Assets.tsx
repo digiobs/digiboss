@@ -375,7 +375,7 @@ export default function Assets() {
           <Palette className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-semibold">Brand Kit</h2>
           <Badge variant="outline" className="ml-2">
-            {isAllClientsSelected ? 'All clients' : currentClient?.name ?? 'NA'}
+            {isAllClientsSelected ? 'Admin (all clients)' : currentClient?.name ?? 'NA'}
           </Badge>
         </div>
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -58,10 +58,18 @@ const statusColors: Record<string, string> = {
 export default function Deliverables() {
   const { clients } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const [selectedClientId, setSelectedClientId] = useState<string>(ALL_CLIENTS_ID);
+  const [selectedClientId, setSelectedClientId] = useState<string>(
+    isAdmin ? ALL_CLIENTS_ID : (clients[0]?.id ?? ALL_CLIENTS_ID)
+  );
   const [selectedType, setSelectedType] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin && selectedClientId === ALL_CLIENTS_ID && clients.length > 0) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [isAdmin, clients, selectedClientId]);
 
   const clientFilter = selectedClientId === ALL_CLIENTS_ID ? null : selectedClientId;
   const { data: deliverables = [], isLoading, refetch } = useDeliverables({ clientId: clientFilter, type: selectedType });
@@ -152,7 +160,7 @@ export default function Deliverables() {
             <SelectValue placeholder="Client" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL_CLIENTS_ID}>Tous les clients</SelectItem>
+            {isAdmin && <SelectItem value={ALL_CLIENTS_ID}>Admin (tous les clients)</SelectItem>}
             {clients.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}

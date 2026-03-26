@@ -10,7 +10,7 @@ export interface Client {
 export const ALL_CLIENTS_ID = '__all_clients__';
 export const ALL_CLIENTS_CLIENT: Client = {
   id: ALL_CLIENTS_ID,
-  name: 'All clients',
+  name: 'Admin (all clients)',
   color: 'blue',
 };
 
@@ -84,7 +84,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       setCurrentClientId((prev) => {
         if (prev === ALL_CLIENTS_ID) return prev;
         const selectedStillExists = prev != null && normalized.some((client) => client.id === prev);
-        return selectedStillExists ? prev : normalized[0]?.id ?? null;
+        if (selectedStillExists) return prev;
+        return normalized[0]?.id ?? null;
       });
     } else if (error) {
       console.error('Error fetching clients:', error);

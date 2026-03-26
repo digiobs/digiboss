@@ -22,9 +22,18 @@ import { toast } from "sonner";
 export default function Home() {
   const { clients } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const [selectedClientId, setSelectedClientId] = useState<string>(ALL_CLIENTS_ID);
+  const [selectedClientId, setSelectedClientId] = useState<string>(
+    isAdmin ? ALL_CLIENTS_ID : (clients[0]?.id ?? ALL_CLIENTS_ID)
+  );
   const [syncing, setSyncing] = useState(false);
   const [selectedAction, setSelectedAction] = useState<NextBestAction | null>(null);
+
+  // Auto-select first client for non-admin users
+  useEffect(() => {
+    if (!isAdmin && selectedClientId === ALL_CLIENTS_ID && clients.length > 0) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [isAdmin, clients, selectedClientId]);
   const [generateSignal, setGenerateSignal] = useState(0);
   const [isGeneratingActions, setIsGeneratingActions] = useState(false);
   const highlightedActionIds = selectedAction ? [selectedAction.id] : [];
@@ -86,7 +95,7 @@ export default function Home() {
                 <SelectValue placeholder="Client" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_CLIENTS_ID}>Tous les clients</SelectItem>
+                {isAdmin && <SelectItem value={ALL_CLIENTS_ID}>Admin (tous les clients)</SelectItem>}
                 {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.name}

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import type { InsightsFilters, InsightSourceFilter, InsightThemeFilter, InsightImpactFilter, InsightStatusFilter } from '@/types/insights';
 
 interface InsightsTopBarProps {
@@ -55,6 +56,7 @@ const statusOptions: { value: InsightStatusFilter; label: string }[] = [
 
 export function InsightsTopBar({ filters, onFiltersChange }: InsightsTopBarProps) {
   const { currentClient, clients, setCurrentClient } = useClient();
+  const { isAdmin } = useVisibilityMode();
   const [showFilters, setShowFilters] = useState(false);
 
   const handleSearchChange = (value: string) => {
@@ -90,7 +92,7 @@ export function InsightsTopBar({ filters, onFiltersChange }: InsightsTopBarProps
               <SelectValue placeholder="Select workspace" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_CLIENTS_ID}>All clients</SelectItem>
+              {isAdmin && <SelectItem value={ALL_CLIENTS_ID}>Admin (all clients)</SelectItem>}
               {clients.map((client) => (
                 <SelectItem key={client.id} value={client.id}>
                   {client.name}

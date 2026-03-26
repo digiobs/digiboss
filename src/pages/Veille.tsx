@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -77,12 +77,20 @@ function getSeverityConfig(severity: string) {
 export default function Veille() {
   const { clients } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const [selectedClientId, setSelectedClientId] = useState<string>(ALL_CLIENTS_ID);
+  const [selectedClientId, setSelectedClientId] = useState<string>(
+    isAdmin ? ALL_CLIENTS_ID : (clients[0]?.id ?? ALL_CLIENTS_ID)
+  );
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin && selectedClientId === ALL_CLIENTS_ID && clients.length > 0) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [isAdmin, clients, selectedClientId]);
 
   const syncMarketNews = async () => {
     setSyncing(true);
@@ -192,7 +200,7 @@ export default function Veille() {
             <SelectValue placeholder="Client" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL_CLIENTS_ID}>Tous les clients</SelectItem>
+            {isAdmin && <SelectItem value={ALL_CLIENTS_ID}>Admin (tous les clients)</SelectItem>}
             {clients.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}

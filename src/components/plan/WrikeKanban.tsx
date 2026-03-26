@@ -60,7 +60,11 @@ const COLUMNS = [
 export function WrikeKanban({ tasks, isAdmin, isLoading, error }: WrikeKanbanProps) {
   const [selectedTask, setSelectedTask] = useState<WrikeTask | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [clientFilter, setClientFilter] = useState<string>('all');
+  const [clientFilter, setClientFilter] = useState<string>(() => {
+    if (isAdmin) return 'all';
+    const firstExternal = WRIKE_CLIENTS.find(c => c.sector !== 'internal');
+    return firstExternal?.name ?? 'all';
+  });
   const [canalFilter, setCanalFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -139,7 +143,7 @@ export function WrikeKanban({ tasks, isAdmin, isLoading, error }: WrikeKanbanPro
             <SelectValue placeholder="Client" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les clients</SelectItem>
+            {isAdmin && <SelectItem value="all">Admin (tous les clients)</SelectItem>}
             {WRIKE_CLIENTS.filter(c => c.sector !== 'internal').map((c) => (
               <SelectItem key={c.wrikeId} value={c.name}>{c.name}</SelectItem>
             ))}

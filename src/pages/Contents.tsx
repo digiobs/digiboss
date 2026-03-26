@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileText, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useClient } from '@/contexts/ClientContext';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useContents, type Channel } from '@/hooks/useContents';
 import { ContentsKPIStrip } from '@/components/contents/ContentsKPIStrip';
 import { ContentCard } from '@/components/contents/ContentCard';
@@ -16,10 +17,19 @@ type PeriodFilter = '7' | '30' | '90';
 
 export default function Contents() {
   const { clients, currentClient, setCurrentClient } = useClient();
+  const { isAdmin } = useVisibilityMode();
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [period, setPeriod] = useState<PeriodFilter>('30');
-  const [selectedClientId, setSelectedClientId] = useState<string | 'all'>('all');
+  const [selectedClientId, setSelectedClientId] = useState<string | 'all'>(
+    isAdmin ? 'all' : (clients[0]?.id ?? 'all')
+  );
   const [detailId, setDetailId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin && selectedClientId === 'all' && clients.length > 0) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [isAdmin, clients, selectedClientId]);
 
   const effectiveClientId = selectedClientId === 'all' ? null : selectedClientId;
 
@@ -44,7 +54,7 @@ export default function Contents() {
               <SelectValue placeholder="Client" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tous les clients</SelectItem>
+              {isAdmin && <SelectItem value="all">Admin (tous les clients)</SelectItem>}
               {clients.map(c => (
                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}

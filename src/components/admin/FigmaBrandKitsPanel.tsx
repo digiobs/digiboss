@@ -30,7 +30,7 @@ export function FigmaBrandKitsPanel({ clients }: { clients: ClientLite[] }) {
 
   const fetchRows = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("client_brand_kits")
       .select("id,client_id,figma_file_key,token_type,token_name,token_value,imported_at")
       .order("imported_at", { ascending: false })
@@ -49,7 +49,7 @@ export function FigmaBrandKitsPanel({ clients }: { clients: ClientLite[] }) {
       return;
     }
 
-    setRows((data ?? []) as BrandKitRow[]);
+    setRows(((data ?? []) as unknown) as BrandKitRow[]);
     setLoading(false);
   };
 

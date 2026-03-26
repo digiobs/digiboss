@@ -410,7 +410,7 @@ export default function Contenus() {
   }, [recommendations, dismissAnimatingIds, postponedLocal]);
 
   const engagementSeries = useMemo(() => {
-    const buckets = new Map<string, Record<string, number>>();
+    const buckets = new Map<string, Record<string, any>>();
     filteredItems.forEach((item) => {
       const date = new Date(item.content.published_at);
       const key = range.dayCount <= 7 ? toFrenchDate(item.content.published_at) : `${date.getDate()}/${date.getMonth() + 1}`;

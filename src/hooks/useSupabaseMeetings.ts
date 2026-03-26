@@ -178,7 +178,7 @@ function normalizeStoredAiSummary(row: TldvRow): MeetingAISummary | null {
         dueDate: typeof r.dueDate === "string" ? r.dueDate : undefined,
       };
     })
-    .filter((x): x is { action: string; owner?: string; dueDate?: string } => Boolean(x));
+    .filter((x): x is { action: string; owner: string; dueDate: string } => Boolean(x) && typeof x.owner === 'string' && typeof x.dueDate === 'string');
 
   return {
     decisions: toStringArray(raw.decisions),
@@ -297,7 +297,7 @@ export function useSupabaseMeetings() {
       setLoading(true);
 
       try {
-        let query = supabase
+        let query = (supabase as any)
           .from("tldv_meetings")
           .select(
             "id,name,happened_at,duration_seconds,organizer_name,organizer_email,meeting_url,participants_count,raw,client_id,transcript_text,transcript_segments,transcript_status,ai_summary_json,highlights_json",
@@ -319,7 +319,7 @@ export function useSupabaseMeetings() {
           return;
         }
 
-        const rows = (assignedRows ?? []) as TldvRow[];
+        const rows = ((assignedRows ?? []) as unknown) as TldvRow[];
         const mapped: Meeting[] = [];
         for (const row of rows) {
           try {

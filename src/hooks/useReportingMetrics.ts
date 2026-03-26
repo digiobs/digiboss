@@ -17,7 +17,7 @@ export function useReportingMetrics(sections: string[]) {
     (async () => {
       if (!currentClient?.id || sections.length === 0) return;
 
-      let query = supabase
+      let query = (supabase as any)
         .from("reporting_kpis")
         .select("metric_key,value,period_end")
         .in("section", sections)
@@ -31,7 +31,7 @@ export function useReportingMetrics(sections: string[]) {
         return;
       }
       if (!mounted) return;
-      setRows((data ?? []) as ReportingRow[]);
+      setRows(((data ?? []) as unknown) as ReportingRow[]);
     })();
 
     return () => {

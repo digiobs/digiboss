@@ -35,7 +35,7 @@ export function useReportingKpis() {
     let mounted = true;
     (async () => {
       if (!currentClient?.id) return;
-      let query = supabase
+      let query = (supabase as any)
         .from("reporting_kpis")
         .select("section,metric_key,label,value,unit")
         .order("period_end", { ascending: false })
@@ -46,7 +46,7 @@ export function useReportingKpis() {
         console.error("reporting_kpis query error:", error);
         return;
       }
-      if (mounted) setRows((data ?? []) as ReportingRow[]);
+      if (mounted) setRows(((data ?? []) as unknown) as ReportingRow[]);
     })();
     return () => {
       mounted = false;

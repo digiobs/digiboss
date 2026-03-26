@@ -111,7 +111,6 @@ export default function Insights() {
           </Button>
         )}
         </div>
-      </div>
       <TabDataStatusBanner tab="insights" />
 
       {/* Sticky Top Bar */}

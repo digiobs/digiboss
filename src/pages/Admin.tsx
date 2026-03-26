@@ -231,8 +231,8 @@ export default function Admin() {
             <p className="text-muted-foreground">Target table: <code>home_kpis</code></p>
           </div>
           <div className="rounded-lg border border-border p-3">
-            <p className="font-medium">Insights</p>
-            <p className="text-muted-foreground">Target table: <code>insights_items</code></p>
+            <p className="font-medium">Meetings</p>
+            <p className="text-muted-foreground">Target table: <code>tldv_meetings</code></p>
           </div>
           <div className="rounded-lg border border-border p-3">
             <p className="font-medium">Prospects</p>

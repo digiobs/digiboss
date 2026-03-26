@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Lightbulb, BarChart3, Newspaper } from 'lucide-react';
+import { Video, BarChart3, Newspaper } from 'lucide-react';
 import { InsightsTopBar } from '@/components/insights/InsightsTopBar';
 import { MeetingInsightsHeader } from '@/components/insights/MeetingInsightsHeader';
 import { MeetingsTable } from '@/components/insights/MeetingsTable';
@@ -94,11 +94,11 @@ export default function Insights() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Lightbulb className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Insights</h1>
+            <Video className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Meetings</h1>
           </div>
           <p className="text-muted-foreground mt-1">
-            Meeting intelligence, performance signals, and market research in one place.
+            Meeting intelligence, transcripts, and market research in one place.
           </p>
         </div>
       </div>
@@ -110,7 +110,7 @@ export default function Insights() {
       <Tabs value={insightsView} onValueChange={(value) => handleViewChange(value as 'meetings' | 'veille')}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="meetings" className="gap-2">
-            <Lightbulb className="w-4 h-4" />
+            <Video className="w-4 h-4" />
             Meetings
           </TabsTrigger>
           <TabsTrigger value="veille" className="gap-2">
@@ -124,16 +124,18 @@ export default function Insights() {
           {showMeetings && (
             <section className="space-y-4">
               <p className="text-xs text-muted-foreground">
-                Showing meetings strictly assigned to selected client.
+                {isAllClientsSelected
+                  ? `Showing all meetings (${meetings.length})`
+                  : `Showing meetings for ${currentClient?.name ?? 'selected client'} (${meetings.length})`}
               </p>
               {meetingsError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                  Meetings query error: {meetingsError} (Supabase: {projectUrl})
+                  Meetings query error: {meetingsError}
                 </div>
               )}
               {!meetingsError && meetings.length === 0 && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  No meetings for selected client in `tldv_meetings`. If this looks wrong, restart dev server to reload `.env`.
+                  No meetings found for this client. Try syncing tl;dv or selecting a different client.
                 </div>
               )}
               <MeetingInsightsHeader

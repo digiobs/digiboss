@@ -66,7 +66,8 @@ const AppRoutes = () => {
         </PreAuthGuard>
       }>
         <Route path="/home" element={<Home />} />
-        <Route path="/insights" element={<Insights />} />
+        <Route path="/meetings" element={<Insights />} />
+        <Route path="/insights" element={<Navigate to="/meetings" replace />} />
         <Route path="/prospects" element={<Prospects />} />
         <Route path="/plan" element={<Plan />} />
         <Route path="/content" element={<ContentCreator />} />

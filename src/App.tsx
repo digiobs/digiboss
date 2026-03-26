@@ -20,6 +20,7 @@ import Assets from "@/pages/Assets";
 import Reporting from "@/pages/Reporting";
 import Chat from "@/pages/Chat";
 import Admin from "@/pages/Admin";
+import Deliverables from "@/pages/Deliverables";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -74,6 +75,7 @@ const AppRoutes = () => {
         <Route path="/contenus" element={<Contenus />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/reporting" element={<Reporting />} />
+        <Route path="/deliverables" element={<Deliverables />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/admin" element={<Admin />} />
       </Route>

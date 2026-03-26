@@ -13,8 +13,10 @@ import { useClient } from '@/contexts/ClientContext';
 import { toast } from 'sonner';
 
 export default function Insights() {
-  const { currentClient, isAllClientsSelected } = useClient();
-  const { loading: meetingsLoading, meetings, error: meetingsError, refetch } = useSupabaseMeetings();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { currentClient, isAllClientsSelected, clientConfig } = useClient();
+  const { context: veilleContext, loading: veilleLoading, error: veilleError } = useVeilleContext();
+  const { loading: meetingsLoading, meetings, error: meetingsError, projectUrl, refetch } = useSupabaseMeetings();
   const performanceInsights: [] = [];
   const externalInsights: [] = [];
   const opsInsights: [] = [];
@@ -83,18 +85,55 @@ export default function Insights() {
       {/* Sticky Top Bar */}
       <InsightsTopBar filters={filters} onFiltersChange={setFilters} />
 
-      {/* Block A: Meeting Insights (Priority) */}
-      {showMeetings && (
-        <section className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            {isAllClientsSelected
-              ? `Showing all meetings (${meetings.length})`
-              : `Showing meetings for ${currentClient?.name ?? 'selected client'} (${meetings.length})`}
-          </p>
-          {meetingsLoading && (
-            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground animate-pulse">
-              Loading meetings…
-            </div>
+      <Tabs value={insightsView} onValueChange={(value) => handleViewChange(value as 'meetings' | 'veille')}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="meetings" className="gap-2">
+            <Video className="w-4 h-4" />
+            Meetings
+          </TabsTrigger>
+          <TabsTrigger value="veille" className="gap-2">
+            <Newspaper className="w-4 h-4" />
+            Veille
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="meetings" className="space-y-8 mt-4">
+          {/* Block A: Meeting Insights (Priority) */}
+          {showMeetings && (
+            <section className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                {isAllClientsSelected
+                  ? `Showing all meetings (${meetings.length})`
+                  : `Showing meetings for ${currentClient?.name ?? 'selected client'} (${meetings.length})`}
+              </p>
+              {meetingsLoading && (
+                <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground animate-pulse">
+                  Loading meetings…
+                </div>
+              )}
+              {meetingsError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  Meetings query error: {meetingsError}
+                </div>
+              )}
+              {!meetingsLoading && !meetingsError && meetings.length === 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  No meetings found for this client. Try syncing tl;dv or selecting a different client.
+                </div>
+              )}
+              <MeetingInsightsHeader
+                meetingsCount={meetings.length}
+                totalNBAs={totalNBAs}
+                totalVerbatims={totalVerbatims}
+              />
+              <MeetingsTable
+                meetings={filteredMeetings}
+                searchQuery={filters.search}
+                onMeetingClick={handleMeetingClick}
+                onConnectTldv={handleSyncTldv}
+                syncingTldv={syncingTldv}
+              />
+            </section>
           )}
           {meetingsError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">

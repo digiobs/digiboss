@@ -40,7 +40,7 @@ const colorClasses: Record<string, string> = {
 const navItems = [
   { path: '/home', icon: LayoutDashboard, label: 'Home' },
   { path: '/meetings', icon: Lightbulb, label: 'Meetings' },
-  { path: '/meetings?view=veille', icon: Newspaper, label: 'Veille' },
+  { path: '/veille', icon: Newspaper, label: 'Veille' },
   { path: '/prospects', icon: Users, label: 'Prospects' },
   { path: '/plan', icon: Calendar, label: 'Plan' },
   { path: '/content', icon: PenTool, label: 'Content Creator' },
@@ -127,10 +127,7 @@ export function Sidebar() {
       {/* Main Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const isVeilleLink = item.path.startsWith('/meetings?view=veille');
-          const isActive = isVeilleLink
-            ? location.pathname === '/meetings' && new URLSearchParams(location.search).get('view') === 'veille'
-            : location.pathname === item.path;
+          const isActive = location.pathname === item.path;
           const Icon = item.icon;
           
           return (

@@ -1,20 +1,16 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Video, BarChart3, Newspaper } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Video, BarChart3 } from 'lucide-react';
 import { InsightsTopBar } from '@/components/insights/InsightsTopBar';
 import { MeetingInsightsHeader } from '@/components/insights/MeetingInsightsHeader';
 import { MeetingsTable } from '@/components/insights/MeetingsTable';
 import { MeetingDetailDrawer } from '@/components/insights/MeetingDetailDrawer';
 import { InsightFeed } from '@/components/insights/InsightFeed';
-import { MarketNews } from '@/components/insights/MarketNews';
 import type { InsightsFilters, Meeting } from '@/types/insights';
 import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 import { useSupabaseMeetings } from '@/hooks/useSupabaseMeetings';
-import { useVeilleContext } from '@/hooks/useVeilleContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useClient } from '@/contexts/ClientContext';
 import { toast } from 'sonner';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export default function Insights() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,8 +31,6 @@ export default function Insights() {
 
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const initialView = searchParams.get('view') === 'veille' ? 'veille' : 'meetings';
-  const [insightsView, setInsightsView] = useState<'meetings' | 'veille'>(initialView);
 
   // Calculate totals for header
   const totalNBAs = meetings.reduce((acc, m) => acc + m.nbaCount, 0);
@@ -69,24 +63,8 @@ export default function Insights() {
     setSyncingTldv(false);
   };
 
-  const handleViewChange = (value: 'meetings' | 'veille') => {
-    setInsightsView(value);
-    const next = new URLSearchParams(searchParams);
-    if (value === 'veille') {
-      next.set('view', 'veille');
-    } else {
-      next.delete('view');
-    }
-    setSearchParams(next, { replace: true });
-  };
-
-  useEffect(() => {
-    const viewFromUrl = searchParams.get('view') === 'veille' ? 'veille' : 'meetings';
-    setInsightsView((prev) => (prev === viewFromUrl ? prev : viewFromUrl));
-  }, [searchParams]);
-
-  const showMeetings = (filters.source === 'all' || filters.source === 'meetings') && insightsView === 'meetings';
-  const showFeed = filters.source !== 'meetings' && insightsView === 'meetings';
+  const showMeetings = filters.source === 'all' || filters.source === 'meetings';
+  const showFeed = filters.source !== 'meetings';
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -157,59 +135,53 @@ export default function Insights() {
               />
             </section>
           )}
-
-          {/* Block B: Consolidated Insight Feed */}
-          {showFeed && (
-            <section className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">Insight Feed</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Performance anomalies, external research, and operational blockers.
-                  </p>
-                </div>
-              </div>
-              <InsightFeed
-                performanceInsights={performanceInsights}
-                externalInsights={externalInsights}
-                opsInsights={opsInsights}
-                filters={filters}
-              />
-            </section>
+          {meetingsError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              Meetings query error: {meetingsError}
+            </div>
           )}
-        </TabsContent>
+          {!meetingsLoading && !meetingsError && meetings.length === 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              No meetings found for this client. Try syncing tl;dv or selecting a different client.
+            </div>
+          )}
+          <MeetingInsightsHeader
+            meetingsCount={meetings.length}
+            totalNBAs={totalNBAs}
+            totalVerbatims={totalVerbatims}
+          />
+          <MeetingsTable
+            meetings={filteredMeetings}
+            searchQuery={filters.search}
+            onMeetingClick={handleMeetingClick}
+            onConnectTldv={handleSyncTldv}
+            syncingTldv={syncingTldv}
+          />
+        </section>
+      )}
 
-        <TabsContent value="veille" className="space-y-4 mt-4">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-foreground">
-                Veille - {veilleContext.scopeLabel}
-              </h2>
+      {/* Block B: Consolidated Insight Feed */}
+      {showFeed && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Insight Feed</h2>
               <p className="text-sm text-muted-foreground">
-                Generated by Claude AI using your client context (industry, keywords, competitors).
+                Performance anomalies, external research, and operational blockers.
               </p>
             </div>
-            {veilleLoading && (
-              <div className="mb-4 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                Loading client context for veille...
-              </div>
-            )}
-            {veilleError && (
-              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Could not load full client context: {veilleError}
-              </div>
-            )}
-            <MarketNews
-              industry={veilleContext.industry ?? clientConfig?.industry ?? undefined}
-              keywords={veilleContext.keywords.length > 0 ? veilleContext.keywords : clientConfig?.market_news_keywords ?? undefined}
-              competitors={veilleContext.competitors.length > 0 ? veilleContext.competitors : clientConfig?.competitors ?? undefined}
-            />
           </div>
-        </TabsContent>
-      </Tabs>
+          <InsightFeed
+            performanceInsights={performanceInsights}
+            externalInsights={externalInsights}
+            opsInsights={opsInsights}
+            filters={filters}
+          />
+        </section>
+      )}
 
       {/* Meeting Detail Drawer */}
       <MeetingDetailDrawer

@@ -294,39 +294,57 @@ export function useSupabaseMeetings() {
         return;
       }
 
-      let query = supabase
-        .from("tldv_meetings")
-        .select(
-          "id,name,happened_at,duration_seconds,organizer_name,organizer_email,meeting_url,participants_count,raw,client_id,transcript_text,transcript_segments,transcript_status,ai_summary_json,highlights_json",
-        )
-        .order("happened_at", { ascending: false })
-        .limit(200);
-      if (!isAllClientsSelected) {
-        query = query.eq("client_id", currentClient.id);
-      }
-      const { data: assignedRows, error } = await query;
+      setLoading(true);
 
-      if (error) {
-        console.error("tldv_meetings query error:", error);
+      try {
+        let query = supabase
+          .from("tldv_meetings")
+          .select(
+            "id,name,happened_at,duration_seconds,organizer_name,organizer_email,meeting_url,participants_count,raw,client_id,transcript_text,transcript_segments,transcript_status,ai_summary_json,highlights_json",
+          )
+          .order("happened_at", { ascending: false })
+          .limit(200);
+        if (!isAllClientsSelected) {
+          query = query.eq("client_id", currentClient.id);
+        }
+        const { data: assignedRows, error: queryError } = await query;
+
+        if (queryError) {
+          console.error("tldv_meetings query error:", queryError);
+          if (!mounted) return;
+          setData([]);
+          setSource("none");
+          setError(queryError.message ?? "Unknown meetings query error");
+          setLoading(false);
+          return;
+        }
+
+        const rows = (assignedRows ?? []) as TldvRow[];
+        const mapped: Meeting[] = [];
+        for (const row of rows) {
+          try {
+            mapped.push(mapTldvRowToMeeting(row));
+          } catch (rowErr) {
+            console.error("Failed to map meeting row:", row.id, rowErr);
+          }
+        }
+        mapped.sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        );
+
+        if (!mounted) return;
+        setData(mapped);
+        setSource(mapped.length > 0 ? "supabase" : "none");
+        setError(null);
+        setLoading(false);
+      } catch (err) {
+        console.error("useSupabaseMeetings unexpected error:", err);
         if (!mounted) return;
         setData([]);
         setSource("none");
-        setError(error.message ?? "Unknown meetings query error");
+        setError(err instanceof Error ? err.message : "Unexpected error loading meetings");
         setLoading(false);
-        return;
       }
-
-      const mapped = ((assignedRows ?? []) as TldvRow[])
-        .map(mapTldvRowToMeeting)
-        .sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      );
-
-      if (!mounted) return;
-      setData(mapped);
-      setSource(mapped.length > 0 ? "supabase" : "none");
-      setError(null);
-      setLoading(false);
     })();
 
     return () => {

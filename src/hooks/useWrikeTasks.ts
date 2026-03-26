@@ -44,7 +44,7 @@ async function fetchSupabaseFallback(): Promise<WrikeTask[]> {
 
   if (error || !data) return [];
 
-  return data.map((pt: any) => {
+  return data.map((pt: Record<string, unknown>) => {
     const client = CLIENT_DISPLAY[pt.client_id] || { name: pt.client_id, sector: 'industrial' };
     return {
       id: pt.wrike_task_id || pt.id,

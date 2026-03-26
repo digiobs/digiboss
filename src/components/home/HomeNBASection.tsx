@@ -56,7 +56,7 @@ export function HomeNBASection() {
     }
   };
 
-  const handleAction = (action: any) => {
+  const handleAction = (action: Record<string, unknown>) => {
     if (action.wrike_url) {
       window.open(action.wrike_url, '_blank');
     }
@@ -90,7 +90,7 @@ export function HomeNBASection() {
         </div>
       ) : (
         <div className="space-y-3">
-          {actions.map((task: any) => {
+          {actions.map((task: Record<string, unknown>) => {
             const priorityScore = task.priority === 'high' ? 85 : task.priority === 'medium' ? 55 : 30;
             const dueDate = task.due_date ? new Date(task.due_date).toLocaleDateString('fr-FR') : 'Sans date';
 

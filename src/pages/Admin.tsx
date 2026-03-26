@@ -140,7 +140,7 @@ export default function Admin() {
       const insertPayload = supportsColor
         ? { name: trimmedName, color: clientColor }
         : { name: trimmedName };
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('clients')
         .insert(insertPayload)
         .select()
@@ -159,7 +159,7 @@ export default function Admin() {
       const updatePayload = supportsColor
         ? { name: trimmedName, color: clientColor }
         : { name: trimmedName };
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('clients')
         .update(updatePayload)
         .eq('id', editingClient.id);

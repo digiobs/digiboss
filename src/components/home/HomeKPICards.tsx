@@ -35,10 +35,10 @@ export function HomeKPICards() {
   }
 
   const values: Record<string, number> = {
-    total_tasks_active: (homeKpis as any)?.total_tasks_active ?? 0,
-    tasks_due_this_week: (homeKpis as any)?.tasks_due_this_week ?? 0,
-    high_priority_count: (homeKpis as any)?.high_priority_count ?? 0,
-    completed_this_month: (homeKpis as any)?.completed_this_month ?? 0,
+    total_tasks_active: (homeKpis as Record<string, number> | undefined)?.total_tasks_active ?? 0,
+    tasks_due_this_week: (homeKpis as Record<string, number> | undefined)?.tasks_due_this_week ?? 0,
+    high_priority_count: (homeKpis as Record<string, number> | undefined)?.high_priority_count ?? 0,
+    completed_this_month: (homeKpis as Record<string, number> | undefined)?.completed_this_month ?? 0,
     avgHealthScore: legacyData?.avgHealthScore ?? 0,
   };
 

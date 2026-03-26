@@ -12,7 +12,7 @@ interface PlanTask {
   priority: string;
   assignee: string | null;
   due_date: string | null;
-  tags: any;
+  tags: string[] | null;
   source_module: string | null;
   wrike_task_id: string | null;
   wrike_permalink: string | null;

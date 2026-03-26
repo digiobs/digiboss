@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HomeKPIStrip } from "@/components/home/HomeKPIStrip";
 import { HomeWeeklySummary } from "@/components/home/HomeWeeklySummary";
 import { HomeNextBestActions } from "@/components/home/HomeNextBestActions";

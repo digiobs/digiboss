@@ -71,7 +71,7 @@ export const mockNotifications: Notification[] = [
     priority: 'medium',
     status: 'read',
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
-    actionUrl: '/insights',
+    actionUrl: '/meetings',
     actionLabel: 'View Insight',
     metadata: {
       source: 'Competitive Intelligence',

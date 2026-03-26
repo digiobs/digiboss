@@ -114,7 +114,7 @@ export function useNotifications() {
           title: 'New keyword opportunity found',
           message: 'Rising search term in your industry with low competition.',
           priority: 'medium',
-          actionUrl: '/insights',
+          actionUrl: '/meetings',
           actionLabel: 'Explore',
           metadata: { confidence: 75, impact: 'medium', category: 'SEO' },
         },

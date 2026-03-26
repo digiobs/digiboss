@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChannelBadge } from './ChannelBadge';
-import { useContentDetail } from '@/hooks/useContents';
+import { useContentDetail, type Channel } from '@/hooks/useContents';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -47,7 +47,7 @@ export function ContentDetailDrawer({ contentId, open, onClose }: Props) {
           <>
             <SheetHeader className="pb-4">
               <div className="flex items-center gap-2 mb-2">
-                <ChannelBadge channel={content.channel as any} />
+                <ChannelBadge channel={content.channel as Channel} />
                 <Badge variant="secondary">{format(new Date(content.published_at), 'dd MMMM yyyy', { locale: fr })}</Badge>
               </div>
               <SheetTitle className="text-lg">{content.title}</SheetTitle>

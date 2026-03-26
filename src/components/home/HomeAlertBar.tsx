@@ -23,7 +23,7 @@ export function HomeAlertBar() {
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-      {allAlerts.map((alert: any) => {
+      {allAlerts.map((alert: Record<string, unknown>) => {
         const isCritical = alert.type === 'critical';
         return (
           <div

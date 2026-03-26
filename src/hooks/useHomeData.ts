@@ -151,7 +151,7 @@ export function useHomeKPIs() {
 
       const contentsCount = contentsRes.count ?? 0;
       const prevContentsCount = prevContentsRes.count ?? 0;
-      const totalImpressions = (metricsRes.data ?? []).reduce((sum, m) => sum + ((m as any).impressions ?? 0), 0);
+      const totalImpressions = (metricsRes.data ?? []).reduce((sum, m) => sum + (m.impressions ?? 0), 0);
 
       return {
         activeClients: clientIds.length,
@@ -319,13 +319,13 @@ export function useClientTaskHealth() {
   return useQuery({
     queryKey: ['client-task-health'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('plan_tasks')
         .select('client_id, status, clients(name, id)');
       if (error) throw error;
 
       // Group by client and calculate health metrics
-      const grouped = (data ?? []).reduce((acc: Record<string, any>, task: any) => {
+      const grouped = (data ?? []).reduce((acc: Record<string, Record<string, unknown>>, task) => {
         const clientId = task.client_id;
         if (!acc[clientId]) {
           acc[clientId] = {
@@ -344,7 +344,7 @@ export function useClientTaskHealth() {
       }, {});
 
       // Calculate health status for each client
-      return Object.values(grouped).map((client: any) => {
+      return Object.values(grouped).map((client: Record<string, unknown>) => {
         let health = 'green';
         if (client.overdue >= 3) health = 'red';
         else if (client.overdue >= 1) health = 'yellow';

@@ -51,7 +51,7 @@ export function ContentsSummaryCharts({ contents, isLoading }: { contents: Conte
 
   const volumeData = Object.entries(weekMap).map(([week, channels]) => ({ week, ...channels }));
   const engagementData = Object.entries(engagementMap).map(([week, channels]) => {
-    const row: Record<string, any> = { week };
+    const row: Record<string, string | number> = { week };
     Object.entries(channels).forEach(([ch, { sum, count }]) => {
       row[ch] = Number((sum / count).toFixed(1));
     });

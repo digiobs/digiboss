@@ -52,7 +52,7 @@ export function useContents(options: {
       const since = new Date();
       since.setDate(since.getDate() - periodDays);
 
-      let query = (supabase as any)
+      let query = supabase
         .from('contents')
         .select('*, clients(name), content_metrics(*)')
         .eq('status', 'published')
@@ -79,7 +79,7 @@ export function useContentDetail(contentId: string | null) {
     queryKey: ['content-detail', contentId],
     enabled: !!contentId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('contents')
         .select('*, clients(name), content_metrics(*)')
         .eq('id', contentId!)

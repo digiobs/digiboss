@@ -55,7 +55,7 @@ serve(async (req) => {
         // Get tasks from a space with pagination
         let allTasks: unknown[] = [];
         let nextPageToken: string | undefined;
-        let pageUrl = `${WRIKE_BASE}/folders/${folderId}/tasks?fields=[${(fields || ['customFields', 'effortAllocation']).map((f: string) => `"${f}"`).join(',')}]&pageSize=100`;
+        const pageUrl = `${WRIKE_BASE}/folders/${folderId}/tasks?fields=[${(fields || ['customFields', 'effortAllocation']).map((f: string) => `"${f}"`).join(',')}]&pageSize=100`;
         
         do {
           const pageUrlWithToken = nextPageToken ? `${pageUrl}&nextPageToken=${nextPageToken}` : pageUrl;
@@ -97,7 +97,7 @@ serve(async (req) => {
     if (method === 'GET' && useCache !== false) {
       const cached = getCached(url);
       if (cached) {
-        return new Response(JSON.stringify({ data: (cached as any).data || cached, cached: true }), {
+        return new Response(JSON.stringify({ data: (cached as Record<string, unknown>).data || cached, cached: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }

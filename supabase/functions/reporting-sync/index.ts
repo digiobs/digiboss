@@ -169,6 +169,16 @@ serve(async (req) => {
         { client_id: id, section: "social", metric_key: "li_followers", label: "LI Followers", value: lemlistCountByClient.get(id) ?? 0, unit: "count", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "acquisition", metric_key: "seo_clicks", label: "SEO Clicks", value: clickCount, unit: "count", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "acquisition", metric_key: "avg_position", label: "Avg Position", value: avgPosition, unit: "ratio", period_start: periodStart, period_end: periodEnd },
+        // P7: Strategy section (placeholder — populated by future PMF skill)
+        { client_id: id, section: "strategy", metric_key: "pmf_score", label: "Score PMF", value: 0, unit: "score", period_start: periodStart, period_end: periodEnd },
+        { client_id: id, section: "strategy", metric_key: "pmf_clarity", label: "Clarté douleur", value: 0, unit: "score", period_start: periodStart, period_end: periodEnd },
+        // P8: SEO health section
+        { client_id: id, section: "seo", metric_key: "health_score", label: "Score Santé SEO", value: avgPosition > 0 ? Math.round(Math.max(0, 100 - avgPosition * 2)) : 0, unit: "score", period_start: periodStart, period_end: periodEnd },
+        { client_id: id, section: "seo", metric_key: "quick_wins", label: "Quick Wins", value: 0, unit: "count", period_start: periodStart, period_end: periodEnd },
+        // P9: AI visibility section (placeholder — populated by future Meteoria integration)
+        { client_id: id, section: "ai-visibility", metric_key: "mention_rate", label: "Taux de mention IA", value: 0, unit: "percent", period_start: periodStart, period_end: periodEnd },
+        { client_id: id, section: "ai-visibility", metric_key: "market_share", label: "Part de voix IA", value: 0, unit: "percent", period_start: periodStart, period_end: periodEnd },
+        { client_id: id, section: "ai-visibility", metric_key: "sentiment_positive", label: "Sentiment positif", value: 0, unit: "percent", period_start: periodStart, period_end: periodEnd },
       );
     }
 
@@ -177,6 +187,29 @@ serve(async (req) => {
         onConflict: "client_id,section,metric_key,period_start,period_end",
       });
       if (upsertError) throw new Error(`Failed to upsert reporting KPIs: ${upsertError.message}`);
+    }
+
+    // P1: Auto-upsert hero KPIs into home_kpis after each reporting run
+    const homeKpiRows: { client_id: string; key: string; label: string; value: string; delta: number | null; trend: string | null }[] = [];
+    for (const id of clientIds) {
+      const metrics = metricByClient.get(id) ?? {};
+      const semrushStats = seoPosByClient.get(id) ?? { sum: 0, count: 0 };
+      const avgPos = semrushStats.count > 0 ? semrushStats.sum / semrushStats.count : 0;
+      const seoHealthScore = avgPos > 0 ? Math.round(Math.max(0, 100 - avgPos * 2)) : 0;
+      const clickCount = metrics.clicks ?? 0;
+
+      homeKpiRows.push(
+        { client_id: id, key: "sessions", label: "Sessions", value: String(metrics.impressions ?? 0), delta: null, trend: null },
+        { client_id: id, key: "seo_clicks", label: "SEO Clicks", value: String(clickCount), delta: null, trend: null },
+        { client_id: id, key: "li_impressions", label: "LinkedIn Impressions", value: String(metrics.impressions ?? 0), delta: null, trend: null },
+        { client_id: id, key: "health_score", label: "Score Santé", value: String(seoHealthScore), delta: null, trend: null },
+      );
+    }
+    if (homeKpiRows.length > 0) {
+      const { error: homeError } = await supabase.from("home_kpis").upsert(homeKpiRows, {
+        onConflict: "client_id,key",
+      });
+      if (homeError) console.error("home_kpis upsert warning:", homeError.message);
     }
 
     await finishIntegrationRun(supabase, runId, {
@@ -191,7 +224,7 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ synced: rows.length, periodStart, periodEnd, clients: clientIds.size }),
+      JSON.stringify({ synced: rows.length, homeKpis: homeKpiRows.length, periodStart, periodEnd, clients: clientIds.size }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {

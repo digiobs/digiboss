@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createServiceClient } from "../_shared/ingestion.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +11,11 @@ interface GenerateRequest {
   keywords?: string[];
   brandTone?: string[];
   context?: string;
+  clientId?: string;
+  funnelStage?: string;
+  pillar?: string;
+  channel?: string;
+  deliverableId?: string;
 }
 
 serve(async (req) => {
@@ -23,7 +29,7 @@ serve(async (req) => {
       throw new Error("PERPLEXITY_API_KEY is not configured");
     }
 
-    const { title, keywords = [], brandTone = [], context = "" }: GenerateRequest = await req.json();
+    const { title, keywords = [], brandTone = [], context = "", clientId, funnelStage, pillar, channel, deliverableId }: GenerateRequest = await req.json();
 
     if (!title) {
       return new Response(
@@ -118,10 +124,34 @@ Format the response as JSON with these fields:
       };
     }
 
+    // P2: Insert into content_items after successful generation
+    let contentItemId: string | null = null;
+    if (clientId) {
+      const supabase = createServiceClient();
+      const { data: inserted, error: insertError } = await supabase
+        .from("content_items")
+        .insert({
+          client_id: clientId,
+          title,
+          content_type: "blog-post",
+          status: "draft",
+          funnel_stage: funnelStage ?? "TOFU",
+          payload: { pillar: pillar ?? null, channel: channel ?? null, deliverable_id: deliverableId ?? null, keywords, citations },
+        })
+        .select("id")
+        .single();
+      if (insertError) {
+        console.error("content_items insert warning:", insertError.message);
+      } else {
+        contentItemId = inserted?.id ?? null;
+      }
+    }
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         content: parsedContent,
-        citations 
+        citations,
+        contentItemId,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

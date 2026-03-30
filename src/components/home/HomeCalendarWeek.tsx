@@ -95,7 +95,7 @@ export function HomeCalendarWeek() {
                   <p className="text-xs text-muted-foreground italic">Journée libre</p>
                 ) : (
                   <div className="space-y-1">
-                    {dayEvents.map((event: any) => {
+                    {dayEvents.map((event: { id: string; event_type: string; scheduled_at: string; title: string; channel?: string }) => {
                       const cfg = eventTypeConfig[event.event_type] || eventTypeConfig.content_planned;
                       const Icon = cfg.icon;
                       const time = format(new Date(event.scheduled_at), 'HH:mm');

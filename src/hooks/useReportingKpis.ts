@@ -35,7 +35,7 @@ export function useReportingKpis() {
     let mounted = true;
     (async () => {
       if (!currentClient?.id) return;
-      let query = (supabase as any)
+      let query = (supabase as unknown as { from: (table: string) => Record<string, unknown> })
         .from("reporting_kpis")
         .select("section,metric_key,label,value,unit")
         .order("period_end", { ascending: false })

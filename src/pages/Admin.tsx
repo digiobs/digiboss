@@ -140,7 +140,7 @@ export default function Admin() {
       const insertPayload = supportsColor
         ? { name: trimmedName, color: clientColor }
         : { name: trimmedName };
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (supabase as unknown as { from: (table: string) => Record<string, unknown> })
         .from('clients')
         .insert(insertPayload)
         .select()

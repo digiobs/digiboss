@@ -30,7 +30,7 @@ export function useDeliverables(options?: { type?: string; clientId?: string | n
   return useQuery({
     queryKey: ['deliverables', filterClientId, filterType],
     queryFn: async () => {
-      let query = (supabase as any)
+      let query = (supabase as unknown as { from: (table: string) => Record<string, unknown> })
         .from('deliverables')
         .select('id,client_id,type,title,description,status,skill_name,channel,sub_type,notion_url,sharepoint_url,onedrive_path,filename,period,tags,created_at,clients(name)')
         .order('created_at', { ascending: false })

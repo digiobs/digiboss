@@ -68,7 +68,7 @@ export function HomeActivityFeed() {
       ) : (
         <ScrollArea className="max-h-[350px]">
           <div className="space-y-1 pr-2">
-            {events.map((event: any) => {
+            {events.map((event: { id: string; event_type: string; created_at: string; message?: string; clients?: { name: string } }) => {
               const emoji = eventEmoji[event.event_type] || '📄';
               const timeAgo = formatDistanceToNow(new Date(event.created_at), {
                 addSuffix: true,

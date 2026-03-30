@@ -73,7 +73,7 @@ export function HomeCalendarWeek() {
       ) : (
         <div className="space-y-1">
           {days.map((day) => {
-            const dayEvents = (data?.events ?? []).filter((e: any) =>
+            const dayEvents = (data?.events ?? []).filter((e: { scheduled_at: string }) =>
               isSameDay(new Date(e.scheduled_at), day)
             );
             const today = isToday(day);

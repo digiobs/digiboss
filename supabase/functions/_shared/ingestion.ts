@@ -6,7 +6,8 @@ export type IntegrationProvider =
   | "semrush"
   | "supermetrics"
   | "market-news"
-  | "claude";
+  | "claude"
+  | "wrike";
 
 export type IntegrationRunStatus = "running" | "success" | "partial" | "failed";
 

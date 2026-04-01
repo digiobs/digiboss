@@ -129,6 +129,7 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
   const [syncing, setSyncing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [syncingLinkedin, setSyncingLinkedin] = useState(false);
+  const [syncingWrike, setSyncingWrike] = useState(false);
   const [viewMode, setViewMode] = useState<"simple" | "detailed">("simple");
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
@@ -557,6 +558,28 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
     }
   };
 
+  const runWrikeSync = async () => {
+    setSyncingWrike(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-active-wrike-clients", { body: {} });
+      if (error) {
+        toast.error("Wrike sync failed");
+        console.error("sync-active-wrike-clients invoke error:", error);
+        return;
+      }
+      const synced = data?.total_synced ?? 0;
+      const clients = data?.clients_synced ?? 0;
+      const unmatched = data?.unmatched_folders ?? [];
+      let msg = `Wrike sync done: ${synced} tasks synced across ${clients} clients.`;
+      if (unmatched.length > 0) {
+        msg += ` ${unmatched.length} unmatched folder(s): ${unmatched.join(", ")}`;
+      }
+      toast.success(msg);
+    } finally {
+      setSyncingWrike(false);
+    }
+  };
+
   const statusClass = (status: MappingStatus) => {
     if (status === "connected") return "status-completed";
     if (status === "pending") return "status-in-progress";
@@ -600,6 +623,10 @@ export function ClientDataMappingsPanel({ clients }: { clients: ClientLite[] }) 
           <Button size="sm" variant="outline" onClick={runLinkedinPostsSync} disabled={syncingLinkedin}>
             {syncingLinkedin ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCcw className="w-4 h-4 mr-1" />}
             Sync LinkedIn posts
+          </Button>
+          <Button size="sm" variant="outline" onClick={runWrikeSync} disabled={syncingWrike}>
+            {syncingWrike ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCcw className="w-4 h-4 mr-1" />}
+            Sync Wrike clients
           </Button>
           <Button size="sm" onClick={openCreate}>
             <Plus className="w-4 h-4 mr-1" />

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   Search,
   Globe,
@@ -17,6 +17,7 @@ import {
   Zap,
   ExternalLink,
   RefreshCw,
+  CloudDownload,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,8 +41,12 @@ import {
 import { cn } from '@/lib/utils';
 import { useSeoGeo } from '@/hooks/useSeoGeo';
 import { useGoogleSearchConsole } from '@/hooks/useGoogleSearchConsole';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
+import { useClient } from '@/contexts/ClientContext';
+import { supabase } from '@/integrations/supabase/client';
 import { format, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
 
 const positionChartConfig = {
   position: { label: 'Position', color: 'hsl(142, 76%, 36%)' },
@@ -88,6 +93,36 @@ export default function SeoGeo() {
     totals: gscTotals,
     isLoading: gscLoading,
   } = useGoogleSearchConsole();
+
+  const { isAdmin } = useVisibilityMode();
+  const { currentClient, isAllClientsSelected } = useClient();
+  const { toast } = useToast();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const syncFromOneDrive = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const payload: Record<string, unknown> = { dryRun: false };
+      if (!isAllClientsSelected && currentClient?.id) {
+        payload.clientId = currentClient.id;
+      }
+      const { data, error } = await supabase.functions.invoke('onedrive-semrush-sync', { body: payload });
+      if (error) throw error;
+      const inserted = data?.totalInserted ?? 0;
+      toast({
+        title: 'Sync OneDrive terminé',
+        description: `${inserted} positions Semrush importées depuis les dossiers Claude/seo.`,
+      });
+      refetch();
+    } catch (err) {
+      toast({
+        title: 'Erreur sync OneDrive',
+        description: err instanceof Error ? err.message : 'Erreur inconnue',
+        variant: 'destructive',
+      });
+    }
+    setIsSyncing(false);
+  }, [currentClient?.id, isAllClientsSelected, refetch, toast]);
 
   // Build position evolution chart data
   const positionChartData = useMemo(() => {
@@ -153,6 +188,12 @@ export default function SeoGeo() {
             <div className="w-2 h-2 rounded-full bg-amber-500" />
             Meteoria
           </Badge>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={syncFromOneDrive} disabled={isSyncing} className="gap-1.5 text-xs">
+              <CloudDownload className={cn('w-4 h-4', isSyncing && 'animate-pulse')} />
+              Sync OneDrive
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={refetch} disabled={isLoading}>
             <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
           </Button>

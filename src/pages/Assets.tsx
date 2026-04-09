@@ -1,4 +1,4 @@
-import { FolderOpen, Search, Grid3X3, List, Plus, FileText, Image, Palette, ExternalLink, CloudIcon, RefreshCw, Type, Eye } from 'lucide-react';
+import { FolderOpen, Search, Grid3X3, List, Plus, FileText, Image, Palette, ExternalLink, CloudIcon, RefreshCw, Type, Eye, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 import { useSupabaseAssets } from '@/hooks/useSupabaseTabData';
 import { useDeliverables } from '@/hooks/useDeliverables';
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { supabase } from '@/integrations/supabase/client';
@@ -575,6 +576,13 @@ export default function Assets() {
           <FileText className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-semibold">Livrables</h2>
           <Badge variant="secondary">{deliverables?.length ?? 0} documents</Badge>
+          <Link
+            to="/deliverables"
+            className="ml-auto text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            Voir tous les livrables
+            <ArrowRight className="w-3 h-3" />
+          </Link>
         </div>
 
         {/* OneDrive path indicator */}

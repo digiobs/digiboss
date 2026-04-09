@@ -8,7 +8,9 @@ import {
   Clock,
   Sparkles,
   ArrowRight,
+  ExternalLink,
   Filter,
+  Info,
   Zap,
   Layers,
   Calendar,
@@ -111,6 +113,25 @@ function ProposalCard({
               <p className="text-xs font-medium text-muted-foreground mb-1">Justification</p>
               <p className="text-xs">{proposal.rationale}</p>
             </div>
+            {proposal.source_insight && (
+              <div className="bg-blue-50 dark:bg-blue-950/30 rounded p-2 border border-blue-200 dark:border-blue-800">
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1 flex items-center gap-1">
+                  <Info className="w-3 h-3" />Source de l'insight
+                </p>
+                <p className="text-xs">{proposal.source_insight}</p>
+                {proposal.source_url && (
+                  <a
+                    href={proposal.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Voir la source
+                  </a>
+                )}
+              </div>
+            )}
             {proposal.draft_content && (
               <div className="bg-accent/30 rounded p-3 border border-border/50">
                 <p className="text-xs font-medium text-muted-foreground mb-2">Brouillon du contenu</p>

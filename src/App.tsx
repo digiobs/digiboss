@@ -13,7 +13,6 @@ import PreLogin from "@/pages/PreLogin";
 import Home from "@/pages/Home";
 import Insights from "@/pages/Insights";
 import Prospects from "@/pages/Prospects";
-import Plan from "@/pages/Plan";
 import Assets from "@/pages/Assets";
 import Reporting from "@/pages/Reporting";
 import Chat from "@/pages/Chat";
@@ -72,7 +71,6 @@ const AppRoutes = () => {
         <Route path="/meetings" element={<Insights />} />
         <Route path="/insights" element={<Navigate to="/meetings" replace />} />
         <Route path="/prospects" element={<Prospects />} />
-        <Route path="/plan" element={<Plan />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/reporting" element={<Reporting />} />
         <Route path="/deliverables" element={<Deliverables />} />

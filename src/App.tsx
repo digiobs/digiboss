@@ -22,6 +22,7 @@ import Veille from "@/pages/Veille";
 import Proposals from "@/pages/Proposals";
 import EditorialCalendar from "@/pages/EditorialCalendar";
 import KpiDashboard from "@/pages/KpiDashboard";
+import SeoGeo from "@/pages/SeoGeo";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -78,6 +79,7 @@ const AppRoutes = () => {
         <Route path="/proposals" element={<Proposals />} />
         <Route path="/calendar" element={<EditorialCalendar />} />
         <Route path="/kpis" element={<KpiDashboard />} />
+        <Route path="/seo-geo" element={<SeoGeo />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/admin" element={<Admin />} />
       </Route>

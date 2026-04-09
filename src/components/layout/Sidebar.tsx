@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Building2,
   Loader2,
+  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -46,6 +47,7 @@ const navItems = [
   { path: '/assets', icon: FolderOpen, label: 'Assets' },
   { path: '/proposals', icon: Sparkles, label: 'Propositions' },
   { path: '/calendar', icon: CalendarDays, label: 'Calendrier' },
+  { path: '/seo-geo', icon: Search, label: 'SEO / GEO' },
   { path: '/kpis', icon: Activity, label: 'KPIs' },
   { path: '/reporting', icon: BarChart3, label: 'Reporting' },
   { path: '/deliverables', icon: FileCheck, label: 'Livrables' },

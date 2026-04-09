@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { HomeKPIStrip } from "@/components/home/HomeKPIStrip";
-import { HomeWeeklySummary } from "@/components/home/HomeWeeklySummary";
 import { HomeNextBestActions } from "@/components/home/HomeNextBestActions";
-import { HomePlanSnapshot } from "@/components/home/HomePlanSnapshot";
-import { SignalsPanel } from "@/components/home/SignalsPanel";
-import { ContentPipelinePanel } from "@/components/home/ContentPipelinePanel";
-import { DataHealthWidget } from "@/components/home/DataHealthWidget";
+import { HomeTasksAvancement } from "@/components/home/HomeTasksAvancement";
+import { HomeSeoSnapshot } from "@/components/home/HomeSeoSnapshot";
+import { HomeEditorialPipeline } from "@/components/home/HomeEditorialPipeline";
+import { HomeVeilleAlerts } from "@/components/home/HomeVeilleAlerts";
+import { HomeRecentMeetings } from "@/components/home/HomeRecentMeetings";
+import { HomeRecentDeliverables } from "@/components/home/HomeRecentDeliverables";
 import { type NextBestAction, dashboardKPIs } from "@/data/dashboardData";
 import { useHomeReportingKpis } from "@/hooks/useHomeData";
 import { TabDataStatusBanner } from "@/components/data/TabDataStatusBanner";
@@ -27,7 +28,6 @@ export default function Home() {
   const [selectedAction, setSelectedAction] = useState<NextBestAction | null>(null);
   const [generateSignal, setGenerateSignal] = useState(0);
   const [isGeneratingActions, setIsGeneratingActions] = useState(false);
-  const highlightedActionIds = selectedAction ? [selectedAction.id] : [];
   const { data: reportingData } = useHomeReportingKpis(selectedClientId);
 
   const syncDashboard = async () => {
@@ -36,11 +36,11 @@ export default function Home() {
       const payload = isAllClientsSelected ? {} : { clientId: selectedClientId };
       const { error } = await supabase.functions.invoke('dashboard-news', { body: payload });
       if (error) throw error;
-      toast.success('Dashboard data synced');
+      toast.success('Donnees synchronisees');
       window.location.reload();
     } catch (error) {
       console.error('dashboard sync failed:', error);
-      toast.error('Dashboard sync failed');
+      toast.error('Echec de la synchronisation');
     } finally {
       setSyncing(false);
     }
@@ -58,19 +58,20 @@ export default function Home() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-6">
+      {/* Hero section */}
       <div className="rounded-2xl border border-border bg-gradient-to-br from-background via-background to-primary/5 p-5 md:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
               <Sparkles className="h-3.5 w-3.5" />
-              New Lovable Home
+              Centre de Commande
             </div>
             <div className="space-y-1">
               <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-                Marketing Command Center
+                Centre de Commande Marketing
               </h1>
               <p className="max-w-2xl text-sm text-muted-foreground">
-                Priorites, performance, and next actions in one place for your team and clients.
+                Priorites, performance et prochaines actions pour votre equipe et vos clients.
               </p>
             </div>
           </div>
@@ -78,7 +79,7 @@ export default function Home() {
             {isAdmin && (
               <Button variant="outline" size="sm" className="gap-2" onClick={syncDashboard} disabled={syncing}>
                 <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Syncing...' : 'Sync Data'}
+                {syncing ? 'Synchro...' : 'Sync'}
               </Button>
             )}
             <Select
@@ -102,7 +103,7 @@ export default function Home() {
             </Select>
             <Button size="sm" variant="outline" className="gap-2">
               <CalendarDays className="h-4 w-4" />
-              This week
+              Cette semaine
             </Button>
             <Button
               size="sm"
@@ -111,7 +112,7 @@ export default function Home() {
               disabled={isGeneratingActions}
             >
               <Zap className="h-4 w-4" />
-              {isGeneratingActions ? "Generating..." : "Generate insights"}
+              {isGeneratingActions ? "Generation..." : "Generer insights"}
             </Button>
           </div>
         </div>
@@ -139,33 +140,43 @@ export default function Home() {
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Badge variant="outline" className="gap-1">
             <LayoutDashboard className="h-3 w-3" />
-            {isAllClientsSelected ? "Global view" : selectedClient?.name ?? "Client"}
+            {isAllClientsSelected ? "Vue globale" : selectedClient?.name ?? "Client"}
           </Badge>
           <Badge variant="outline" className="gap-1">
             <ArrowUpRight className="h-3 w-3" />
-            Live KPI tracking
+            KPIs en direct
           </Badge>
         </div>
       </div>
 
       <TabDataStatusBanner tab="home" />
 
+      {/* Performance Overview */}
       <Card className="border-border/60">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Performance Overview</CardTitle>
+          <CardTitle className="text-base">Vue d'ensemble performance</CardTitle>
         </CardHeader>
         <CardContent>
           <HomeKPIStrip reportingKpis={reportingData?.stripKpis} />
         </CardContent>
       </Card>
 
-      <HomeWeeklySummary />
+      {/* Tasks Avancement */}
+      <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Avancement des taches</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <HomeTasksAvancement />
+        </CardContent>
+      </Card>
 
+      {/* 2-column grid */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="space-y-6 xl:col-span-7">
           <Card className="border-border/60">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Next Best Actions</CardTitle>
+              <CardTitle className="text-base">Prochaines actions recommandees</CardTitle>
             </CardHeader>
             <CardContent>
               <HomeNextBestActions
@@ -184,27 +195,58 @@ export default function Home() {
         <div className="space-y-6 xl:col-span-5">
           <Card className="border-border/60">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Plan Snapshot</CardTitle>
+              <CardTitle className="text-base">Apercu SEO</CardTitle>
             </CardHeader>
             <CardContent>
-              <HomePlanSnapshot highlightedActionIds={highlightedActionIds} />
+              <HomeSeoSnapshot />
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-1">
-            <SignalsPanel />
-            <ContentPipelinePanel />
-            <DataHealthWidget />
-          </div>
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Pipeline editorial</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeEditorialPipeline />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Veille & Alertes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeVeilleAlerts />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Reunions recentes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeRecentMeetings />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Livrables recents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeRecentDeliverables />
+            </CardContent>
+          </Card>
         </div>
       </div>
 
+      {/* Footer CTA */}
       <div className="flex items-center justify-between rounded-xl border border-dashed border-border/80 bg-muted/30 px-4 py-3">
         <p className="text-sm text-muted-foreground">
-          Need a dedicated deep-dive? Jump to Reporting, Prospects, or Contenus for channel-level analysis.
+          Besoin d'une analyse approfondie ? Consultez Reporting, Prospects ou Contenus pour une analyse par canal.
         </p>
         <Button variant="ghost" size="sm" className="text-xs">
-          Explore tabs
+          Explorer les onglets
         </Button>
       </div>
     </div>

@@ -22,6 +22,9 @@ import Chat from "@/pages/Chat";
 import Admin from "@/pages/Admin";
 import Deliverables from "@/pages/Deliverables";
 import Veille from "@/pages/Veille";
+import Proposals from "@/pages/Proposals";
+import EditorialCalendar from "@/pages/EditorialCalendar";
+import KpiDashboard from "@/pages/KpiDashboard";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -78,6 +81,9 @@ const AppRoutes = () => {
         <Route path="/reporting" element={<Reporting />} />
         <Route path="/deliverables" element={<Deliverables />} />
         <Route path="/veille" element={<Veille />} />
+        <Route path="/proposals" element={<Proposals />} />
+        <Route path="/calendar" element={<EditorialCalendar />} />
+        <Route path="/kpis" element={<KpiDashboard />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/admin" element={<Admin />} />
       </Route>

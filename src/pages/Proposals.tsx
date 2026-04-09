@@ -111,6 +111,14 @@ function ProposalCard({
               <p className="text-xs font-medium text-muted-foreground mb-1">Justification</p>
               <p className="text-xs">{proposal.rationale}</p>
             </div>
+            {proposal.draft_content && (
+              <div className="bg-accent/30 rounded p-3 border border-border/50">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Brouillon du contenu</p>
+                <div className="text-sm text-foreground whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+                  {proposal.draft_content}
+                </div>
+              </div>
+            )}
             {proposal.tags.length > 0 && (
               <div className="flex items-center gap-1 flex-wrap">
                 <Tag className="w-3 h-3 text-muted-foreground" />

@@ -44,7 +44,7 @@ export interface Convergence {
   created_at: string;
 }
 
-const sb = supabase as unknown as { from: (t: string) => any };
+const sb = supabase as unknown as { from: (t: string) => Record<string, unknown> };
 
 export function useCreativeProposals() {
   const { currentClient, isAllClientsSelected } = useClient();
@@ -130,7 +130,7 @@ export function useCreativeProposals() {
 
     // If approved, call the approve_proposal RPC to auto-schedule
     if (newStatus === 'approved') {
-      const { error: rpcError } = await supabase.rpc('approve_proposal' as any, { proposal_id: proposalId } as any);
+      const { error: rpcError } = await (supabase as unknown as { rpc: (fn: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }> }).rpc('approve_proposal', { proposal_id: proposalId });
       if (rpcError) {
         console.warn('approve_proposal RPC failed (non-blocking):', rpcError);
       }

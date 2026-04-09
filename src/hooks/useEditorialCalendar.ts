@@ -27,7 +27,7 @@ export interface CalendarEntry {
   updated_at: string;
 }
 
-const sb = supabase as unknown as { from: (t: string) => any };
+const sb = supabase as unknown as { from: (t: string) => Record<string, unknown> };
 
 export function useEditorialCalendar() {
   const { currentClient, isAllClientsSelected } = useClient();

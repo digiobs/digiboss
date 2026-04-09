@@ -52,21 +52,24 @@ import { cn } from '@/lib/utils';
 const canalIcons: Record<string, typeof Linkedin> = {
   linkedin: Linkedin,
   blog: BookOpen,
-  email: Mail,
+  newsletter: Mail,
   web: Globe,
+  notion: FileText,
 };
 
 const statusColors: Record<string, string> = {
   idee: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
   brouillon: 'bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-200',
-  pret: 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200',
+  valide: 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200',
+  programme: 'bg-violet-200 text-violet-800 dark:bg-violet-800 dark:text-violet-200',
   publie: 'bg-emerald-200 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-200',
 };
 
 const priorityColors: Record<string, string> = {
-  high: 'border-l-red-500',
-  normal: 'border-l-blue-400',
-  low: 'border-l-slate-300',
+  critique: 'border-l-red-500',
+  urgent: 'border-l-orange-500',
+  important: 'border-l-blue-400',
+  normal: 'border-l-slate-300',
 };
 
 function EntryChip({
@@ -176,7 +179,7 @@ function EntryDetailDialog({
             <div className="pt-2 border-t">
               <p className="text-muted-foreground text-xs mb-2">Changer le statut</p>
               <div className="flex gap-2 flex-wrap">
-                {['idee', 'brouillon', 'pret', 'publie'].map((s) => (
+                {['idee', 'brouillon', 'valide', 'programme', 'publie'].map((s) => (
                   <Button
                     key={s}
                     size="sm"

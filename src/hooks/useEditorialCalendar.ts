@@ -113,7 +113,8 @@ export function useEditorialCalendar() {
     byStatus: {
       idee: entries.filter((e) => e.status === 'idee').length,
       brouillon: entries.filter((e) => e.status === 'brouillon').length,
-      pret: entries.filter((e) => e.status === 'pret').length,
+      valide: entries.filter((e) => e.status === 'valide').length,
+      programme: entries.filter((e) => e.status === 'programme').length,
       publie: entries.filter((e) => e.status === 'publie').length,
     },
     byCanal: entries.reduce<Record<string, number>>((acc, e) => {

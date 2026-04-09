@@ -44,9 +44,10 @@ const statusConfig: Record<string, { label: string; icon: typeof Lightbulb; colo
 };
 
 const urgencyConfig: Record<string, { label: string; color: string }> = {
-  haute: { label: 'Haute', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
-  moyenne: { label: 'Moyenne', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
-  basse: { label: 'Basse', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+  '🔴 Critique': { label: 'Critique', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+  '🟠 Urgent': { label: 'Urgent', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' },
+  '🟡 Important': { label: 'Important', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  '🟢 Normal': { label: 'Normal', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
 };
 
 function ProposalCard({
@@ -61,7 +62,7 @@ function ProposalCard({
   isAdmin: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const urgency = urgencyConfig[proposal.urgency] ?? urgencyConfig.basse;
+  const urgency = urgencyConfig[proposal.urgency] ?? urgencyConfig['🟢 Normal'];
   const age = formatDistanceToNow(new Date(proposal.created_at), { locale: fr, addSuffix: true });
 
   return (
@@ -259,9 +260,10 @@ export default function Proposals() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Toutes</SelectItem>
-            <SelectItem value="haute">Haute</SelectItem>
-            <SelectItem value="moyenne">Moyenne</SelectItem>
-            <SelectItem value="basse">Basse</SelectItem>
+            <SelectItem value="🔴 Critique">Critique</SelectItem>
+            <SelectItem value="🟠 Urgent">Urgent</SelectItem>
+            <SelectItem value="🟡 Important">Important</SelectItem>
+            <SelectItem value="🟢 Normal">Normal</SelectItem>
           </SelectContent>
         </Select>
       </div>

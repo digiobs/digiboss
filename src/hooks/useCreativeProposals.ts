@@ -21,6 +21,7 @@ export interface CreativeProposal {
   marronnier_name: string | null;
   marronnier_date: string | null;
   convergence_cluster_id: string | null;
+  draft_content: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;

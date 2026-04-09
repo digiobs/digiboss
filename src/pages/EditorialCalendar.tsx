@@ -159,6 +159,14 @@ function EntryDetailDialog({
               <p>{entry.serie_id} · Épisode {entry.serie_episode}/{entry.serie_total}</p>
             </div>
           )}
+          {entry.draft_content && (
+            <div>
+              <p className="text-muted-foreground text-xs">Brouillon</p>
+              <div className="text-sm text-foreground whitespace-pre-wrap max-h-[200px] overflow-y-auto bg-accent/30 rounded p-2 border border-border/50">
+                {entry.draft_content}
+              </div>
+            </div>
+          )}
           {entry.notes && (
             <div>
               <p className="text-muted-foreground text-xs">Notes</p>
@@ -176,7 +184,7 @@ function EntryDetailDialog({
             <div className="pt-2 border-t">
               <p className="text-muted-foreground text-xs mb-2">Changer le statut</p>
               <div className="flex gap-2 flex-wrap">
-                {['idee', 'brouillon', 'pret', 'publie'].map((s) => (
+                {['idee', 'brouillon', 'valide', 'programme', 'publie'].map((s) => (
                   <Button
                     key={s}
                     size="sm"

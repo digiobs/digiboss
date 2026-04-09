@@ -22,6 +22,7 @@ export interface CalendarEntry {
   notes: string | null;
   tags: string[];
   marronnier: string | null;
+  draft_content: string | null;
   priority: string;
   created_at: string;
   updated_at: string;

@@ -68,6 +68,7 @@ export interface Meeting {
   verbatims: Verbatim[];
   aiSummary: MeetingAISummary;
   nbaCount: number;
+  nbas?: NBA[];
   tags: string[];
   workflowTags: ('branding' | 'content' | 'web' | 'growth')[];
 }

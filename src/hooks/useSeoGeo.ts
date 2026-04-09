@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useClient } from '@/contexts/ClientContext';
 
+const sb = supabase as unknown as { from: (t: string) => Record<string, unknown> };
+
 export interface SemrushKeyword {
   keyword: string;
   domain: string;
@@ -46,7 +48,9 @@ export function useSeoGeo() {
 
     try {
       // 1. Fetch Semrush keyword positions (latest date per keyword + previous for change)
-      let semrushQuery = supabase
+      type SemrushRow = { keyword: string; domain: string; position: number | null; search_volume: number | null; traffic_percent: number | null; report_date: string };
+
+      let semrushQuery = sb
         .from('semrush_domain_metrics')
         .select('keyword, domain, position, search_volume, traffic_percent, report_date')
         .order('report_date', { ascending: false })
@@ -56,11 +60,16 @@ export function useSeoGeo() {
         semrushQuery = semrushQuery.eq('client_id', currentClient.id);
       }
 
-      const { data: semrushData, error: semrushError } = await semrushQuery;
+      const { data: rawSemrush, error: semrushError } = await semrushQuery;
+      const semrushData = (rawSemrush ?? []) as SemrushRow[];
 
-      if (!semrushError && semrushData) {
+      if (semrushError) {
+        console.error('semrush query error:', semrushError);
+      }
+
+      if (semrushData.length > 0) {
         // Group by keyword, get latest + previous position
-        const keywordMap = new Map<string, { latest: typeof semrushData[0]; previous: typeof semrushData[0] | null }>();
+        const keywordMap = new Map<string, { latest: SemrushRow; previous: SemrushRow | null }>();
 
         for (const row of semrushData) {
           const key = row.keyword;
@@ -106,7 +115,9 @@ export function useSeoGeo() {
       }
 
       // 2. Fetch reporting KPIs for SEO + AI visibility
-      let kpiQuery = supabase
+      type KpiRow = { section: string; metric_key: string; value: number | null };
+
+      let kpiQuery = sb
         .from('reporting_kpis')
         .select('section, metric_key, value')
         .in('section', ['seo', 'ai-visibility', 'acquisition'])
@@ -117,9 +128,14 @@ export function useSeoGeo() {
         kpiQuery = kpiQuery.eq('client_id', currentClient.id);
       }
 
-      const { data: kpiData, error: kpiError } = await kpiQuery;
+      const { data: rawKpi, error: kpiError } = await kpiQuery;
+      const kpiData = (rawKpi ?? []) as KpiRow[];
 
-      if (!kpiError && kpiData) {
+      if (kpiError) {
+        console.error('kpi query error:', kpiError);
+      }
+
+      if (kpiData.length > 0) {
         const kpiMap = new Map<string, number>();
         for (const row of kpiData) {
           const key = `${row.section}:${row.metric_key}`;

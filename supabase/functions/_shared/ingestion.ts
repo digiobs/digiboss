@@ -6,7 +6,9 @@ export type IntegrationProvider =
   | "semrush"
   | "supermetrics"
   | "market-news"
-  | "claude";
+  | "claude"
+  | "hubspot"
+  | "linkedin";
 
 export type IntegrationRunStatus = "running" | "success" | "partial" | "failed";
 

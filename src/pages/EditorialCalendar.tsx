@@ -1,4 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { WRIKE_CLIENTS } from '@/types/wrike';
 import {
   addDays,
   startOfWeek,
@@ -26,6 +28,7 @@ import {
   Mail,
   Globe,
   BookOpen,
+  Download,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -217,6 +220,36 @@ export default function EditorialCalendar() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [filterCanal, setFilterCanal] = useState<string>('all');
   const [draggedEntryId, setDraggedEntryId] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const wrikeFolderId = useMemo(() => {
+    if (!currentClient?.name) return null;
+    const target = currentClient.name.trim().toLowerCase();
+    return WRIKE_CLIENTS.find((c) => c.name.toLowerCase() === target)?.wrikeId ?? null;
+  }, [currentClient?.name]);
+
+  const handleWrikeImport = useCallback(async () => {
+    if (!currentClient?.id) return;
+    if (!wrikeFolderId) {
+      toast.error('Aucun projet Wrike associé à ce client');
+      return;
+    }
+    setIsImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('wrike-editorial-import', {
+        body: { clientId: currentClient.id, wrikeFolderId },
+      });
+      if (error) throw error;
+      const imported = (data as { imported?: number } | null)?.imported ?? 0;
+      toast.success(`${imported} publication${imported > 1 ? 's' : ''} importée${imported > 1 ? 's' : ''} depuis Wrike`);
+      await refetch();
+    } catch (err) {
+      console.error('wrike-editorial-import failed:', err);
+      toast.error("Échec de l'import Wrike");
+    } finally {
+      setIsImporting(false);
+    }
+  }, [currentClient?.id, wrikeFolderId, refetch]);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -287,10 +320,24 @@ export default function EditorialCalendar() {
             {isAllClientsSelected ? 'Tous les clients' : currentClient?.name} · {stats.total} publications
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Actualiser
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && !isAllClientsSelected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleWrikeImport}
+              disabled={isImporting || !wrikeFolderId}
+              title={wrikeFolderId ? 'Importer les tâches Wrike (articles, posts, newsletters)' : 'Aucun projet Wrike associé'}
+            >
+              <Download className={cn('w-4 h-4 mr-2', isImporting && 'animate-pulse')} />
+              {isImporting ? 'Import en cours…' : 'Importer Wrike'}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}

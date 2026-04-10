@@ -63,12 +63,14 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     let { data, error } = await supabase
       .from('clients')
       .select('id, name')
+      .eq('status', 'active')
       .order('name');
 
     if (error && colorMissing(error.message)) {
       const fallback = await supabase
         .from('clients')
         .select('id, name')
+        .eq('status', 'active')
         .order('name');
       data = fallback.data as Array<{ id: string; name: string; color?: string }> | null;
       error = fallback.error;

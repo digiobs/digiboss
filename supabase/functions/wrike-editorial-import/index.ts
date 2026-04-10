@@ -25,6 +25,7 @@ type WrikeTask = {
   customStatusId?: string;
   importance?: string;
   dates?: { start?: string; due?: string; type?: string };
+  completedDate?: string;
   permalink?: string;
   parentIds?: string[];
   customFields?: WrikeCustomField[];
@@ -138,11 +139,14 @@ async function fetchAllTasksInFolder(folderId: string, token: string): Promise<W
   return tasks;
 }
 
+// Use the task's end date as the calendar date.
+// For completed tasks, prefer the actual completion date (when the content
+// was really published); otherwise fall back to the planned due date.
+// Tasks without any end date are skipped — the calendar requires a date.
 function pickDate(task: WrikeTask): string | null {
+  if (task.completedDate) return task.completedDate.slice(0, 10);
   const due = task.dates?.due;
   if (due) return due.slice(0, 10);
-  const start = task.dates?.start;
-  if (start) return start.slice(0, 10);
   return null;
 }
 

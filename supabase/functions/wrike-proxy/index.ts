@@ -91,11 +91,71 @@ serve(async (req) => {
       case 'getFolderTree':
         url = `${WRIKE_BASE}/folders/${folderId}/folders`;
         break;
-      case 'listFolders':
-        // Flat list of all folders the user can see (used by the
+      case 'listFolders': {
+        // Flat list of spaces + their direct subfolders (used by the
         // "Liaison clients → Wrike" picker in /settings/integrations).
-        url = `${WRIKE_BASE}/folders?fields=["project","scope"]`;
-        break;
+        // We avoid the bare /folders endpoint because it requires a scope
+        // and fails with non-2xx when called at root. Instead we walk
+        // /spaces then /folders/{spaceId}/folders per space.
+        const spacesResp = await fetch(`${WRIKE_BASE}/spaces`, {
+          headers: { 'Authorization': `Bearer ${WRIKE_TOKEN}` },
+        });
+        if (!spacesResp.ok) {
+          const errText = await spacesResp.text();
+          throw new Error(`Wrike API error [${spacesResp.status}] on /spaces: ${errText}`);
+        }
+        const spacesJson = await spacesResp.json() as { data?: Array<{ id: string; title: string }> };
+        const spaces = spacesJson.data ?? [];
+
+        type PickerFolder = {
+          id: string;
+          title: string;
+          scope: string;
+          project?: { status?: string } | null;
+        };
+        const allFolders: PickerFolder[] = [];
+
+        for (const space of spaces) {
+          // The space itself is a valid target (its id is usable as folderId
+          // for POST /folders/{id}/tasks).
+          allFolders.push({
+            id: space.id,
+            title: space.title,
+            scope: 'WsRoot',
+            project: null,
+          });
+
+          try {
+            const subResp = await fetch(
+              `${WRIKE_BASE}/folders/${space.id}/folders?fields=["project"]`,
+              { headers: { 'Authorization': `Bearer ${WRIKE_TOKEN}` } },
+            );
+            if (!subResp.ok) continue;
+            const subJson = await subResp.json() as {
+              data?: Array<{
+                id: string;
+                title: string;
+                scope?: string;
+                project?: { status?: string } | null;
+              }>;
+            };
+            for (const f of subJson.data ?? []) {
+              allFolders.push({
+                id: f.id,
+                title: `${space.title} / ${f.title}`,
+                scope: f.scope ?? 'WsFolder',
+                project: f.project ?? null,
+              });
+            }
+          } catch (err) {
+            console.warn(`[wrike-proxy] listFolders: failed to fetch folders for space ${space.id}:`, err);
+          }
+        }
+
+        return new Response(JSON.stringify({ data: allFolders }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
           status: 400,

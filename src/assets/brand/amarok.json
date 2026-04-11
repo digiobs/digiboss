@@ -1,0 +1,15 @@
+{
+  "client_id": "amarok",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#1A2041", "name": "Bleu marine", "usage": "Fond principal IVD" },
+    { "hex": "#4CAF50", "name": "Vert", "usage": "Accents formation hygiène" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds" }
+  ],
+  "typographies": [],
+  "figma_urls": [],
+  "style_visuel": {
+    "visuels": "réglementation IVDR, labo microbiologie",
+    "ambiance": "double: scientifique IVD + pragmatique formation"
+  }
+}

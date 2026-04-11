@@ -1,0 +1,31 @@
+{
+  "client_id": "alibeez",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#1A2B6B", "name": "Bleu foncé", "usage": "Fond principal, hero" },
+    { "hex": "#00BCD4", "name": "Bleu clair/Cyan", "usage": "Accents, icônes, CTA" },
+    { "hex": "#FFD600", "name": "Jaune vif", "usage": "Highlights, badges, CTA urgents" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds" },
+    { "hex": "#F5F5F5", "name": "Gris clair", "usage": "Cards, blocs alternés" }
+  ],
+  "typographies": [
+    { "name": "Poppins / Montserrat", "description": "Sans-serif géométrique bold — titres" },
+    { "name": "Sans-serif regular", "description": "Sans-serif regular — textes courants" }
+  ],
+  "figma_urls": [
+    {
+      "name": "Charte graphique",
+      "url": "https://www.figma.com/design/D9o3230DSKSreXLS70OjjA/Alibeez---Charte-graphique?node-id=0-1"
+    },
+    {
+      "name": "Social media",
+      "url": "https://www.figma.com/design/VdponEmOtGxJhvUvHSfPdk/Alibeez---Social-media?node-id=1-255"
+    }
+  ],
+  "style_visuel": {
+    "logo": "Alibeez bleu foncé sur blanc",
+    "visuels": "photos pro, dashboards, mockups interface",
+    "ambiance": "corporate-tech, professionnelle",
+    "social_media": "templates LinkedIn fond bleu foncé, titres jaune vif"
+  }
+}

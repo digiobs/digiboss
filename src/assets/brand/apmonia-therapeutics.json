@@ -1,0 +1,14 @@
+{
+  "client_id": "apmonia-therapeutics",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#1A1F36", "name": "Bleu foncé", "usage": "Fond principal" },
+    { "hex": "#7C3AED", "name": "Violet", "usage": "Accents biotech" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds" }
+  ],
+  "typographies": [],
+  "figma_urls": [],
+  "style_visuel": {
+    "ambiance": "biotech oncologie, scientifique, innovante"
+  }
+}

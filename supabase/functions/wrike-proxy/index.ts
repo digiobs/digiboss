@@ -36,8 +36,8 @@ serve(async (req) => {
     WRIKE_BASE = bundle.apiBase;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Wrike not connected';
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
+    // Return 200 so supabase.functions.invoke() surfaces the error body.
+    return new Response(JSON.stringify({ data: [], error: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
@@ -94,19 +94,9 @@ serve(async (req) => {
       case 'listFolders': {
         // Flat list of spaces + their direct subfolders (used by the
         // "Liaison clients → Wrike" picker in /settings/integrations).
-        // We avoid the bare /folders endpoint because it requires a scope
-        // and fails with non-2xx when called at root. Instead we walk
-        // /spaces then /folders/{spaceId}/folders per space.
-        const spacesResp = await fetch(`${WRIKE_BASE}/spaces`, {
-          headers: { 'Authorization': `Bearer ${WRIKE_TOKEN}` },
-        });
-        if (!spacesResp.ok) {
-          const errText = await spacesResp.text();
-          throw new Error(`Wrike API error [${spacesResp.status}] on /spaces: ${errText}`);
-        }
-        const spacesJson = await spacesResp.json() as { data?: Array<{ id: string; title: string }> };
-        const spaces = spacesJson.data ?? [];
-
+        // Always returns HTTP 200 so the frontend (which uses
+        // supabase.functions.invoke) can surface the real Wrike error in
+        // `data.error` — 500s get swallowed as "non-2xx" by the client.
         type PickerFolder = {
           id: string;
           title: string;
@@ -114,47 +104,86 @@ serve(async (req) => {
           project?: { status?: string } | null;
         };
         const allFolders: PickerFolder[] = [];
+        const diagnostics: string[] = [];
 
-        for (const space of spaces) {
-          // The space itself is a valid target (its id is usable as folderId
-          // for POST /folders/{id}/tasks).
-          allFolders.push({
-            id: space.id,
-            title: space.title,
-            scope: 'WsRoot',
-            project: null,
+        try {
+          const spacesResp = await fetch(`${WRIKE_BASE}/spaces`, {
+            headers: { 'Authorization': `Bearer ${WRIKE_TOKEN}` },
           });
-
-          try {
-            const subResp = await fetch(
-              `${WRIKE_BASE}/folders/${space.id}/folders?fields=["project"]`,
-              { headers: { 'Authorization': `Bearer ${WRIKE_TOKEN}` } },
+          if (!spacesResp.ok) {
+            const errText = await spacesResp.text();
+            return new Response(
+              JSON.stringify({
+                data: [],
+                error: `Wrike /spaces returned ${spacesResp.status}: ${errText.slice(0, 400)}`,
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
             );
-            if (!subResp.ok) continue;
-            const subJson = await subResp.json() as {
-              data?: Array<{
-                id: string;
-                title: string;
-                scope?: string;
-                project?: { status?: string } | null;
-              }>;
-            };
-            for (const f of subJson.data ?? []) {
-              allFolders.push({
-                id: f.id,
-                title: `${space.title} / ${f.title}`,
-                scope: f.scope ?? 'WsFolder',
-                project: f.project ?? null,
-              });
-            }
-          } catch (err) {
-            console.warn(`[wrike-proxy] listFolders: failed to fetch folders for space ${space.id}:`, err);
           }
-        }
+          const spacesJson = await spacesResp.json() as {
+            data?: Array<{ id: string; title: string }>;
+          };
+          const spaces = spacesJson.data ?? [];
+          diagnostics.push(`spaces=${spaces.length}`);
 
-        return new Response(JSON.stringify({ data: allFolders }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+          for (const space of spaces) {
+            allFolders.push({
+              id: space.id,
+              title: space.title,
+              scope: 'WsRoot',
+              project: null,
+            });
+
+            try {
+              const subResp = await fetch(
+                `${WRIKE_BASE}/folders/${space.id}/folders?fields=["project"]`,
+                { headers: { 'Authorization': `Bearer ${WRIKE_TOKEN}` } },
+              );
+              if (!subResp.ok) {
+                const errText = await subResp.text();
+                diagnostics.push(
+                  `sub(${space.id})=${subResp.status}:${errText.slice(0, 80)}`,
+                );
+                continue;
+              }
+              const subJson = await subResp.json() as {
+                data?: Array<{
+                  id: string;
+                  title: string;
+                  scope?: string;
+                  project?: { status?: string } | null;
+                }>;
+              };
+              for (const f of subJson.data ?? []) {
+                allFolders.push({
+                  id: f.id,
+                  title: `${space.title} / ${f.title}`,
+                  scope: f.scope ?? 'WsFolder',
+                  project: f.project ?? null,
+                });
+              }
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              diagnostics.push(`sub(${space.id})=throw:${message.slice(0, 80)}`);
+            }
+          }
+
+          return new Response(
+            JSON.stringify({ data: allFolders, diagnostics }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error('[wrike-proxy] listFolders crashed:', err);
+          return new Response(
+            JSON.stringify({
+              data: [],
+              error: `listFolders crashed: ${message}`,
+              diagnostics,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
       }
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {

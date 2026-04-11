@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { assets } from '@/data/mockData';
 import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
+import { BrandCharteSection } from '@/components/assets/BrandCharteSection';
 import { useSupabaseAssets } from '@/hooks/useSupabaseTabData';
 import { useDeliverables } from '@/hooks/useDeliverables';
 import { useEffect, useMemo, useState } from 'react';
@@ -480,6 +481,15 @@ export default function Assets() {
           </div>
         )}
       </div>
+
+      {/* ============================================================ */}
+      {/*  CHARTE GRAPHIQUE (snapshots src/assets/brand + live DB)      */}
+      {/* ============================================================ */}
+      <BrandCharteSection
+        clientId={currentClient?.id ?? null}
+        isAllClientsSelected={isAllClientsSelected}
+        isAdmin={isAdmin}
+      />
 
       {/* ============================================================ */}
       {/*  FIGMA PROJECTS (from DB cache)                              */}

@@ -1,0 +1,21 @@
+{
+  "client_id": "nerya",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#006DA4", "name": "Tracks (Bleu)", "usage": "Couleur produit Tracks — headers, CTA, éléments principaux" },
+    { "hex": "#2A4D82", "name": "Bleu foncé", "usage": "Fond sections hero, headers secondaires, éléments structurants" },
+    { "hex": "#F9B233", "name": "Jaune", "usage": "Couleur d'accroche — CTA, badges, highlights, éléments interactifs" },
+    { "hex": "#B3345A", "name": "e-PDP (Rose framboise)", "usage": "Couleur produit e-PDP — accents, éléments liés à la prévention" },
+    { "hex": "#1E1E1E", "name": "Noir", "usage": "Textes forts, éléments sombres" },
+    { "hex": "#FEFEFE", "name": "Blanc", "usage": "Fonds de contenu, cartes, espaces" },
+    { "hex": "#F3F3F0", "name": "Gris", "usage": "Fonds de sections alternées, blocs témoignages" }
+  ],
+  "typographies": [],
+  "figma_urls": [
+    {
+      "name": "Nerya — Site web",
+      "url": "https://www.figma.com/design/5qwSMeT0ab7uUokV3y54CJ/Nerya---Site-web?node-id=11985-1647"
+    }
+  ],
+  "style_visuel": {}
+}

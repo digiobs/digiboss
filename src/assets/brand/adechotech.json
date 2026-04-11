@@ -1,0 +1,27 @@
+{
+  "client_id": "adechotech",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#0A1F44", "name": "Bleu marine", "usage": "Fond principal, headers" },
+    { "hex": "#1B4F8A", "name": "Bleu institutionnel", "usage": "Sections secondaires" },
+    { "hex": "#C8E600", "name": "Vert chartreuse", "usage": "Accents, CTA, highlights" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds" },
+    { "hex": "#F0F0F0", "name": "Gris clair", "usage": "Blocs alternés" }
+  ],
+  "typographies": [
+    { "name": "Bai Jamjuree", "description": "Bai Jamjuree (Google Fonts) — titres et textes" }
+  ],
+  "figma_urls": [
+    {
+      "name": "AdEchoTech Newsletter",
+      "url": "https://www.figma.com/design/q3o6EBz6pH6coAwhOnxgz9/AdEchoTech---Newsletter?node-id=1-21"
+    }
+  ],
+  "style_visuel": {
+    "cta": "boutons vert chartreuse sur bleu marine",
+    "logo": "ADECHOTECH blanc sur bleu marine",
+    "visuels": "photos cliniques, robot MELODY",
+    "ambiance": "médicale, institutionnelle, innovante",
+    "iconographie": "icônes médicales"
+  }
+}

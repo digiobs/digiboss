@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:functions": "node ./scripts/smoke-edge-functions.mjs",
+    "brand:export": "node ./scripts/export-brand-kits.mjs",
     "ci": "npm run lint && npm run typecheck && npm run test && npm run build && npm run smoke:functions"
   },
   "dependencies": {

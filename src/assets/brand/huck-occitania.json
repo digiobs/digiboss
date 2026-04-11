@@ -1,0 +1,19 @@
+{
+  "client_id": "huck-occitania",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#003B73", "name": "Bleu Huck", "usage": "Couleur principale — identité industrielle, fiabilité" },
+    { "hex": "#FF6B00", "name": "Orange", "usage": "Couleur accent — CTA, highlights, énergie" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds de contenu" },
+    { "hex": "#F0F0F0", "name": "Gris", "usage": "Fonds alternés, sections secondaires" }
+  ],
+  "typographies": [
+    { "name": "Montserrat / DM Sans", "description": "Sans-serif industriel (style Montserrat/DM Sans)" }
+  ],
+  "figma_urls": [],
+  "style_visuel": {
+    "logo": "HUCK OCCITANIA — typographie industrielle avec accent couleur orange",
+    "visuels": "Photos de produits en situation (filets sport, BTP, aires de jeux), chantiers, installations",
+    "ambiance": "Industriel, fabricant français, Made in France — tonalité terrain et professionnelle"
+  }
+}

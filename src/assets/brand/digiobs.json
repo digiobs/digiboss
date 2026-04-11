@@ -1,0 +1,14 @@
+{
+  "client_id": "digiobs",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#2563EB", "name": "Bleu DigiObs", "usage": "Couleur principale" },
+    { "hex": "#1E1E1E", "name": "Noir", "usage": "Textes" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds" }
+  ],
+  "typographies": [],
+  "figma_urls": [],
+  "style_visuel": {
+    "ambiance": "marketing digital, moderne, professionnelle"
+  }
+}

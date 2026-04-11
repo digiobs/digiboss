@@ -91,6 +91,11 @@ serve(async (req) => {
       case 'getFolderTree':
         url = `${WRIKE_BASE}/folders/${folderId}/folders`;
         break;
+      case 'listFolders':
+        // Flat list of all folders the user can see (used by the
+        // "Liaison clients → Wrike" picker in /settings/integrations).
+        url = `${WRIKE_BASE}/folders?fields=["project","scope"]`;
+        break;
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
           status: 400,

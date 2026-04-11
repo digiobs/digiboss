@@ -1,13 +1,11 @@
 import { useState, useMemo } from 'react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
   Lightbulb,
   CheckCircle2,
   XCircle,
   Clock,
-  Sparkles,
-  ArrowRight,
   ExternalLink,
   Filter,
   Info,
@@ -17,9 +15,9 @@ import {
   Tag,
   ChevronDown,
   ChevronRight,
-  AlertTriangle,
-  TrendingUp,
   RefreshCw,
+  Rocket,
+  Send,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,18 +30,64 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
-import { useCreativeProposals, type CreativeProposal, type ProposalStatus } from '@/hooks/useCreativeProposals';
+import { useCreativeProposals, type CreativeProposal } from '@/hooks/useCreativeProposals';
+import { WorkflowLegend } from '@/components/proposals/WorkflowLegend';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const statusConfig: Record<string, { label: string; icon: typeof Lightbulb; color: string; bg: string }> = {
-  new: { label: 'Nouvelles', icon: Sparkles, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800' },
-  pending: { label: 'En attente', icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' },
-  approved: { label: 'Validées', icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800' },
-  rejected: { label: 'Rejetées', icon: XCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800' },
+type ColumnKey = 'enAttente' | 'approved' | 'readyToPublish' | 'rejected';
+
+type ColumnConfig = {
+  key: ColumnKey;
+  label: string;
+  description: string;
+  icon: typeof Lightbulb;
+  color: string;
+  bg: string;
 };
+
+const columnsConfig: ColumnConfig[] = [
+  {
+    key: 'enAttente',
+    label: 'En attente',
+    description: "Propositions générées par nos IA, en attente de validation par l'équipe DigiObs.",
+    icon: Clock,
+    color: 'text-amber-600 dark:text-amber-400',
+    bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800',
+  },
+  {
+    key: 'approved',
+    label: 'Validées',
+    description: "Idées retenues par DigiObs. Une tâche Wrike a été créée pour démarrer la production.",
+    icon: CheckCircle2,
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800',
+  },
+  {
+    key: 'readyToPublish',
+    label: 'À publier',
+    description: 'Contenus rédigés et validés, prêts à être publiés sur vos canaux.',
+    icon: Rocket,
+    color: 'text-violet-600 dark:text-violet-400',
+    bg: 'bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800',
+  },
+  {
+    key: 'rejected',
+    label: 'Rejetées',
+    description: 'Propositions écartées par DigiObs ou le client.',
+    icon: XCircle,
+    color: 'text-red-600 dark:text-red-400',
+    bg: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800',
+  },
+];
 
 const urgencyConfig: Record<string, { label: string; color: string }> = {
   '🔴 Critique': { label: 'Critique', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
@@ -56,11 +100,13 @@ function ProposalCard({
   proposal,
   onApprove,
   onReject,
+  onMarkReady,
   isAdmin,
 }: {
   proposal: CreativeProposal;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onMarkReady: (id: string) => void;
   isAdmin: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -151,6 +197,19 @@ function ProposalCard({
           </div>
         )}
 
+        {/* Wrike link — visible on approved / ready_to_publish / published */}
+        {proposal.wrike_permalink && (
+          <a
+            href={proposal.wrike_permalink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Voir la tâche dans Wrike
+          </a>
+        )}
+
         {isAdmin && (proposal.status === 'new' || proposal.status === 'pending') && (
           <div className="flex gap-2 mt-3 pt-3 border-t">
             <Button
@@ -173,6 +232,20 @@ function ProposalCard({
             </Button>
           </div>
         )}
+
+        {isAdmin && proposal.status === 'approved' && (
+          <div className="flex gap-2 mt-3 pt-3 border-t">
+            <Button
+              size="sm"
+              variant="default"
+              className="flex-1 bg-violet-600 hover:bg-violet-700 text-white"
+              onClick={() => onMarkReady(proposal.id)}
+            >
+              <Rocket className="w-3.5 h-3.5 mr-1" />
+              Marquer à publier
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -181,7 +254,17 @@ function ProposalCard({
 export default function Proposals() {
   const { currentClient, isAllClientsSelected } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const { proposals, convergences, proposalsByStatus, stats, isLoading, updateProposalStatus, refetch } = useCreativeProposals();
+  const {
+    proposals,
+    convergences,
+    proposalsByStatus,
+    stats,
+    isLoading,
+    updateProposalStatus,
+    approveAndPushToWrike,
+    markReadyToPublish,
+    refetch,
+  } = useCreativeProposals();
   const [filterSkill, setFilterSkill] = useState<string>('all');
   const [filterUrgency, setFilterUrgency] = useState<string>('all');
 
@@ -192,9 +275,18 @@ export default function Proposals() {
 
   const handleApprove = async (id: string) => {
     try {
-      await updateProposalStatus(id, 'approved');
-      toast.success('Proposition validée et planifiée dans le calendrier');
-    } catch {
+      const result = await approveAndPushToWrike(id);
+      if (result?.status === 'ok') {
+        toast.success('Proposition validée · tâche Wrike créée');
+      } else if (result?.status === 'approved_without_wrike') {
+        toast.warning(
+          `Proposition validée, mais Wrike indisponible (${result.error ?? 'erreur inconnue'}).`,
+        );
+      } else {
+        toast.success('Proposition validée');
+      }
+    } catch (err) {
+      console.error(err);
       toast.error('Erreur lors de la validation');
     }
   };
@@ -208,6 +300,24 @@ export default function Proposals() {
     }
   };
 
+  const handleMarkReady = async (id: string) => {
+    try {
+      const result = await markReadyToPublish(id, 'ready_to_publish');
+      if (result?.status === 'ok') {
+        toast.success('Contenu marqué "À publier" · Wrike mis à jour');
+      } else if (result?.status === 'updated_without_wrike') {
+        toast.warning(
+          `Contenu marqué "À publier", mais Wrike non mis à jour (${result.error ?? 'erreur inconnue'}).`,
+        );
+      } else {
+        toast.success('Contenu marqué à publier');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Erreur lors du passage à publier');
+    }
+  };
+
   const filterProposals = (list: CreativeProposal[]) =>
     list.filter((p) => {
       if (filterSkill !== 'all' && p.source_skill !== filterSkill) return false;
@@ -215,15 +325,9 @@ export default function Proposals() {
       return true;
     });
 
-  const columns: { key: keyof typeof proposalsByStatus; status: string }[] = [
-    { key: 'new', status: 'new' },
-    { key: 'pending', status: 'pending' },
-    { key: 'approved', status: 'approved' },
-    { key: 'rejected', status: 'rejected' },
-  ];
-
   return (
-    <div className="space-y-6">
+    <TooltipProvider delayDuration={200}>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -241,18 +345,20 @@ export default function Proposals() {
         </Button>
       </div>
 
+      {/* Workflow legend — client-facing */}
+      <WorkflowLegend />
+
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {columns.map(({ key, status }) => {
-          const cfg = statusConfig[status];
-          const Icon = cfg.icon;
+        {columnsConfig.map((col) => {
+          const Icon = col.icon;
           return (
-            <Card key={key} className={cn('border', cfg.bg)}>
+            <Card key={col.key} className={cn('border', col.bg)}>
               <CardContent className="p-3 flex items-center gap-3">
-                <Icon className={cn('w-5 h-5', cfg.color)} />
+                <Icon className={cn('w-5 h-5', col.color)} />
                 <div>
-                  <p className="text-xl font-bold">{proposalsByStatus[key].length}</p>
-                  <p className="text-xs text-muted-foreground">{cfg.label}</p>
+                  <p className="text-xl font-bold">{proposalsByStatus[col.key].length}</p>
+                  <p className="text-xs text-muted-foreground">{col.label}</p>
                 </div>
               </CardContent>
             </Card>
@@ -311,15 +417,28 @@ export default function Proposals() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {columns.map(({ key, status }) => {
-                const cfg = statusConfig[status];
-                const Icon = cfg.icon;
-                const filtered = filterProposals(proposalsByStatus[key]);
+              {columnsConfig.map((col) => {
+                const Icon = col.icon;
+                const filtered = filterProposals(proposalsByStatus[col.key]);
                 return (
-                  <div key={key} className="space-y-2">
-                    <div className={cn('flex items-center gap-2 p-2 rounded-lg border', cfg.bg)}>
-                      <Icon className={cn('w-4 h-4', cfg.color)} />
-                      <span className="font-medium text-sm">{cfg.label}</span>
+                  <div key={col.key} className="space-y-2">
+                    <div className={cn('flex items-center gap-2 p-2 rounded-lg border', col.bg)}>
+                      <Icon className={cn('w-4 h-4', col.color)} />
+                      <span className="font-medium text-sm">{col.label}</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="text-muted-foreground/70 hover:text-foreground"
+                            aria-label={`En savoir plus sur ${col.label}`}
+                          >
+                            <Info className="w-3.5 h-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[240px] text-xs">
+                          {col.description}
+                        </TooltipContent>
+                      </Tooltip>
                       <Badge variant="secondary" className="ml-auto text-xs">{filtered.length}</Badge>
                     </div>
                     <div className="space-y-0 max-h-[60vh] overflow-y-auto pr-1">
@@ -332,6 +451,7 @@ export default function Proposals() {
                             proposal={p}
                             onApprove={handleApprove}
                             onReject={handleReject}
+                            onMarkReady={handleMarkReady}
                             isAdmin={isAdmin}
                           />
                         ))
@@ -395,6 +515,7 @@ export default function Proposals() {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

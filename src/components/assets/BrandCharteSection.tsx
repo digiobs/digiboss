@@ -123,11 +123,24 @@ function TypographyRow({ typo }: { typo: BrandTypography }) {
   );
 }
 
-function CharteCard({ charte, onRefresh, refreshing }: {
+function CharteCard({ charte, onRefresh, refreshing, fallbackFileKey }: {
   charte: BrandCharte;
   onRefresh?: () => void;
   refreshing?: boolean;
+  fallbackFileKey?: string | null;
 }) {
+  const figmaLinks: BrandFigmaUrl[] = useMemo(() => {
+    if (charte.figma_urls.length > 0) return charte.figma_urls;
+    if (fallbackFileKey) {
+      return [
+        {
+          name: `Ouvrir dans Figma`,
+          url: `https://www.figma.com/design/${fallbackFileKey}`,
+        },
+      ];
+    }
+    return [];
+  }, [charte.figma_urls, fallbackFileKey]);
   return (
     <div className="bg-card rounded-xl border border-border p-6">
       <div className="flex items-center gap-2 mb-4">
@@ -218,11 +231,11 @@ function CharteCard({ charte, onRefresh, refreshing }: {
           <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
             <ExternalLink className="w-3.5 h-3.5" /> Fichiers Figma
           </h3>
-          {charte.figma_urls.length === 0 ? (
+          {figmaLinks.length === 0 ? (
             <p className="text-sm text-muted-foreground">NA</p>
           ) : (
             <div className="space-y-2">
-              {charte.figma_urls.map((link, idx) => (
+              {figmaLinks.map((link, idx) => (
                 <a
                   key={`${link.url}-${idx}`}
                   href={link.url}
@@ -336,32 +349,50 @@ export function BrandCharteSection({
   isAdmin = false,
 }: BrandCharteSectionProps) {
   const [liveCharte, setLiveCharte] = useState<BrandCharte | null>(null);
+  const [mappingFileKey, setMappingFileKey] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  /* Fetch live charte from client_brand_kits */
+  /* Fetch live charte from client_brand_kits + Figma file_key from mappings */
   useEffect(() => {
     let mounted = true;
     (async () => {
       if (!clientId || isAllClientsSelected) {
-        if (mounted) setLiveCharte(null);
+        if (mounted) {
+          setLiveCharte(null);
+          setMappingFileKey(null);
+        }
         return;
       }
 
-      const { data, error } = await (
-        supabase as unknown as { from: (table: string) => Record<string, unknown> }
-      )
-        .from('client_brand_kits')
-        .select('client_id,figma_file_key,token_type,token_name,token_value,preview_url,payload')
-        .eq('client_id', clientId)
-        .limit(400);
+      const [kitRes, mapRes] = await Promise.all([
+        (supabase as unknown as { from: (table: string) => Record<string, unknown> })
+          .from('client_brand_kits')
+          .select('client_id,figma_file_key,token_type,token_name,token_value,preview_url,payload')
+          .eq('client_id', clientId)
+          .limit(400),
+        (supabase as unknown as { from: (table: string) => Record<string, unknown> })
+          .from('client_data_mappings')
+          .select('external_account_id,status')
+          .eq('client_id', clientId)
+          .eq('provider', 'figma')
+          .eq('status', 'connected')
+          .maybeSingle(),
+      ]);
 
       if (!mounted) return;
-      if (error) {
-        console.warn('client_brand_kits fetch error:', error);
+
+      if (kitRes.error) {
+        console.warn('client_brand_kits fetch error:', kitRes.error);
         setLiveCharte(null);
-        return;
+      } else {
+        setLiveCharte(kitRowsToCharte(clientId, (kitRes.data ?? []) as BrandKitRow[]));
       }
-      setLiveCharte(kitRowsToCharte(clientId, (data ?? []) as BrandKitRow[]));
+
+      const key =
+        mapRes.data && typeof mapRes.data === 'object' && 'external_account_id' in mapRes.data
+          ? ((mapRes.data as { external_account_id: string | null }).external_account_id ?? null)
+          : null;
+      setMappingFileKey(key && key.trim().length > 0 ? key.trim() : null);
     })();
     return () => {
       mounted = false;
@@ -453,6 +484,17 @@ export function BrandCharteSection({
           Aucune charte graphique disponible pour ce client.
           {isAdmin && ' Cliquez sur "Sync Figma" pour importer depuis Figma.'}
         </div>
+        {mappingFileKey && (
+          <a
+            href={`https://www.figma.com/design/${mappingFileKey}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Ouvrir le fichier Figma ({mappingFileKey.slice(0, 12)}…)
+          </a>
+        )}
       </div>
     );
   }
@@ -462,6 +504,7 @@ export function BrandCharteSection({
       charte={effectiveCharte}
       onRefresh={isAdmin ? handleRefresh : undefined}
       refreshing={refreshing}
+      fallbackFileKey={mappingFileKey}
     />
   );
 }

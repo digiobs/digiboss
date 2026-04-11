@@ -1,4 +1,4 @@
-import { FolderOpen, Search, Grid3X3, List, Plus, FileText, Image, Palette, ExternalLink, CloudIcon, RefreshCw, Type, Eye, ArrowRight } from 'lucide-react';
+import { FolderOpen, Search, Grid3X3, List, Plus, FileText, Image, ExternalLink, CloudIcon, RefreshCw, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -32,17 +32,6 @@ const typeIllustrations: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
 /* ------------------------------------------------------------------ */
-
-type BrandColor = { hex: string; name: string; usage?: string };
-type FigmaUrl = { url: string; name: string };
-type StyleVisuel = Record<string, string>;
-
-type BrandGuidelines = {
-  colors: BrandColor[];
-  typographies: string[];
-  figma_urls: FigmaUrl[];
-  style_visuel: StyleVisuel | null;
-};
 
 type FigmaFolder = {
   id: string;
@@ -105,9 +94,6 @@ export default function Assets() {
     }
   };
 
-  // Brand guidelines from client fiches
-  const [brandGuidelines, setBrandGuidelines] = useState<BrandGuidelines | null>(null);
-
   // Figma folders from DB cache (not edge function)
   const [figmaFolders, setFigmaFolders] = useState<FigmaFolder[]>([]);
   const [figmaSyncStates, setFigmaSyncStates] = useState<FigmaSyncState[]>([]);
@@ -118,46 +104,6 @@ export default function Assets() {
 
   // Deliverables
   const { data: deliverables, isLoading: deliverablesLoading } = useDeliverables();
-
-  /* ---------- Fetch brand guidelines from client_brand_guidelines ---------- */
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!currentClient?.id || isAllClientsSelected) {
-        if (mounted) setBrandGuidelines(null);
-        return;
-      }
-
-      const { data, error } = await (supabase as unknown as { from: (table: string) => Record<string, unknown> })
-        .from('client_brand_guidelines')
-        .select('colors,typographies,figma_urls,style_visuel')
-        .eq('client_id', currentClient.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('client_brand_guidelines query error:', error);
-        if (mounted) setBrandGuidelines(null);
-        return;
-      }
-
-      if (!data) {
-        if (mounted) setBrandGuidelines(null);
-        return;
-      }
-
-      if (mounted) {
-        setBrandGuidelines({
-          colors: Array.isArray(data.colors) ? (data.colors as BrandColor[]) : [],
-          typographies: Array.isArray(data.typographies) ? (data.typographies as string[]) : [],
-          figma_urls: Array.isArray(data.figma_urls) ? (data.figma_urls as FigmaUrl[]) : [],
-          style_visuel: data.style_visuel && typeof data.style_visuel === 'object' && !Array.isArray(data.style_visuel)
-            ? (data.style_visuel as StyleVisuel)
-            : null,
-        });
-      }
-    })();
-    return () => { mounted = false; };
-  }, [currentClient?.id, isAllClientsSelected]);
 
   /* ---------- Fetch OneDrive path from client_configs ---------- */
   useEffect(() => {
@@ -370,119 +316,6 @@ export default function Assets() {
       </div>
 
       {/* ============================================================ */}
-      {/*  BRAND KIT (from client_brand_guidelines)                    */}
-      {/* ============================================================ */}
-      <div className="bg-card rounded-xl border border-border p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Palette className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold">Brand Kit</h2>
-          <Badge variant="outline" className="ml-2">
-            {isAllClientsSelected ? 'Admin (all clients)' : currentClient?.name ?? 'NA'}
-          </Badge>
-        </div>
-
-        {isAllClientsSelected ? (
-          <p className="text-sm text-muted-foreground">
-            Select a client to view their brand kit.
-          </p>
-        ) : !brandGuidelines ? (
-          <p className="text-sm text-muted-foreground">
-            No brand guidelines configured for this client.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Colors */}
-            <div>
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
-                <Palette className="w-3.5 h-3.5" /> Colors
-              </h3>
-              {brandGuidelines.colors.length === 0 ? (
-                <p className="text-sm text-muted-foreground">NA</p>
-              ) : (
-                <div className="flex items-start gap-3 flex-wrap">
-                  {brandGuidelines.colors.map((color) => (
-                    <div key={color.hex} className="text-center group">
-                      <div
-                        className="w-12 h-12 rounded-lg border border-border shadow-sm"
-                        style={{ backgroundColor: color.hex }}
-                        title={`${color.name} — ${color.usage ?? ''}`}
-                      />
-                      <p className="text-[10px] font-medium mt-1 text-foreground truncate max-w-[56px]">
-                        {color.name}
-                      </p>
-                      <p className="text-[9px] text-muted-foreground truncate max-w-[56px]">
-                        {color.hex}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Typography */}
-            <div>
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
-                <Type className="w-3.5 h-3.5" /> Typography
-              </h3>
-              {brandGuidelines.typographies.length === 0 ? (
-                <p className="text-sm text-muted-foreground">NA</p>
-              ) : (
-                <div className="space-y-2">
-                  {brandGuidelines.typographies.map((typo, idx) => (
-                    <p key={idx} className="text-sm text-foreground">{typo}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Style Visuel */}
-            <div>
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
-                <Eye className="w-3.5 h-3.5" /> Style visuel
-              </h3>
-              {!brandGuidelines.style_visuel ? (
-                <p className="text-sm text-muted-foreground">NA</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {Object.entries(brandGuidelines.style_visuel).map(([key, value]) => (
-                    <div key={key}>
-                      <span className="text-xs font-medium text-muted-foreground capitalize">{key}:</span>{' '}
-                      <span className="text-xs text-foreground">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Figma URLs */}
-            <div>
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
-                <ExternalLink className="w-3.5 h-3.5" /> Figma Files
-              </h3>
-              {brandGuidelines.figma_urls.length === 0 ? (
-                <p className="text-sm text-muted-foreground">NA</p>
-              ) : (
-                <div className="space-y-2">
-                  {brandGuidelines.figma_urls.map((link, idx) => (
-                    <a
-                      key={idx}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-sm text-primary hover:underline"
-                    >
-                      <ExternalLink className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{link.name}</span>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ============================================================ */}
       {/*  CHARTE GRAPHIQUE (snapshots src/assets/brand + live DB)      */}
       {/* ============================================================ */}
       <BrandCharteSection
@@ -499,6 +332,9 @@ export default function Assets() {
           <FolderOpen className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-semibold">Figma Projects</h2>
           <Badge variant="secondary">{figmaFolders.length} pages</Badge>
+          <span className="text-[11px] text-muted-foreground ml-2 hidden md:inline">
+            (les thumbnails Figma expirent, cliquez sur Sync pour rafraîchir)
+          </span>
           <Button size="sm" variant="outline" className="ml-auto gap-1.5" onClick={refreshFigmaCache} disabled={refreshingFigma}>
             <RefreshCw className={`w-3.5 h-3.5 ${refreshingFigma ? 'animate-spin' : ''}`} />
             {refreshingFigma ? 'Syncing...' : 'Sync Figma'}
@@ -553,12 +389,31 @@ export default function Assets() {
                       rel="noopener noreferrer"
                       className="rounded-lg border border-border overflow-hidden bg-card hover:border-primary/30 hover:shadow-sm transition-all group"
                     >
-                      <div className="aspect-video bg-muted overflow-hidden">
+                      <div className="aspect-video bg-muted overflow-hidden relative">
                         {folder.thumbnail_url ? (
                           <img
                             src={folder.thumbnail_url}
                             alt={folder.folder_name}
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              // Figma's S3 presigned thumbnails expire after a few
+                              // hours; swap in a placeholder so the card stays
+                              // clickable. Use the "Sync Figma" button to refresh.
+                              const img = e.currentTarget;
+                              img.style.display = 'none';
+                              const parent = img.parentElement;
+                              if (parent && !parent.querySelector('[data-thumb-fallback]')) {
+                                const div = document.createElement('div');
+                                div.setAttribute('data-thumb-fallback', 'true');
+                                div.className =
+                                  'absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground';
+                                div.innerHTML =
+                                  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                                parent.appendChild(div);
+                              }
+                            }}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">

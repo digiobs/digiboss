@@ -1,11 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getWrikeToken } from "../_shared/wrike-token.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
-
-const WRIKE_BASE = 'https://www.wrike.com/api/v4';
 
 // In-memory cache
 const cache = new Map<string, { data: unknown; timestamp: number }>();
@@ -29,9 +28,15 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const WRIKE_TOKEN = Deno.env.get('WRIKE_ACCESS_TOKEN');
-  if (!WRIKE_TOKEN) {
-    return new Response(JSON.stringify({ error: 'WRIKE_ACCESS_TOKEN is not configured' }), {
+  let WRIKE_TOKEN: string;
+  let WRIKE_BASE: string;
+  try {
+    const bundle = await getWrikeToken();
+    WRIKE_TOKEN = bundle.token;
+    WRIKE_BASE = bundle.apiBase;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Wrike not connected';
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -86,6 +91,71 @@ serve(async (req) => {
       case 'getFolderTree':
         url = `${WRIKE_BASE}/folders/${folderId}/folders`;
         break;
+      case 'listFolders': {
+        // Flat list of spaces + their direct subfolders (used by the
+        // "Liaison clients → Wrike" picker in /settings/integrations).
+        // We avoid the bare /folders endpoint because it requires a scope
+        // and fails with non-2xx when called at root. Instead we walk
+        // /spaces then /folders/{spaceId}/folders per space.
+        const spacesResp = await fetch(`${WRIKE_BASE}/spaces`, {
+          headers: { 'Authorization': `Bearer ${WRIKE_TOKEN}` },
+        });
+        if (!spacesResp.ok) {
+          const errText = await spacesResp.text();
+          throw new Error(`Wrike API error [${spacesResp.status}] on /spaces: ${errText}`);
+        }
+        const spacesJson = await spacesResp.json() as { data?: Array<{ id: string; title: string }> };
+        const spaces = spacesJson.data ?? [];
+
+        type PickerFolder = {
+          id: string;
+          title: string;
+          scope: string;
+          project?: { status?: string } | null;
+        };
+        const allFolders: PickerFolder[] = [];
+
+        for (const space of spaces) {
+          // The space itself is a valid target (its id is usable as folderId
+          // for POST /folders/{id}/tasks).
+          allFolders.push({
+            id: space.id,
+            title: space.title,
+            scope: 'WsRoot',
+            project: null,
+          });
+
+          try {
+            const subResp = await fetch(
+              `${WRIKE_BASE}/folders/${space.id}/folders?fields=["project"]`,
+              { headers: { 'Authorization': `Bearer ${WRIKE_TOKEN}` } },
+            );
+            if (!subResp.ok) continue;
+            const subJson = await subResp.json() as {
+              data?: Array<{
+                id: string;
+                title: string;
+                scope?: string;
+                project?: { status?: string } | null;
+              }>;
+            };
+            for (const f of subJson.data ?? []) {
+              allFolders.push({
+                id: f.id,
+                title: `${space.title} / ${f.title}`,
+                scope: f.scope ?? 'WsFolder',
+                project: f.project ?? null,
+              });
+            }
+          } catch (err) {
+            console.warn(`[wrike-proxy] listFolders: failed to fetch folders for space ${space.id}:`, err);
+          }
+        }
+
+        return new Response(JSON.stringify({ data: allFolders }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
           status: 400,

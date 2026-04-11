@@ -23,6 +23,8 @@ import Proposals from "@/pages/Proposals";
 import EditorialCalendar from "@/pages/EditorialCalendar";
 import KpiDashboard from "@/pages/KpiDashboard";
 import SeoGeo from "@/pages/SeoGeo";
+import SettingsIntegrations from "@/pages/SettingsIntegrations";
+import WrikeCallback from "@/pages/oauth/WrikeCallback";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -82,8 +84,10 @@ const AppRoutes = () => {
         <Route path="/seo-geo" element={<SeoGeo />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/settings/integrations" element={<SettingsIntegrations />} />
+        <Route path="/oauth/wrike/callback" element={<WrikeCallback />} />
       </Route>
-      
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

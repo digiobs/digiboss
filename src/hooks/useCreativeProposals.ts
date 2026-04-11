@@ -2,7 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useClient } from '@/contexts/ClientContext';
 
-export type ProposalStatus = 'new' | 'pending' | 'approved' | 'rejected' | 'archived';
+export type ProposalStatus =
+  | 'new'
+  | 'pending'
+  | 'approved'
+  | 'ready_to_publish'
+  | 'published'
+  | 'rejected'
+  | 'archived';
 
 export interface CreativeProposal {
   id: string;
@@ -29,6 +36,10 @@ export interface CreativeProposal {
   updated_at: string;
   decided_at: string | null;
   archived_at: string | null;
+  wrike_task_id: string | null;
+  wrike_permalink: string | null;
+  ready_at: string | null;
+  published_at: string | null;
 }
 
 export interface Convergence {
@@ -142,19 +153,78 @@ export function useCreativeProposals() {
     await fetchProposals();
   }, [fetchProposals]);
 
+  /**
+   * Validate a proposal AND push it as a Wrike task so the DigiObs team
+   * sees the work to do in their kanban. The edge function always marks
+   * the proposal as 'approved' even if Wrike is unreachable — in that
+   * case the response has `status: 'approved_without_wrike'` so the UI
+   * can show a warning toast.
+   */
+  const approveAndPushToWrike = useCallback(
+    async (proposalId: string) => {
+      if (!currentClient?.id) throw new Error('No current client');
+      const { data, error } = await supabase.functions.invoke(
+        'wrike-create-proposal-task',
+        { body: { clientId: currentClient.id, proposalId } },
+      );
+      await fetchProposals();
+      if (error) throw error;
+      return data as {
+        status: 'ok' | 'approved_without_wrike';
+        wrike_task_id?: string | null;
+        wrike_permalink?: string | null;
+        error?: string;
+      };
+    },
+    [currentClient?.id, fetchProposals],
+  );
+
+  /**
+   * Move a proposal to "à publier" (or "published") and mirror that
+   * status on the linked Wrike task. Falls back gracefully when the
+   * proposal has no Wrike task (returns `updated_without_wrike`).
+   */
+  const markReadyToPublish = useCallback(
+    async (proposalId: string, target: 'ready_to_publish' | 'published' = 'ready_to_publish') => {
+      const { data, error } = await supabase.functions.invoke(
+        'wrike-update-proposal-status',
+        { body: { proposalId, newProposalStatus: target } },
+      );
+      await fetchProposals();
+      if (error) throw error;
+      return data as {
+        status: 'ok' | 'updated_without_wrike';
+        error?: string;
+      };
+    },
+    [fetchProposals],
+  );
+
+  const enAttente = proposals.filter((p) => p.status === 'new' || p.status === 'pending');
+  const approved = proposals.filter((p) => p.status === 'approved');
+  const readyToPublish = proposals.filter((p) => p.status === 'ready_to_publish');
+  const published = proposals.filter((p) => p.status === 'published');
+  const rejected = proposals.filter((p) => p.status === 'rejected');
+
   const proposalsByStatus = {
+    // Legacy individual buckets (kept for backward compatibility).
     new: proposals.filter((p) => p.status === 'new'),
     pending: proposals.filter((p) => p.status === 'pending'),
-    approved: proposals.filter((p) => p.status === 'approved'),
-    rejected: proposals.filter((p) => p.status === 'rejected'),
+    // New workflow buckets.
+    enAttente,
+    approved,
+    readyToPublish,
+    published,
+    rejected,
   };
 
   const stats = {
     total: proposals.filter((p) => p.status !== 'archived').length,
-    new: proposalsByStatus.new.length,
-    pending: proposalsByStatus.pending.length,
-    approved: proposalsByStatus.approved.length,
-    rejected: proposalsByStatus.rejected.length,
+    enAttente: enAttente.length,
+    approved: approved.length,
+    readyToPublish: readyToPublish.length,
+    published: published.length,
+    rejected: rejected.length,
     convergences: convergences.length,
   };
 
@@ -165,6 +235,8 @@ export function useCreativeProposals() {
     stats,
     isLoading,
     updateProposalStatus,
+    approveAndPushToWrike,
+    markReadyToPublish,
     refetch: fetchProposals,
   };
 }

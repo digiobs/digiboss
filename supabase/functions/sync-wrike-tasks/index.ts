@@ -1,13 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getWrikeToken } from "../_shared/wrike-token.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-const WRIKE_BASE = "https://www.wrike.com/api/v4";
 
 // Custom field IDs → resource_links type mapping
 const CUSTOM_FIELD_LINKS: Record<string, string> = {
@@ -73,20 +72,26 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const WRIKE_TOKEN = Deno.env.get("WRIKE_ACCESS_TOKEN");
-  if (!WRIKE_TOKEN) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  let WRIKE_TOKEN: string;
+  let WRIKE_BASE: string;
+  try {
+    const bundle = await getWrikeToken(supabase);
+    WRIKE_TOKEN = bundle.token;
+    WRIKE_BASE = bundle.apiBase;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     return new Response(
-      JSON.stringify({ error: "WRIKE_ACCESS_TOKEN is not configured" }),
+      JSON.stringify({ error: message }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     const body = await req.json();

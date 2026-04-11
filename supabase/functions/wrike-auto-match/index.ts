@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getWrikeToken } from "../_shared/wrike-token.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,22 +59,28 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const requestedClientId = (body?.clientId as string | undefined) ?? null;
 
-    const WRIKE_ACCESS_TOKEN = Deno.env.get("WRIKE_ACCESS_TOKEN");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Missing Supabase runtime secrets");
-    if (!WRIKE_ACCESS_TOKEN) {
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    let WRIKE_ACCESS_TOKEN: string;
+    let WRIKE_API_BASE: string;
+    try {
+      const bundle = await getWrikeToken(supabase);
+      WRIKE_ACCESS_TOKEN = bundle.token;
+      WRIKE_API_BASE = bundle.apiBase;
+    } catch (err) {
       return new Response(
         JSON.stringify({
           matched: 0,
           totalCandidates: 0,
-          message: "WRIKE_ACCESS_TOKEN is not configured.",
+          message: err instanceof Error ? err.message : "Wrike not connected",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     let taskQuery = supabase
       .from("plan_tasks")
@@ -127,7 +134,7 @@ serve(async (req) => {
       if (!folderOrProjectId) continue;
 
       const wrikeResp = await fetch(
-        `https://www.wrike.com/api/v4/folders/${folderOrProjectId}/tasks?descendants=true&pageSize=100`,
+        `${WRIKE_API_BASE}/folders/${folderOrProjectId}/tasks?descendants=true&pageSize=100`,
         {
           headers: {
             Authorization: `Bearer ${WRIKE_ACCESS_TOKEN}`,

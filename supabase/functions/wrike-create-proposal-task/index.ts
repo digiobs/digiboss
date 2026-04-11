@@ -1,13 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getWrikeToken } from "../_shared/wrike-token.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-const WRIKE_BASE = "https://www.wrike.com/api/v4";
 
 /**
  * Target Wrike customStatus label when a proposal is validated.
@@ -82,11 +81,12 @@ async function wrikeFetch(
 }
 
 async function resolveCustomStatusId(
+  apiBase: string,
   token: string,
   label: string,
 ): Promise<string | null> {
   try {
-    const workflows = await wrikeFetch(`${WRIKE_BASE}/workflows`, token);
+    const workflows = await wrikeFetch(`${apiBase}/workflows`, token);
     const data = (workflows.data ?? []) as WrikeWorkflow[];
     const needle = label.trim().toLowerCase();
     for (const wf of data) {
@@ -108,7 +108,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const WRIKE_TOKEN = Deno.env.get("WRIKE_ACCESS_TOKEN");
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -120,6 +119,16 @@ serve(async (req) => {
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  let WRIKE_TOKEN: string | null = null;
+  let WRIKE_BASE: string = "https://www.wrike.com/api/v4";
+  try {
+    const bundle = await getWrikeToken(supabase);
+    WRIKE_TOKEN = bundle.token;
+    WRIKE_BASE = bundle.apiBase;
+  } catch {
+    WRIKE_TOKEN = null; // Wrike not connected → function will fall back to approved_without_wrike
+  }
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -215,6 +224,7 @@ serve(async (req) => {
     // Resolve the "En cours de rédaction" customStatus (may be null if
     // the workspace doesn't use that label — we still create the task).
     const customStatusId = await resolveCustomStatusId(
+      WRIKE_BASE,
       WRIKE_TOKEN,
       DEFAULT_WRIKE_STATUS_LABEL,
     );

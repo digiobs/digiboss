@@ -10,6 +10,7 @@ import {
   FileCheck,
   MessageSquare,
   Settings,
+  Plug,
   Sparkles,
   CalendarDays,
   Activity,
@@ -60,6 +61,7 @@ const navItems = [
 ];
 
 const bottomNavItems = [
+  { path: '/settings/integrations', icon: Plug, label: 'Intégrations' },
   { path: '/admin', icon: Settings, label: 'Admin' },
 ];
 

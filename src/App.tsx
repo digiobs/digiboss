@@ -7,7 +7,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { ClientProvider } from "@/contexts/ClientContext";
 import { PreAuthProvider, usePreAuth } from "@/contexts/PreAuthContext";
-import { TeamAuthProvider } from "@/contexts/TeamAuthContext";
+import { TeamAuthProvider, useTeamAuth } from "@/contexts/TeamAuthContext";
 import { TeamAuthGate } from "@/components/auth/TeamAuthGate";
 import Landing from "@/pages/Landing";
 import Auth from "@/pages/Auth";
@@ -32,29 +32,34 @@ import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Protected route wrapper that checks pre-authentication
+// Protected route wrapper: allow access if pre-authenticated OR logged in via Supabase
 function PreAuthGuard({ children }: { children: React.ReactNode }) {
   const { isPreAuthenticated } = usePreAuth();
-  
-  if (!isPreAuthenticated) {
+  const { isTeamMember, isLoading } = useTeamAuth();
+
+  if (isLoading) return null;
+
+  if (!isPreAuthenticated && !isTeamMember) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
 const AppRoutes = () => {
   const { isPreAuthenticated } = usePreAuth();
+  const { isTeamMember, isLoading } = useTeamAuth();
+  const isAuthenticated = isPreAuthenticated || isTeamMember;
 
   return (
     <Routes>
       {/* Public landing page */}
-      <Route path="/" element={isPreAuthenticated ? <Navigate to="/home" replace /> : <Landing />} />
-      
+      <Route path="/" element={isAuthenticated ? <Navigate to="/home" replace /> : <Landing />} />
+
       {/* Pre-auth login route - redirects to dashboard if already authenticated */}
-      <Route 
-        path="/login" 
-        element={isPreAuthenticated ? <Navigate to="/home" replace /> : <PreLogin />} 
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/home" replace /> : <PreLogin />}
       />
       
       {/* Auth route — accessible without pre-auth so team members can

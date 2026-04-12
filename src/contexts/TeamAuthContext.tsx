@@ -70,7 +70,12 @@ export function TeamAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Listen for auth state changes.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        // When a new sign-in fires, set loading=true so PreAuthGuard
+        // waits for the profile check instead of redirecting to /login.
+        if (event === 'SIGNED_IN') {
+          setIsLoading(true);
+        }
         await resolveSession(session?.user ?? null);
         setIsLoading(false);
       },

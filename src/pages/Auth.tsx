@@ -101,6 +101,7 @@ export default function Auth() {
         setIsLogin(true);
       }
     } catch (err) {
+      console.error('[Auth] unexpected error:', err);
       toast.error('An unexpected error occurred');
     } finally {
       setIsLoading(false);

@@ -77,7 +77,7 @@ function getDefaultValues(defaultClientId?: string, task?: PlanTaskRow): TaskFor
       status: (task.status as TaskFormData['status']) || 'backlog',
       motCleCible: task.mot_cle_cible || '',
       nombreMots: task.nombre_mots || null,
-      resourceLinks: task.resource_links || [],
+      resourceLinks: (task.resource_links as TaskFormData['resourceLinks']) || [],
       effortReserve: task.effort_reserve ? Number(task.effort_reserve) : null,
       assigneeIds: task.assignee_ids || [],
       tags: task.tags || [],

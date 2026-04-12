@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Users, CreditCard, Link, Shield, ChevronRight, Building2, Pencil, Trash2, Plus, Loader2, Cog } from 'lucide-react';
+import { Settings, Users, CreditCard, Link, Shield, ChevronRight, Building2, Pencil, Trash2, Plus, Loader2, Cog, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -14,6 +14,7 @@ import { FigmaBrandKitsPanel } from '@/components/admin/FigmaBrandKitsPanel';
 import { IntegrationHealthPanel } from '@/components/admin/IntegrationHealthPanel';
 import { RlsAuditPanel } from '@/components/admin/RlsAuditPanel';
 import { TeamMembersPanel } from '@/components/admin/TeamMembersPanel';
+import { ClientAccessDialog } from '@/components/admin/ClientAccessDialog';
 import { useClient } from '@/contexts/ClientContext';
 import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 
@@ -62,6 +63,7 @@ export default function Admin() {
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [configClient, setConfigClient] = useState<Client | null>(null);
+  const [accessClient, setAccessClient] = useState<Client | null>(null);
 
   // Fetch clients from database
   useEffect(() => {
@@ -293,6 +295,9 @@ export default function Admin() {
                 <span className="font-medium">{client.name}</span>
               </div>
               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setAccessClient(client)} title="Manage access">
+                  <UserCheck className="w-4 h-4" />
+                </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openConfigDialog(client)} title="Configure">
                   <Cog className="w-4 h-4" />
                 </Button>
@@ -490,6 +495,16 @@ export default function Admin() {
           clientId={configClient.id}
           clientName={configClient.name}
           onSaved={refetchConfig}
+        />
+      )}
+
+      {/* Client Access Dialog */}
+      {accessClient && (
+        <ClientAccessDialog
+          open={!!accessClient}
+          onOpenChange={(open) => !open && setAccessClient(null)}
+          clientId={accessClient.id}
+          clientName={accessClient.name}
         />
       )}
     </div>

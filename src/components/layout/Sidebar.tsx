@@ -71,8 +71,9 @@ const bottomNavItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { clients, currentClient, setCurrentClient, isLoading } = useClient();
+  const { clients, currentClient, setCurrentClient, isLoading, isAdminUser } = useClient();
   const { isAdmin } = useVisibilityMode();
+  const showAllClientsOption = isAdmin && isAdminUser;
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
 
   const getColorClass = (color: string) => colorClasses[color ?? 'blue'] || 'bg-blue-500';
@@ -132,7 +133,7 @@ export function Sidebar() {
               <CommandInput placeholder="Rechercher un client..." className="h-9" />
               <CommandList className="max-h-[60vh]">
                 <CommandEmpty>Aucun client trouvé.</CommandEmpty>
-                {isAdmin && (
+                {showAllClientsOption && (
                   <>
                     <CommandGroup heading="Admin">
                       <CommandItem

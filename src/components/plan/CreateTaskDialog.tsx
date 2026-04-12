@@ -63,9 +63,17 @@ interface CreateTaskDialogProps {
   defaultClientId?: string;
   clientName?: string;
   task?: PlanTaskRow;
+  /** When provided (and `task` is not), opens the dialog in create mode
+   *  with fields pre-filled from this partial payload. Used to edit a
+   *  content opportunity before saving it as a task. */
+  prefill?: Partial<TaskFormData>;
 }
 
-function getDefaultValues(defaultClientId?: string, task?: PlanTaskRow): TaskFormData {
+function getDefaultValues(
+  defaultClientId?: string,
+  task?: PlanTaskRow,
+  prefill?: Partial<TaskFormData>,
+): TaskFormData {
   if (task) {
     return {
       title: task.title || '',
@@ -97,7 +105,7 @@ function getDefaultValues(defaultClientId?: string, task?: PlanTaskRow): TaskFor
     };
   }
 
-  return {
+  const base: TaskFormData = {
     title: '',
     description: '',
     taskType: 'autre',
@@ -125,6 +133,8 @@ function getDefaultValues(defaultClientId?: string, task?: PlanTaskRow): TaskFor
     contentStatus: null,
     funnelStage: null,
   };
+
+  return prefill ? { ...base, ...prefill } : base;
 }
 
 export function CreateTaskDialog({
@@ -134,12 +144,13 @@ export function CreateTaskDialog({
   defaultClientId,
   clientName,
   task,
+  prefill,
 }: CreateTaskDialogProps) {
   const isEdit = !!task;
 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(createTaskSchema),
-    defaultValues: getDefaultValues(defaultClientId, task),
+    defaultValues: getDefaultValues(defaultClientId, task, prefill),
   });
 
   const { mutate, isPending } = useCreateTask({
@@ -149,12 +160,13 @@ export function CreateTaskDialog({
     },
   });
 
-  // Reset form when dialog opens with different task
+  // Reset form when dialog opens with different task or prefill
   useEffect(() => {
     if (open) {
-      form.reset(getDefaultValues(defaultClientId, task));
+      form.reset(getDefaultValues(defaultClientId, task, prefill));
     }
-  }, [open, task?.id, defaultClientId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, task?.id, defaultClientId, prefill]);
 
   const onSubmit = (data: TaskFormData) => {
     if (isEdit && task) {

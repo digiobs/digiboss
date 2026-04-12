@@ -12,10 +12,15 @@ interface PlanTask {
   priority: string;
   assignee: string | null;
   due_date: string | null;
+  start_date: string | null;
   tags: string[] | null;
   source_module: string | null;
   wrike_task_id: string | null;
   wrike_permalink: string | null;
+  task_type: string | null;
+  canal: string | null;
+  format: string | null;
+  thematique: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -55,12 +60,16 @@ function planTaskToWrikeTask(pt: PlanTask): WrikeTask {
     title: pt.title,
     status: STATUS_TO_WRIKE[pt.status] || 'Idéation',
     importance: pt.priority === 'high' ? 'High' : pt.priority === 'low' ? 'Low' : 'Normal',
-    dates: pt.due_date ? { due: pt.due_date, type: 'Planned' } : undefined,
+    dates: {
+      ...(pt.start_date ? { start: pt.start_date } : {}),
+      ...(pt.due_date ? { due: pt.due_date } : {}),
+      type: 'Planned',
+    },
     clientName: client.name,
     clientSector: client.sector,
-    // Store extra fields for enhanced display
-    canal: Array.isArray(pt.tags) ? pt.tags[0] : '',
-    format: '',
+    canal: pt.canal || (Array.isArray(pt.tags) ? pt.tags[0] : '') || '',
+    format: pt.format || '',
+    thematique: pt.thematique || '',
     lienContenuProd: pt.wrike_permalink || undefined,
   };
 }

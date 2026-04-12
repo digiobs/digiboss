@@ -49,14 +49,15 @@ async function fetchSupabaseFallback(): Promise<WrikeTask[]> {
     return {
       id: pt.wrike_task_id || pt.id,
       title: pt.title,
-      status: STATUS_TO_WRIKE[pt.status] || 'Idéation',
+      status: STATUS_TO_WRIKE[pt.status as string] || 'Idéation',
       importance: pt.priority === 'high' ? 'High' : pt.priority === 'low' ? 'Low' : 'Normal',
-      dates: pt.due_date ? { due: pt.due_date, type: 'Planned' } : undefined,
+      dates: pt.due_date ? { due: pt.due_date as string, type: 'Planned' } : undefined,
       clientName: client.name,
       clientSector: client.sector,
-      canal: Array.isArray(pt.tags) ? pt.tags[0] : '',
-      format: '',
-      lienContenuProd: pt.wrike_permalink || undefined,
+      canal: (pt.canal as string) || (Array.isArray(pt.tags) ? pt.tags[0] : '') || '',
+      format: (pt.format as string) || '',
+      thematique: (pt.thematique as string) || '',
+      lienContenuProd: (pt.wrike_permalink as string) || undefined,
     } as WrikeTask;
   });
 }

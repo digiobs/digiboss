@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { LayoutGrid, BarChart3, AlertTriangle, RefreshCw } from 'lucide-react';
+import { LayoutGrid, BarChart3, AlertTriangle, RefreshCw, Plus } from 'lucide-react';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useClient } from '@/contexts/ClientContext';
 import { useWrikeTasks } from '@/hooks/useWrikeTasks';
 import { WrikeKanban } from '@/components/plan/WrikeKanban';
 import { ClientAvancement } from '@/components/plan/ClientAvancement';
+import { CreateTaskDialog } from '@/components/plan/CreateTaskDialog';
 import { VisibilityToggle } from '@/components/plan/VisibilityToggle';
 import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ export default function Plan() {
   });
   const [syncing, setSyncing] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('avancement');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const syncWrike = async () => {
     setSyncing(true);
@@ -81,6 +83,10 @@ export default function Plan() {
               Kanban
             </button>
           </div>
+          <Button className="gap-2" onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Nouvelle tâche
+          </Button>
           {isAdmin && viewMode === 'kanban' && (
             <Button variant="outline" className="gap-2" onClick={syncWrike} disabled={syncing}>
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
@@ -113,6 +119,15 @@ export default function Plan() {
           clientId={isAllClientsSelected ? undefined : currentClient?.id}
         />
       )}
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        isAdmin={isAdmin}
+        defaultClientId={isAllClientsSelected ? undefined : currentClient?.id}
+        clientName={isAllClientsSelected ? undefined : currentClient?.name}
+      />
     </div>
   );
 }

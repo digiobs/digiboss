@@ -8,7 +8,8 @@ export type IntegrationProvider =
   | "market-news"
   | "claude"
   | "hubspot"
-  | "linkedin";
+  | "linkedin"
+  | "wrike";
 
 export type IntegrationRunStatus = "running" | "success" | "partial" | "failed";
 

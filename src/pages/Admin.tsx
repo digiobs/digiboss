@@ -13,6 +13,7 @@ import { ClientDataMappingsPanel } from '@/components/admin/ClientDataMappingsPa
 import { FigmaBrandKitsPanel } from '@/components/admin/FigmaBrandKitsPanel';
 import { IntegrationHealthPanel } from '@/components/admin/IntegrationHealthPanel';
 import { RlsAuditPanel } from '@/components/admin/RlsAuditPanel';
+import { TeamMembersPanel } from '@/components/admin/TeamMembersPanel';
 import { useClient } from '@/contexts/ClientContext';
 import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 
@@ -41,12 +42,6 @@ const integrations = [
   { name: 'SEMrush', status: 'disconnected', lastSync: null },
 ];
 
-const teamMembers = [
-  { name: 'Alex Morgan', email: 'alex@digiobs.com', role: 'Admin', status: 'active' },
-  { name: 'Sarah Chen', email: 'sarah@digiobs.com', role: 'Manager', status: 'active' },
-  { name: 'Mike Johnson', email: 'mike@digiobs.com', role: 'Contributor', status: 'active' },
-  { name: 'Emily Watson', email: 'emily@digiobs.com', role: 'Viewer', status: 'invited' },
-];
 
 const auditLog = [
   { action: 'Campaign created', user: 'Alex Morgan', time: '2 hours ago' },
@@ -316,36 +311,7 @@ export default function Admin() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Users & Roles */}
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" />
-              <h2 className="font-semibold">Team Members</h2>
-            </div>
-            <Button size="sm">Invite</Button>
-          </div>
-          <div className="divide-y divide-border">
-            {teamMembers.map((member) => (
-              <div key={member.email} className="p-4 flex items-center justify-between hover:bg-muted/50">
-                <div>
-                  <p className="font-medium">{member.name}</p>
-                  <p className="text-sm text-muted-foreground">{member.email}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary">{member.role}</Badge>
-                  <Badge
-                    variant="secondary"
-                    className={
-                      member.status === 'active' ? 'status-completed' : 'status-in-progress'
-                    }
-                  >
-                    {member.status}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <TeamMembersPanel />
 
         {/* Integrations */}
         <div className="bg-card rounded-xl border border-border overflow-hidden">

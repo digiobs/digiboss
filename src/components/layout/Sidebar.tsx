@@ -19,6 +19,7 @@ import {
   Loader2,
   Search,
   Check,
+  Briefcase,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -61,6 +62,7 @@ const navItems = [
 ];
 
 const bottomNavItems = [
+  { path: '/admin/my-work', icon: Briefcase, label: 'Mon travail' },
   { path: '/settings/integrations', icon: Plug, label: 'Intégrations' },
   { path: '/admin', icon: Settings, label: 'Admin' },
 ];

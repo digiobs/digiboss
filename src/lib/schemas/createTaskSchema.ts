@@ -43,6 +43,16 @@ export const createTaskSchema = z.object({
   sousTraitance: z.coerce.number().min(0).nullable().default(null),
   marge: z.coerce.number().nullable().default(null),
   syncToWrike: z.boolean().default(false),
+  // Content item fields
+  contentType: z
+    .enum(['blog-post', 'testimonial', 'webinar', 'linkedin-post', 'landing-page'])
+    .nullable()
+    .optional(),
+  contentStatus: z
+    .enum(['idea', 'draft', 'review', 'approved', 'scheduled', 'published'])
+    .nullable()
+    .optional(),
+  funnelStage: z.enum(['awareness', 'consideration', 'conversion']).nullable().optional(),
 }).superRefine((data, ctx) => {
   // Canal required for content and social_media tasks
   if ((data.taskType === 'contenu' || data.taskType === 'social_media') && !data.canal) {
@@ -58,6 +68,14 @@ export const createTaskSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: 'Format requis quand un canal est sélectionné',
       path: ['format'],
+    });
+  }
+  // Content type required for content tasks
+  if (data.taskType === 'contenu' && !data.contentType) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Type de contenu requis',
+      path: ['contentType'],
     });
   }
 });

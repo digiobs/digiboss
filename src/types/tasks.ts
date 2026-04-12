@@ -1,4 +1,5 @@
 // Task types for DigiObs Plan
+import type { ContentType, ContentStatus, FunnelStage } from '@/types/content';
 
 export type TaskStatus = 'backlog' | 'in_progress' | 'review' | 'done' | 'cancelled';
 export type TaskPriority = 'high' | 'medium' | 'low';
@@ -129,6 +130,10 @@ export interface TaskFormData {
   sousTraitance: number | null;
   marge: number | null;
   syncToWrike: boolean;
+  // Content item fields (when taskType === 'contenu')
+  contentType?: ContentType | null;
+  contentStatus?: ContentStatus | null;
+  funnelStage?: FunnelStage | null;
 }
 
 export const mockTasks: Task[] = [

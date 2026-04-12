@@ -60,10 +60,11 @@ const contentTypeIcons: Record<string, React.ElementType> = {
 interface ContentCardProps {
   item: ContentItem;
   onClick: () => void;
+  onEdit?: () => void;
   isDragging?: boolean;
 }
 
-function ContentCard({ item, onClick, isDragging }: ContentCardProps) {
+function ContentCard({ item, onClick, onEdit, isDragging }: ContentCardProps) {
   const Icon = contentTypeIcons[item.contentType] || FileText;
   
   return (
@@ -89,7 +90,14 @@ function ContentCard({ item, onClick, isDragging }: ContentCardProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Edit</DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  (onEdit ?? onClick)();
+                }}
+              >
+                Edit
+              </DropdownMenuItem>
               <DropdownMenuItem>Duplicate</DropdownMenuItem>
               <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
             </DropdownMenuContent>

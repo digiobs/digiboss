@@ -43,7 +43,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, folderId, taskId, fields, status, useCache } = await req.json();
+    const { action, folderId, taskId, fields, status, useCache, taskData } = await req.json();
 
     let url = '';
     let method = 'GET';
@@ -91,6 +91,33 @@ serve(async (req) => {
       case 'getFolderTree':
         url = `${WRIKE_BASE}/folders/${folderId}/folders`;
         break;
+      case 'getContacts':
+        url = `${WRIKE_BASE}/contacts?pageSize=1000`;
+        break;
+      case 'createTask': {
+        if (!folderId || !taskData) {
+          return new Response(JSON.stringify({ error: 'folderId and taskData are required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const createResp = await fetch(`${WRIKE_BASE}/folders/${folderId}/tasks`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${WRIKE_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(taskData),
+        });
+        if (!createResp.ok) {
+          const errText = await createResp.text();
+          throw new Error(`Wrike API error [${createResp.status}]: ${errText}`);
+        }
+        const createResult = await createResp.json();
+        return new Response(JSON.stringify(createResult), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       case 'listFolders': {
         // Flat list of spaces + their direct subfolders (used by the
         // "Liaison clients → Wrike" picker in /settings/integrations).

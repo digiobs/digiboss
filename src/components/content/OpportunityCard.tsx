@@ -17,7 +17,8 @@ import {
   Plus,
   Calendar,
   Bookmark,
-  User
+  User,
+  Pencil
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,7 @@ interface OpportunityCardProps {
   onCreateTask: (opp: ContentOpportunity) => void;
   onSchedule: (opp: ContentOpportunity) => void;
   onSaveToBacklog: (opp: ContentOpportunity) => void;
+  onEditOpportunity?: (opp: ContentOpportunity) => void;
 }
 
 const contentTypeIcons: Record<string, React.ElementType> = {
@@ -57,12 +59,13 @@ const funnelStageColors: Record<string, string> = {
   conversion: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
 };
 
-export function OpportunityCard({ 
-  opportunity, 
-  onGenerateDraft, 
-  onCreateTask, 
+export function OpportunityCard({
+  opportunity,
+  onGenerateDraft,
+  onCreateTask,
   onSchedule,
-  onSaveToBacklog 
+  onSaveToBacklog,
+  onEditOpportunity,
 }: OpportunityCardProps) {
   const [expanded, setExpanded] = useState(false);
   
@@ -216,10 +219,28 @@ export function OpportunityCard({
             <Sparkles className="w-3.5 h-3.5" />
             Generate Draft
           </Button>
+          {onEditOpportunity && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => onEditOpportunity(opportunity)}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Modifier
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Modifier avant de créer la tâche</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => onCreateTask(opportunity)}
               >

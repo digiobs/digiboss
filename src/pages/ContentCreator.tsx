@@ -78,6 +78,7 @@ export default function ContentCreator() {
   // Task dialog state (create OR edit a content task)
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<PlanTaskContentRow | undefined>();
+  const [prefillData, setPrefillData] = useState<Partial<TaskFormData> | undefined>();
 
   const syncContent = async () => {
     setSyncing(true);
@@ -168,39 +169,41 @@ export default function ContentCreator() {
     setActiveTab('studio');
   };
 
+  const buildOpportunityFormData = (opp: ContentOpportunity, cid: string): TaskFormData => ({
+    title: `Create: ${opp.suggestedTitle}`,
+    description: `${opp.suggestedAngle}\n\nWhy now:\n${opp.whyNow.map((w) => `• ${w}`).join('\n')}`,
+    taskType: 'contenu',
+    clientId: cid,
+    canal: '',
+    format: '',
+    thematique: '',
+    startDate: null,
+    dueDate: null,
+    priority: opp.opportunityScore >= 80 ? 'high' : opp.opportunityScore >= 60 ? 'medium' : 'low',
+    status: 'backlog',
+    motCleCible: '',
+    nombreMots: null,
+    resourceLinks: [],
+    effortReserve: null,
+    assigneeIds: [],
+    tags: [contentTypeLabels[opp.contentType], opp.funnelStage, 'content'],
+    budgetTache: null,
+    tarifCatalogue: null,
+    forfaitMensuel: null,
+    sousTraitance: null,
+    marge: null,
+    syncToWrike: false,
+    contentType: opp.contentType,
+    contentStatus: 'idea',
+    funnelStage: opp.funnelStage,
+  });
+
   const handleCreateTask = (opp: ContentOpportunity) => {
     if (!clientId) {
       toast.error('Sélectionnez un client pour créer une tâche');
       return;
     }
-    const formData: TaskFormData = {
-      title: `Create: ${opp.suggestedTitle}`,
-      description: `${opp.suggestedAngle}\n\nWhy now:\n${opp.whyNow.map((w) => `• ${w}`).join('\n')}`,
-      taskType: 'contenu',
-      clientId,
-      canal: '',
-      format: '',
-      thematique: '',
-      startDate: null,
-      dueDate: null,
-      priority: opp.opportunityScore >= 80 ? 'high' : opp.opportunityScore >= 60 ? 'medium' : 'low',
-      status: 'backlog',
-      motCleCible: '',
-      nombreMots: null,
-      resourceLinks: [],
-      effortReserve: null,
-      assigneeIds: [],
-      tags: [contentTypeLabels[opp.contentType], opp.funnelStage, 'content'],
-      budgetTache: null,
-      tarifCatalogue: null,
-      forfaitMensuel: null,
-      sousTraitance: null,
-      marge: null,
-      syncToWrike: false,
-      contentType: opp.contentType,
-      contentStatus: 'idea',
-      funnelStage: opp.funnelStage,
-    };
+    const formData = buildOpportunityFormData(opp, clientId);
 
     createTask.mutate(formData, {
       onSuccess: () => {
@@ -219,6 +222,16 @@ export default function ContentCreator() {
         );
       },
     });
+  };
+
+  const handleEditOpportunity = (opp: ContentOpportunity) => {
+    if (!clientId) {
+      toast.error('Sélectionnez un client pour modifier cette opportunité');
+      return;
+    }
+    setEditingTask(undefined);
+    setPrefillData(buildOpportunityFormData(opp, clientId));
+    setTaskDialogOpen(true);
   };
 
   const handleSchedule = (opp: ContentOpportunity) => {
@@ -304,12 +317,14 @@ export default function ContentCreator() {
   const handleItemClick = (item: ContentItem) => {
     const row = (item as ContentItemWithRow)._row;
     if (!row) return;
+    setPrefillData(undefined);
     setEditingTask(row);
     setTaskDialogOpen(true);
   };
 
   const openNewTaskDialog = () => {
     setEditingTask(undefined);
+    setPrefillData(undefined);
     setTaskDialogOpen(true);
   };
 
@@ -423,6 +438,7 @@ export default function ContentCreator() {
                   onCreateTask={handleCreateTask}
                   onSchedule={handleSchedule}
                   onSaveToBacklog={handleSaveToBacklog}
+                  onEditOpportunity={handleEditOpportunity}
                 />
               ))}
             </div>
@@ -530,6 +546,7 @@ export default function ContentCreator() {
         defaultClientId={clientId}
         clientName={isAllClientsSelected ? undefined : currentClient?.name}
         task={editingTask}
+        prefill={prefillData}
       />
     </div>
   );

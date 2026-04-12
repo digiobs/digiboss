@@ -37,18 +37,20 @@ function PreAuthGuard({ children }: { children: React.ReactNode }) {
   const { isPreAuthenticated } = usePreAuth();
   const { isTeamMember, isLoading } = useTeamAuth();
 
+  // Pre-auth (user/user22) grants immediate access — no need to wait for Supabase
+  if (isPreAuthenticated) return <>{children}</>;
+
+  // Supabase auth: wait for session check to complete
   if (isLoading) return null;
 
-  if (!isPreAuthenticated && !isTeamMember) {
-    return <Navigate to="/login" replace />;
-  }
+  if (isTeamMember) return <>{children}</>;
 
-  return <>{children}</>;
+  return <Navigate to="/login" replace />;
 }
 
 const AppRoutes = () => {
   const { isPreAuthenticated } = usePreAuth();
-  const { isTeamMember, isLoading } = useTeamAuth();
+  const { isTeamMember } = useTeamAuth();
   const isAuthenticated = isPreAuthenticated || isTeamMember;
 
   return (

@@ -125,7 +125,13 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchClients();
-    
+
+    // Refetch when auth state changes (e.g. after login, the session
+    // switches from anon → authenticated which may affect RLS).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      fetchClients();
+    });
+
     // Subscribe to realtime changes
     const channel = supabase
       .channel('clients-context-changes')
@@ -139,6 +145,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       .subscribe();
 
     return () => {
+      subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, []);

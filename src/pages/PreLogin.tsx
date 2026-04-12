@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -103,6 +103,15 @@ export default function PreLogin() {
               Continue
             </Button>
           </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Membre de l'équipe ?{' '}
+              <Link to="/auth" className="text-primary hover:underline font-medium">
+                Se connecter avec email
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -27,6 +27,7 @@ import EditorialCalendar from "@/pages/EditorialCalendar";
 import KpiDashboard from "@/pages/KpiDashboard";
 import SeoGeo from "@/pages/SeoGeo";
 import SettingsIntegrations from "@/pages/SettingsIntegrations";
+import ProfileSettings from "@/pages/ProfileSettings";
 import WrikeCallback from "@/pages/oauth/WrikeCallback";
 import NotFound from "@/pages/NotFound";
 
@@ -93,6 +94,9 @@ const AppRoutes = () => {
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/my-work" element={
           <TeamAuthGate><MyWork /></TeamAuthGate>
+        } />
+        <Route path="/settings/profile" element={
+          <TeamAuthGate><ProfileSettings /></TeamAuthGate>
         } />
         <Route path="/settings/integrations" element={<SettingsIntegrations />} />
         <Route path="/oauth/wrike/callback" element={<WrikeCallback />} />

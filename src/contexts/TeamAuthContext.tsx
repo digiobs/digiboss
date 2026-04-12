@@ -43,32 +43,42 @@ export function TeamAuthProvider({ children }: { children: ReactNode }) {
     return data as TeamProfile | null;
   };
 
+  /**
+   * Resolve a session: fetch the profile, and if it doesn't exist
+   * (deleted user / stale JWT) automatically sign out so the dead
+   * token is cleared from localStorage.
+   */
+  const resolveSession = async (authUser: User | null) => {
+    setUser(authUser);
+
+    if (authUser) {
+      const p = await fetchProfile(authUser.id);
+      if (!p) {
+        // Stale session for a deleted user → auto-invalidate
+        console.warn('[TeamAuth] No profile for session user — signing out stale session');
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        return;
+      }
+      setProfile(p);
+    } else {
+      setProfile(null);
+    }
+  };
+
   useEffect(() => {
     // Listen for auth state changes.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        const authUser = session?.user ?? null;
-        setUser(authUser);
-
-        if (authUser) {
-          const p = await fetchProfile(authUser.id);
-          setProfile(p);
-        } else {
-          setProfile(null);
-        }
+        await resolveSession(session?.user ?? null);
         setIsLoading(false);
       },
     );
 
     // Check existing session on mount.
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const authUser = session?.user ?? null;
-      setUser(authUser);
-
-      if (authUser) {
-        const p = await fetchProfile(authUser.id);
-        setProfile(p);
-      }
+      await resolveSession(session?.user ?? null);
       setIsLoading(false);
     });
 

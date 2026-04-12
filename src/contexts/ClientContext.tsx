@@ -87,7 +87,14 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       .eq('id', userId)
       .maybeSingle();
 
-    if (profile?.role === 'admin') {
+    if (!profile) {
+      // Session exists but no profile row (stale/deleted user) — no filter
+      allowedClientIds.current = null;
+      setIsAdminUser(false);
+      return;
+    }
+
+    if (profile.role === 'admin') {
       allowedClientIds.current = null; // admin sees all
       setIsAdminUser(true);
       return;

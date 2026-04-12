@@ -88,7 +88,9 @@ export function TopBar() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile Settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings/profile')}>
+                Profile Settings
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setPreferencesOpen(true)}>
                 Notification Preferences
               </DropdownMenuItem>

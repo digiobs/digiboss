@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Rocket,
   Send,
+  Pencil,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,8 @@ import { useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { useCreativeProposals, type CreativeProposal } from '@/hooks/useCreativeProposals';
 import { WorkflowLegend } from '@/components/proposals/WorkflowLegend';
+import { CreateTaskDialog } from '@/components/plan/CreateTaskDialog';
+import type { TaskFormData } from '@/types/tasks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -101,12 +104,14 @@ function ProposalCard({
   onApprove,
   onReject,
   onMarkReady,
+  onEdit,
   isAdmin,
 }: {
   proposal: CreativeProposal;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onMarkReady: (id: string) => void;
+  onEdit: (p: CreativeProposal) => void;
   isAdmin: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -246,6 +251,20 @@ function ProposalCard({
             </Button>
           </div>
         )}
+
+        {isAdmin && (
+          <div className="flex gap-2 mt-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1"
+              onClick={() => onEdit(proposal)}
+            >
+              <Pencil className="w-3.5 h-3.5 mr-1" />
+              Modifier / Créer tâche
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -267,6 +286,38 @@ export default function Proposals() {
   } = useCreativeProposals();
   const [filterSkill, setFilterSkill] = useState<string>('all');
   const [filterUrgency, setFilterUrgency] = useState<string>('all');
+
+  // Create-task dialog state (prefilled from a creative proposal)
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskPrefill, setTaskPrefill] = useState<Partial<TaskFormData> | undefined>();
+
+  const urgencyToPriority = (urgency: string): TaskFormData['priority'] => {
+    if (urgency.includes('Critique') || urgency.includes('Urgent')) return 'high';
+    if (urgency.includes('Important')) return 'medium';
+    return 'low';
+  };
+
+  const handleEditProposal = (p: CreativeProposal) => {
+    const descriptionParts = [
+      p.description,
+      p.rationale ? `\n\nJustification:\n${p.rationale}` : '',
+      p.source_insight ? `\n\nInsight source:\n${p.source_insight}` : '',
+      p.source_url ? `\n\nSource: ${p.source_url}` : '',
+      p.draft_content ? `\n\nBrouillon:\n${p.draft_content}` : '',
+    ].filter(Boolean).join('');
+
+    setTaskPrefill({
+      title: p.title,
+      description: descriptionParts,
+      taskType: 'contenu',
+      clientId: p.client_id,
+      priority: urgencyToPriority(p.urgency),
+      status: 'backlog',
+      tags: Array.isArray(p.tags) ? p.tags.map(String) : [],
+      contentStatus: 'idea',
+    });
+    setTaskDialogOpen(true);
+  };
 
   const skills = useMemo(() => {
     const set = new Set(proposals.map((p) => p.source_skill));
@@ -452,6 +503,7 @@ export default function Proposals() {
                             onApprove={handleApprove}
                             onReject={handleReject}
                             onMarkReady={handleMarkReady}
+                            onEdit={handleEditProposal}
                             isAdmin={isAdmin}
                           />
                         ))
@@ -515,6 +567,16 @@ export default function Proposals() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Create-task dialog — opens prefilled from a creative proposal */}
+      <CreateTaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        isAdmin={isAdmin}
+        defaultClientId={isAllClientsSelected ? undefined : currentClient?.id}
+        clientName={isAllClientsSelected ? undefined : currentClient?.name}
+        prefill={taskPrefill}
+      />
       </div>
     </TooltipProvider>
   );

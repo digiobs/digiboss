@@ -41,6 +41,9 @@ export function useCreateTask({ onSuccess }: UseCreateTaskOptions = {}) {
         sous_traitance: data.sousTraitance || null,
         marge: data.marge || null,
         sync_to_wrike: data.syncToWrike,
+        content_type: data.contentType || null,
+        content_status: data.contentStatus || null,
+        funnel_stage: data.funnelStage || null,
       };
 
       if (isEdit) {
@@ -81,6 +84,7 @@ export function useCreateTask({ onSuccess }: UseCreateTaskOptions = {}) {
       queryClient.invalidateQueries({ queryKey: ['plan-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['wrike-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['client-avancement'] });
+      queryClient.invalidateQueries({ queryKey: ['content-tasks'] });
       toast.success('Tâche enregistrée avec succès');
       onSuccess?.();
     },

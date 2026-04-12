@@ -22,6 +22,7 @@ import { ProductionTab } from './task-form/ProductionTab';
 import { AdminFinanceTab } from './task-form/AdminFinanceTab';
 import { TeamMemberPicker } from './task-form/TeamMemberPicker';
 import type { TaskFormData, TaskType } from '@/types/tasks';
+import type { ContentType, ContentStatus, FunnelStage } from '@/types/content';
 import { Loader2, LayoutGrid } from 'lucide-react';
 
 interface PlanTaskRow {
@@ -50,6 +51,9 @@ interface PlanTaskRow {
   sous_traitance: number | null;
   marge: number | null;
   sync_to_wrike: boolean | null;
+  content_type?: string | null;
+  content_status?: string | null;
+  funnel_stage?: string | null;
 }
 
 interface CreateTaskDialogProps {
@@ -87,6 +91,9 @@ function getDefaultValues(defaultClientId?: string, task?: PlanTaskRow): TaskFor
       sousTraitance: task.sous_traitance ? Number(task.sous_traitance) : null,
       marge: task.marge ? Number(task.marge) : null,
       syncToWrike: task.sync_to_wrike || false,
+      contentType: (task.content_type as ContentType) || null,
+      contentStatus: (task.content_status as ContentStatus) || null,
+      funnelStage: (task.funnel_stage as FunnelStage) || null,
     };
   }
 
@@ -114,6 +121,9 @@ function getDefaultValues(defaultClientId?: string, task?: PlanTaskRow): TaskFor
     sousTraitance: null,
     marge: null,
     syncToWrike: false,
+    contentType: null,
+    contentStatus: null,
+    funnelStage: null,
   };
 }
 

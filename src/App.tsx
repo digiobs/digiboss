@@ -7,9 +7,12 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { ClientProvider } from "@/contexts/ClientContext";
 import { PreAuthProvider, usePreAuth } from "@/contexts/PreAuthContext";
+import { TeamAuthProvider } from "@/contexts/TeamAuthContext";
+import { TeamAuthGate } from "@/components/auth/TeamAuthGate";
 import Landing from "@/pages/Landing";
 import Auth from "@/pages/Auth";
 import PreLogin from "@/pages/PreLogin";
+import MyWork from "@/pages/MyWork";
 import Home from "@/pages/Home";
 import Insights from "@/pages/Insights";
 import Prospects from "@/pages/Prospects";
@@ -54,12 +57,9 @@ const AppRoutes = () => {
         element={isPreAuthenticated ? <Navigate to="/home" replace /> : <PreLogin />} 
       />
       
-      {/* Auth route requires pre-authentication */}
-      <Route path="/auth" element={
-        <PreAuthGuard>
-          <Auth />
-        </PreAuthGuard>
-      } />
+      {/* Auth route — accessible without pre-auth so team members can
+          sign in directly (e.g. from /admin/my-work redirect). */}
+      <Route path="/auth" element={<Auth />} />
       
       {/* Redirect old dashboard route to home */}
       <Route path="/dashboard" element={<Navigate to="/home" replace />} />
@@ -84,6 +84,9 @@ const AppRoutes = () => {
         <Route path="/seo-geo" element={<SeoGeo />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/my-work" element={
+          <TeamAuthGate><MyWork /></TeamAuthGate>
+        } />
         <Route path="/settings/integrations" element={<SettingsIntegrations />} />
         <Route path="/oauth/wrike/callback" element={<WrikeCallback />} />
       </Route>
@@ -99,11 +102,13 @@ const App = () => (
       <DateRangeProvider>
         <ClientProvider>
           <PreAuthProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
+            <TeamAuthProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </TeamAuthProvider>
           </PreAuthProvider>
         </ClientProvider>
       </DateRangeProvider>

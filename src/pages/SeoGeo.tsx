@@ -47,6 +47,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { TypedTasksSection } from '@/components/tasks/TypedTasksSection';
 
 const positionChartConfig = {
   position: { label: 'Position', color: 'hsl(142, 76%, 36%)' },
@@ -622,6 +623,15 @@ export default function SeoGeo() {
 
         {/* ==================== ACTIONS TAB ==================== */}
         <TabsContent value="actions" className="space-y-6 mt-6">
+          {/* Plan tasks scoped to task_type='seo' — unified with Plan page */}
+          <TypedTasksSection
+            taskType="seo"
+            title="Tâches SEO"
+            icon={Search}
+            emptyLabel="Aucune tâche SEO pour ce client. Crées-en une pour démarrer."
+            createLabel="Nouvelle tâche SEO"
+          />
+
           <div className="bg-card rounded-xl border border-border overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">

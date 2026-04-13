@@ -6,7 +6,6 @@ import { HomeSeoSnapshot } from "@/components/home/HomeSeoSnapshot";
 import { HomeEditorialPipeline } from "@/components/home/HomeEditorialPipeline";
 import { HomeVeilleAlerts } from "@/components/home/HomeVeilleAlerts";
 import { HomeRecentMeetings } from "@/components/home/HomeRecentMeetings";
-import { HomeRecentDeliverables } from "@/components/home/HomeRecentDeliverables";
 import { type NextBestAction, dashboardKPIs } from "@/data/dashboardData";
 import { useHomeReportingKpis } from "@/hooks/useHomeData";
 import { TabDataStatusBanner } from "@/components/data/TabDataStatusBanner";
@@ -229,14 +228,6 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Livrables recents</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HomeRecentDeliverables />
-            </CardContent>
-          </Card>
         </div>
       </div>
 

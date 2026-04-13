@@ -1,4 +1,4 @@
-import { FolderOpen, Search, Grid3X3, List, Plus, FileText, Image, ExternalLink, CloudIcon, RefreshCw, ArrowRight } from 'lucide-react';
+import { FolderOpen, Search, Grid3X3, List, Plus, Image, ExternalLink, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -6,9 +6,7 @@ import { assets } from '@/data/mockData';
 import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 import { BrandCharteSection } from '@/components/assets/BrandCharteSection';
 import { useSupabaseAssets } from '@/hooks/useSupabaseTabData';
-import { useDeliverables } from '@/hooks/useDeliverables';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,20 +51,6 @@ type FigmaSyncState = {
   message: string | null;
 };
 
-const DELIVERABLE_TYPE_LABELS: Record<string, string> = {
-  'seo-strategy': 'SEO Strategy',
-  'audit-seo': 'Audit SEO',
-  'rapport-performance': 'Performance Report',
-  'analyse-pmf': 'PMF Analysis',
-  'content-article': 'Article',
-  'content-post': 'Social Post',
-  'campagne': 'Campaign',
-  'architecture-site': 'Site Architecture',
-  'orchestrateur': 'Orchestrator',
-  'veille': 'Market Watch',
-  'autre': 'Other',
-};
-
 /* ------------------------------------------------------------------ */
 /*  Component                                                         */
 /* ------------------------------------------------------------------ */
@@ -98,38 +82,6 @@ export default function Assets() {
   const [figmaFolders, setFigmaFolders] = useState<FigmaFolder[]>([]);
   const [figmaSyncStates, setFigmaSyncStates] = useState<FigmaSyncState[]>([]);
   const [refreshingFigma, setRefreshingFigma] = useState(false);
-
-  // OneDrive path
-  const [onedrivePath, setOnedrivePath] = useState<string | null>(null);
-
-  // Deliverables
-  const { data: deliverables, isLoading: deliverablesLoading } = useDeliverables();
-
-  /* ---------- Fetch OneDrive path from client_configs ---------- */
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!currentClient?.id || isAllClientsSelected) {
-        if (mounted) setOnedrivePath(null);
-        return;
-      }
-
-      const { data, error } = await (supabase as unknown as { from: (table: string) => Record<string, unknown> })
-        .from('client_configs')
-        .select('onedrive_claude_path')
-        .eq('client_id', currentClient.id)
-        .maybeSingle();
-
-      if (mounted) {
-        setOnedrivePath(
-          !error && data && typeof data.onedrive_claude_path === 'string'
-            ? data.onedrive_claude_path
-            : null,
-        );
-      }
-    })();
-    return () => { mounted = false; };
-  }, [currentClient?.id, isAllClientsSelected]);
 
   /* ---------- Fetch Figma folders from DB cache ---------- */
   useEffect(() => {
@@ -266,7 +218,7 @@ export default function Assets() {
             <h1 className="text-2xl font-bold text-foreground">Assets</h1>
           </div>
           <p className="text-muted-foreground mt-1">
-            Brand kit, Figma projects, and deliverables for{' '}
+            Brand kit and Figma projects for{' '}
             {isAllClientsSelected ? 'all clients' : currentClient?.name ?? 'selected client'}.
           </p>
         </div>
@@ -429,136 +381,6 @@ export default function Assets() {
                 </div>
               </div>
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* ============================================================ */}
-      {/*  DELIVERABLES (from deliverables table + OneDrive path)      */}
-      {/* ============================================================ */}
-      <div className="bg-card rounded-xl border border-border p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <FileText className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold">Livrables</h2>
-          <Badge variant="secondary">{deliverables?.length ?? 0} documents</Badge>
-          <Link
-            to="/deliverables"
-            className="ml-auto text-xs text-primary hover:underline flex items-center gap-1"
-          >
-            Voir tous les livrables
-            <ArrowRight className="w-3 h-3" />
-          </Link>
-        </div>
-
-        {/* OneDrive path indicator */}
-        {onedrivePath && (
-          <div className="flex items-center gap-2 mb-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30 px-3 py-2">
-            <CloudIcon className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-            <p className="text-xs text-blue-700 dark:text-blue-300 truncate">
-              OneDrive: <span className="font-medium">{onedrivePath}</span>
-            </p>
-          </div>
-        )}
-
-        {deliverablesLoading ? (
-          <p className="text-sm text-muted-foreground animate-pulse">Loading deliverables...</p>
-        ) : !deliverables || deliverables.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No deliverables yet for this client.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">
-                    Title
-                  </th>
-                  <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">
-                    Type
-                  </th>
-                  <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">
-                    Status
-                  </th>
-                  <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">
-                    Date
-                  </th>
-                  <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">
-                    Links
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {deliverables.map((d) => {
-                  const sharepoint = d.sharepoint_url;
-                  const notion = d.notion_url;
-                  const hasLink = !!sharepoint || !!notion;
-                  return (
-                    <tr key={d.id} className="border-b border-border last:border-0 hover:bg-muted/50">
-                      <td className="px-3 py-2.5">
-                        <p className="text-sm font-medium truncate max-w-xs">
-                          {d.title ?? d.filename ?? 'Untitled'}
-                        </p>
-                        {d.filename && d.title && (
-                          <p className="text-[11px] text-muted-foreground truncate max-w-xs">{d.filename}</p>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Badge variant="secondary" className="text-[10px]">
-                          {DELIVERABLE_TYPE_LABELS[d.type] ?? d.type}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Badge
-                          variant="outline"
-                          className={
-                            d.status === 'delivered'
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px]'
-                              : d.status === 'draft'
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]'
-                                : 'text-[10px]'
-                          }
-                        >
-                          {d.status}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(d.created_at).toLocaleDateString('fr-FR')}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          {sharepoint && (
-                            <a
-                              href={sharepoint}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-primary hover:underline flex items-center gap-1"
-                            >
-                              <CloudIcon className="w-3 h-3" />
-                              SharePoint
-                            </a>
-                          )}
-                          {notion && (
-                            <a
-                              href={notion}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-primary hover:underline flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              Notion
-                            </a>
-                          )}
-                          {!hasLink && (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           </div>
         )}
       </div>

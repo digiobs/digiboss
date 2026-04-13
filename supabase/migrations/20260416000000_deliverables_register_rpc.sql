@@ -1,10 +1,10 @@
 -- Deliverables registry + register_deliverable RPC
 --
--- The `deliverables` table already exists in production (created ad-hoc by an
--- earlier iteration) but was never versioned. This migration brings it into
--- source control using `CREATE TABLE IF NOT EXISTS` so re-running is a no-op
--- on environments where it already exists. The RPC is defined with
--- `CREATE OR REPLACE` so redeploys are safe.
+-- The `deliverables` table already exists in production (created ad-hoc in an
+-- earlier iteration) and uses `client_id text` to mirror `clients.id` which is
+-- also `text` (kebab-cased slug, e.g. "agro-bio"). This migration is written to
+-- be safe on environments where the table already exists (IF NOT EXISTS) and to
+-- idempotently (re)create the upsert RPC + unique indexes it relies on.
 --
 -- See docs/deliverables-routing.md for the human-readable procedure.
 
@@ -12,7 +12,7 @@
 
 CREATE TABLE IF NOT EXISTS public.deliverables (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  client_id text NOT NULL,
 
   -- Classification
   type text NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.deliverables (
   sub_type text,
   channel text,
   period text,            -- yyyy-mm
-  tags text[],
+  tags text[] DEFAULT '{}'::text[],
 
   -- Content metadata
   filename text NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.deliverables (
   status text NOT NULL DEFAULT 'delivered',
 
   -- Physical destinations (exactly one of storage_path / onedrive_path is set)
-  storage_bucket text,
+  storage_bucket text DEFAULT 'deliverables',
   storage_path text,
   onedrive_path text,
   sharepoint_url text,
@@ -40,11 +40,11 @@ CREATE TABLE IF NOT EXISTS public.deliverables (
 
   -- File attributes
   file_size bigint,
-  content_type text,
+  content_type text DEFAULT 'text/html',
 
   -- Production tracking
-  generation_meta jsonb,
-  generated_by text,
+  generation_meta jsonb DEFAULT '{}'::jsonb,
+  generated_by text DEFAULT 'cowork',
   error_message text,
   version integer DEFAULT 1,
 
@@ -66,12 +66,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_deliverables_client_storage_path
 CREATE UNIQUE INDEX IF NOT EXISTS ux_deliverables_client_onedrive_path
   ON public.deliverables (client_id, onedrive_path)
   WHERE onedrive_path IS NOT NULL;
-
-CREATE INDEX IF NOT EXISTS idx_deliverables_client_created
-  ON public.deliverables (client_id, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_deliverables_type
-  ON public.deliverables (type);
 
 CREATE INDEX IF NOT EXISTS idx_deliverables_skill
   ON public.deliverables (skill_name);
@@ -96,9 +90,19 @@ CREATE TRIGGER deliverables_updated_at
 -- Idempotent upsert entry point used by skill producers and by the
 -- `index-deliverables` edge function. Keyed on (client_id, storage_path) for
 -- Supabase-hosted files and (client_id, onedrive_path) for OneDrive.
+--
+-- `client_id` is TEXT (not uuid) — it matches the kebab-cased slug used for
+-- `public.clients.id`.
+
+-- Drop the legacy ad-hoc version (different arg order, no return contract)
+-- so the CREATE OR REPLACE below succeeds.
+DROP FUNCTION IF EXISTS public.register_deliverable(
+  text, text, text, text, text, text, text, text, text, bigint,
+  text, text, text, text, text, text, text[], jsonb, text, text
+);
 
 CREATE OR REPLACE FUNCTION public.register_deliverable(
-  p_client_id       uuid,
+  p_client_id       text,
   p_type            text,
   p_filename        text,
   p_title           text    DEFAULT NULL,
@@ -126,13 +130,14 @@ AS $$
 DECLARE
   v_id uuid;
   v_action text;
+  v_created timestamptz;
+  v_updated timestamptz;
 BEGIN
   IF p_storage_path IS NULL AND p_onedrive_path IS NULL THEN
     RAISE EXCEPTION 'register_deliverable: either p_storage_path or p_onedrive_path must be provided';
   END IF;
 
   IF p_storage_path IS NOT NULL THEN
-    -- Upsert on (client_id, storage_path)
     INSERT INTO public.deliverables (
       client_id, type, skill_name, sub_type, channel, period, tags,
       filename, title, description, status,
@@ -166,9 +171,8 @@ BEGIN
       generated_by    = COALESCE(EXCLUDED.generated_by,   public.deliverables.generated_by),
       sharepoint_url  = COALESCE(EXCLUDED.sharepoint_url, public.deliverables.sharepoint_url),
       updated_at      = now()
-    RETURNING id INTO v_id;
+    RETURNING id, created_at, updated_at INTO v_id, v_created, v_updated;
   ELSE
-    -- Upsert on (client_id, onedrive_path)
     INSERT INTO public.deliverables (
       client_id, type, skill_name, sub_type, channel, period, tags,
       filename, title, description, status,
@@ -202,41 +206,26 @@ BEGIN
       generated_by    = COALESCE(EXCLUDED.generated_by,   public.deliverables.generated_by),
       sharepoint_url  = COALESCE(EXCLUDED.sharepoint_url, public.deliverables.sharepoint_url),
       updated_at      = now()
-    RETURNING id INTO v_id;
+    RETURNING id, created_at, updated_at INTO v_id, v_created, v_updated;
   END IF;
 
-  SELECT CASE WHEN created_at = updated_at THEN 'inserted' ELSE 'updated' END
-    INTO v_action
-  FROM public.deliverables
-  WHERE id = v_id;
+  v_action := CASE WHEN v_created = v_updated THEN 'inserted' ELSE 'updated' END;
 
   RETURN jsonb_build_object('id', v_id, 'action', v_action);
 END $$;
 
 GRANT EXECUTE ON FUNCTION public.register_deliverable(
-  uuid, text, text, text, text, text, text, text, text, text, text[],
+  text, text, text, text, text, text, text, text, text, text, text[],
   text, text, text, text, text, bigint, text, jsonb, text
 ) TO service_role, authenticated;
 
 -- 5. RLS ---------------------------------------------------------------------
--- Mirror the existing (undocumented) policies : clients see only their own
--- deliverables; digiobs admins see everything.
-
+-- RLS is already enabled in production with the following policies, which we
+-- do not re-create here to avoid clobbering existing access control:
+--   - admin_full_access   (ALL  USING is_digiobs_admin())
+--   - client_read_own     (READ USING client_id IN user_client_ids() AND NOT is_archived)
+--   - anon_read           (READ USING NOT is_archived)
+--   - service_role_full_access (ALL USING true)
+--
+-- Just ensure RLS is on for environments where the table is freshly created.
 ALTER TABLE public.deliverables ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "deliverables_select_own_or_admin" ON public.deliverables;
-CREATE POLICY "deliverables_select_own_or_admin"
-  ON public.deliverables FOR SELECT
-  USING (
-    public.is_digiobs_admin(auth.uid())
-    OR client_id IN (
-      SELECT tm.client_id FROM public.team_members tm
-      WHERE tm.auth_user_id = auth.uid()
-    )
-  );
-
-DROP POLICY IF EXISTS "deliverables_write_service_role_only" ON public.deliverables;
-CREATE POLICY "deliverables_write_service_role_only"
-  ON public.deliverables FOR ALL
-  USING (auth.role() = 'service_role')
-  WITH CHECK (auth.role() = 'service_role');

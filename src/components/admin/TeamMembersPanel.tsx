@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, Loader2, Shield, UserCog, Trash2, Mail, KeyRound, Lock } from 'lucide-react';
+import {
+  Users,
+  Plus,
+  Loader2,
+  Shield,
+  Trash2,
+  Mail,
+  KeyRound,
+  Lock,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -44,21 +53,177 @@ type Profile = {
   created_at: string;
 };
 
+type BusyKind = 'role' | 'reset' | 'password' | 'delete' | null;
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function ProfileCard({
+  profile,
+  onRoleChange,
+  onSendReset,
+  onSetPassword,
+  onDelete,
+}: {
+  profile: Profile;
+  onRoleChange: (role: 'team_member' | 'admin') => Promise<void>;
+  onSendReset: () => Promise<void>;
+  onSetPassword: (pwd: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState<BusyKind>(null);
+
+  const run = async (kind: Exclude<BusyKind, null>, fn: () => Promise<void>) => {
+    setBusy(kind);
+    try {
+      await fn();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const isBusy = busy !== null;
+
+  return (
+    <div className="rounded-lg border border-border bg-background p-4 space-y-4">
+      {/* Header: avatar + name/email + delete */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <span className="text-sm font-semibold text-primary">
+              {initials(profile.full_name)}
+            </span>
+          </div>
+          <div className="min-w-0">
+            <p className="font-medium truncate">{profile.full_name}</p>
+            <p className="text-sm text-muted-foreground truncate">
+              {profile.email}
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:text-destructive shrink-0"
+          disabled={isBusy}
+          onClick={() => run('delete', onDelete)}
+        >
+          {busy === 'delete' ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Trash2 className="w-4 h-4" />
+          )}
+          <span className="ml-1.5">Supprimer</span>
+        </Button>
+      </div>
+
+      {/* Fields */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {/* Role */}
+        <div className="space-y-1.5">
+          <Label className="text-xs flex items-center gap-1.5">
+            <Shield className="w-3 h-3" />
+            Rôle
+          </Label>
+          <Select
+            value={profile.role}
+            disabled={isBusy}
+            onValueChange={(v) =>
+              run('role', () => onRoleChange(v as 'team_member' | 'admin'))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="team_member">Membre</SelectItem>
+              <SelectItem value="admin">Administrateur</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Reset email */}
+        <div className="space-y-1.5">
+          <Label className="text-xs flex items-center gap-1.5">
+            <KeyRound className="w-3 h-3" />
+            Réinitialisation par email
+          </Label>
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            disabled={isBusy}
+            onClick={() => run('reset', onSendReset)}
+          >
+            {busy === 'reset' ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Mail className="w-4 h-4 mr-2" />
+            )}
+            Envoyer l'email
+          </Button>
+        </div>
+
+        {/* Direct password */}
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label
+            htmlFor={`pwd-${profile.id}`}
+            className="text-xs flex items-center gap-1.5"
+          >
+            <Lock className="w-3 h-3" />
+            Nouveau mot de passe (sans email)
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id={`pwd-${profile.id}`}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Min. 6 caractères"
+              disabled={isBusy}
+            />
+            <Button
+              variant="secondary"
+              disabled={isBusy || password.trim().length < 6}
+              onClick={async () => {
+                await run('password', () => onSetPassword(password.trim()));
+                setPassword('');
+              }}
+            >
+              {busy === 'password' ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Lock className="w-4 h-4 mr-2" />
+              )}
+              Enregistrer
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TeamMembersPanel() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
-  const [inviteRole, setInviteRole] = useState<'team_member' | 'admin'>('team_member');
+  const [inviteRole, setInviteRole] = useState<'team_member' | 'admin'>(
+    'team_member',
+  );
   const [invitePassword, setInvitePassword] = useState('');
-  const [inviteMethod, setInviteMethod] = useState<'invite' | 'password'>('invite');
+  const [inviteMethod, setInviteMethod] = useState<'invite' | 'password'>(
+    'invite',
+  );
   const [isSending, setIsSending] = useState(false);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [passwordTarget, setPasswordTarget] = useState<Profile | null>(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   const fetchProfiles = useCallback(async () => {
     setIsLoading(true);
@@ -83,7 +248,7 @@ export function TeamMembersPanel() {
     const email = inviteEmail.trim();
     const name = inviteName.trim();
     if (!email) {
-      toast.error('L\'email est requis');
+      toast.error("L'email est requis");
       return;
     }
     if (!name) {
@@ -139,47 +304,23 @@ export function TeamMembersPanel() {
     }
   };
 
-  const openPasswordDialog = (profile: Profile) => {
-    setPasswordTarget(profile);
-    setNewPassword('');
-    setPasswordDialogOpen(true);
-  };
+  const handleRoleChange = async (
+    profileId: string,
+    newRole: 'team_member' | 'admin',
+  ) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: newRole })
+      .eq('id', profileId);
 
-  const handleSetPassword = async () => {
-    if (!passwordTarget) return;
-    const pwd = newPassword.trim();
-    if (pwd.length < 6) {
-      toast.error('Le mot de passe doit contenir au moins 6 caractères');
+    if (error) {
+      toast.error('Impossible de changer le rôle');
       return;
     }
-    setIsUpdatingPassword(true);
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        'invite-team-member',
-        {
-          body: {
-            action: 'set_password',
-            userId: passwordTarget.id,
-            password: pwd,
-          },
-        },
-      );
-      if (error) throw error;
-      const payload = data as { error?: string };
-      if (payload?.error) throw new Error(payload.error);
-
-      toast.success(
-        `Mot de passe mis à jour pour ${passwordTarget.full_name}`,
-      );
-      setPasswordDialogOpen(false);
-      setPasswordTarget(null);
-      setNewPassword('');
-    } catch (err) {
-      const message = await extractEdgeFunctionError(err);
-      toast.error(`Mise à jour impossible : ${message}`);
-    } finally {
-      setIsUpdatingPassword(false);
-    }
+    setProfiles((prev) =>
+      prev.map((p) => (p.id === profileId ? { ...p, role: newRole } : p)),
+    );
+    toast.success('Rôle mis à jour');
   };
 
   const handleSendReset = async (targetEmail: string) => {
@@ -195,22 +336,31 @@ export function TeamMembersPanel() {
     }
   };
 
-  const handleRoleChange = async (profileId: string, newRole: 'team_member' | 'admin') => {
-    setUpdatingId(profileId);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', profileId);
-
-    if (error) {
-      toast.error('Impossible de changer le rôle');
-    } else {
-      setProfiles((prev) =>
-        prev.map((p) => (p.id === profileId ? { ...p, role: newRole } : p)),
-      );
-      toast.success('Rôle mis à jour');
+  const handleSetPassword = async (profile: Profile, pwd: string) => {
+    if (pwd.length < 6) {
+      toast.error('Le mot de passe doit contenir au moins 6 caractères');
+      return;
     }
-    setUpdatingId(null);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'invite-team-member',
+        {
+          body: {
+            action: 'set_password',
+            userId: profile.id,
+            password: pwd,
+          },
+        },
+      );
+      if (error) throw error;
+      const payload = data as { error?: string };
+      if (payload?.error) throw new Error(payload.error);
+
+      toast.success(`Mot de passe mis à jour pour ${profile.full_name}`);
+    } catch (err) {
+      const message = await extractEdgeFunctionError(err);
+      toast.error(`Mise à jour impossible : ${message}`);
+    }
   };
 
   const handleDelete = async (profile: Profile) => {
@@ -222,7 +372,6 @@ export function TeamMembersPanel() {
       return;
     }
 
-    setUpdatingId(profile.id);
     try {
       const { data, error } = await supabase.functions.invoke(
         'invite-team-member',
@@ -237,20 +386,8 @@ export function TeamMembersPanel() {
     } catch (err) {
       const message = await extractEdgeFunctionError(err);
       toast.error(`Suppression impossible : ${message}`);
-    } finally {
-      setUpdatingId(null);
     }
   };
-
-  const roleBadge = (role: string) =>
-    role === 'admin' ? (
-      <Badge className="bg-primary/10 text-primary border-primary/20">
-        <Shield className="w-3 h-3 mr-1" />
-        Admin
-      </Badge>
-    ) : (
-      <Badge variant="secondary">Membre</Badge>
-    );
 
   return (
     <>
@@ -276,87 +413,16 @@ export function TeamMembersPanel() {
             Aucun membre d'équipe. Cliquez "Inviter" pour en ajouter.
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="p-4 space-y-3">
             {profiles.map((p) => (
-              <div
+              <ProfileCard
                 key={p.id}
-                className="p-4 flex items-center justify-between hover:bg-muted/50 group"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-semibold text-primary">
-                      {p.full_name
-                        .split(' ')
-                        .map((w) => w[0])
-                        .join('')
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{p.full_name}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {p.email}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {roleBadge(p.role)}
-
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      title="Envoyer un email de réinitialisation"
-                      disabled={updatingId === p.id}
-                      onClick={() => handleSendReset(p.email)}
-                    >
-                      <KeyRound className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      title="Définir un mot de passe (sans email)"
-                      disabled={updatingId === p.id}
-                      onClick={() => openPasswordDialog(p)}
-                    >
-                      <Lock className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      title={
-                        p.role === 'admin'
-                          ? 'Rétrograder en membre'
-                          : 'Promouvoir admin'
-                      }
-                      disabled={updatingId === p.id}
-                      onClick={() =>
-                        handleRoleChange(
-                          p.id,
-                          p.role === 'admin' ? 'team_member' : 'admin',
-                        )
-                      }
-                    >
-                      <UserCog className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      title="Supprimer"
-                      disabled={updatingId === p.id}
-                      onClick={() => handleDelete(p)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+                profile={p}
+                onRoleChange={(role) => handleRoleChange(p.id, role)}
+                onSendReset={() => handleSendReset(p.email)}
+                onSetPassword={(pwd) => handleSetPassword(p, pwd)}
+                onDelete={() => handleDelete(p)}
+              />
             ))}
           </div>
         )}
@@ -443,58 +509,9 @@ export function TeamMembersPanel() {
             </Button>
             <Button onClick={handleInvite} disabled={isSending}>
               {isSending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {inviteMethod === 'invite' ? 'Envoyer l\'invitation' : 'Créer le compte'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Set password dialog (admin, no email) */}
-      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="w-5 h-5" />
-              Définir le mot de passe
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {passwordTarget && (
-              <p className="text-sm text-muted-foreground">
-                Pour{' '}
-                <span className="font-medium text-foreground">
-                  {passwordTarget.full_name}
-                </span>{' '}
-                ({passwordTarget.email})
-              </p>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="set-password">Nouveau mot de passe</Label>
-              <Input
-                id="set-password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Min. 6 caractères"
-                autoFocus
-              />
-              <p className="text-xs text-muted-foreground">
-                Aucun email envoyé. Communiquez le mot de passe manuellement à l'utilisateur.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setPasswordDialogOpen(false)}
-            >
-              Annuler
-            </Button>
-            <Button onClick={handleSetPassword} disabled={isUpdatingPassword}>
-              {isUpdatingPassword && (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              )}
-              Enregistrer
+              {inviteMethod === 'invite'
+                ? "Envoyer l'invitation"
+                : 'Créer le compte'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -53,7 +53,7 @@ type Profile = {
   created_at: string;
 };
 
-type BusyKind = 'role' | 'reset' | 'password' | 'delete' | null;
+type BusyKind = 'role' | 'reset' | 'password' | 'delete' | 'profile' | null;
 
 function initials(name: string): string {
   return name
@@ -69,16 +69,25 @@ function ProfileCard({
   onRoleChange,
   onSendReset,
   onSetPassword,
+  onUpdateProfile,
   onDelete,
 }: {
   profile: Profile;
   onRoleChange: (role: 'team_member' | 'admin') => Promise<void>;
   onSendReset: () => Promise<void>;
   onSetPassword: (pwd: string) => Promise<void>;
+  onUpdateProfile: (fullName: string, email: string) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState(profile.full_name);
+  const [email, setEmail] = useState(profile.email);
   const [busy, setBusy] = useState<BusyKind>(null);
+
+  useEffect(() => {
+    setFullName(profile.full_name);
+    setEmail(profile.email);
+  }, [profile.full_name, profile.email]);
 
   const run = async (kind: Exclude<BusyKind, null>, fn: () => Promise<void>) => {
     setBusy(kind);
@@ -90,22 +99,81 @@ function ProfileCard({
   };
 
   const isBusy = busy !== null;
+  const profileDirty =
+    fullName.trim() !== profile.full_name || email.trim() !== profile.email;
 
   return (
     <div className="rounded-lg border border-border bg-background p-4 space-y-4">
-      {/* Header: avatar + name/email + delete */}
+      {/* Header: avatar + editable name/email + delete */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
             <span className="text-sm font-semibold text-primary">
-              {initials(profile.full_name)}
+              {initials(fullName || profile.full_name)}
             </span>
           </div>
-          <div className="min-w-0">
-            <p className="font-medium truncate">{profile.full_name}</p>
-            <p className="text-sm text-muted-foreground truncate">
-              {profile.email}
-            </p>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="space-y-1">
+              <Label
+                htmlFor={`name-${profile.id}`}
+                className="text-xs text-muted-foreground"
+              >
+                Nom complet
+              </Label>
+              <Input
+                id={`name-${profile.id}`}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={isBusy}
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label
+                htmlFor={`email-${profile.id}`}
+                className="text-xs text-muted-foreground"
+              >
+                Email
+              </Label>
+              <Input
+                id={`email-${profile.id}`}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isBusy}
+                className="h-9"
+              />
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={isBusy || !profileDirty}
+                onClick={() =>
+                  run('profile', () =>
+                    onUpdateProfile(fullName.trim(), email.trim()),
+                  )
+                }
+              >
+                {busy === 'profile' ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : null}
+                Enregistrer
+              </Button>
+              {profileDirty && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={isBusy}
+                  onClick={() => {
+                    setFullName(profile.full_name);
+                    setEmail(profile.email);
+                  }}
+                >
+                  Annuler
+                </Button>
+              )}
+            </div>
           </div>
         </div>
         <Button
@@ -336,6 +404,55 @@ export function TeamMembersPanel() {
     }
   };
 
+  const handleUpdateProfile = async (
+    profile: Profile,
+    fullName: string,
+    email: string,
+  ) => {
+    const trimmedName = fullName.trim();
+    const trimmedEmail = email.trim();
+    if (!trimmedName) {
+      toast.error('Le nom ne peut pas être vide');
+      return;
+    }
+    if (!trimmedEmail) {
+      toast.error("L'email ne peut pas être vide");
+      return;
+    }
+    const nameChanged = trimmedName !== profile.full_name;
+    const emailChanged = trimmedEmail !== profile.email;
+    if (!nameChanged && !emailChanged) return;
+
+    try {
+      const body: Record<string, unknown> = {
+        action: 'update_user',
+        userId: profile.id,
+      };
+      if (nameChanged) body.full_name = trimmedName;
+      if (emailChanged) body.email = trimmedEmail;
+
+      const { data, error } = await supabase.functions.invoke(
+        'invite-team-member',
+        { body },
+      );
+      if (error) throw error;
+      const payload = data as { error?: string };
+      if (payload?.error) throw new Error(payload.error);
+
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.id === profile.id
+            ? { ...p, full_name: trimmedName, email: trimmedEmail }
+            : p,
+        ),
+      );
+      toast.success(`${trimmedName} a été mis à jour`);
+    } catch (err) {
+      const message = await extractEdgeFunctionError(err);
+      toast.error(`Mise à jour impossible : ${message}`);
+    }
+  };
+
   const handleSetPassword = async (profile: Profile, pwd: string) => {
     if (pwd.length < 6) {
       toast.error('Le mot de passe doit contenir au moins 6 caractères');
@@ -421,6 +538,9 @@ export function TeamMembersPanel() {
                 onRoleChange={(role) => handleRoleChange(p.id, role)}
                 onSendReset={() => handleSendReset(p.email)}
                 onSetPassword={(pwd) => handleSetPassword(p, pwd)}
+                onUpdateProfile={(name, email) =>
+                  handleUpdateProfile(p, name, email)
+                }
                 onDelete={() => handleDelete(p)}
               />
             ))}

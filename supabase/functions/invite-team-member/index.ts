@@ -89,6 +89,69 @@ serve(async (req) => {
       );
     }
 
+    // ── UPDATE USER (name / email) ──────────────────────────
+    if (action === "update_user") {
+      const userId: string | undefined = body?.userId;
+      const newEmail: string | undefined = body?.email?.trim();
+      const newFullName: string | undefined = body?.full_name?.trim();
+
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: "userId is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (!newEmail && !newFullName) {
+        return new Response(
+          JSON.stringify({ error: "nothing to update (email or full_name required)" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const authAttrs: Record<string, unknown> = {};
+      if (newEmail) authAttrs.email = newEmail;
+      if (newFullName) authAttrs.user_metadata = { full_name: newFullName };
+
+      const { error: authError } = await supabase.auth.admin.updateUserById(
+        userId,
+        authAttrs,
+      );
+      if (authError) {
+        console.error("[invite-team-member] updateUserById error:", authError);
+        return new Response(
+          JSON.stringify({ error: authError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const profileUpdate: Record<string, string> = {};
+      if (newEmail) profileUpdate.email = newEmail;
+      if (newFullName) profileUpdate.full_name = newFullName;
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update(profileUpdate)
+        .eq("id", userId);
+
+      if (profileError) {
+        console.error("[invite-team-member] profiles update error:", profileError);
+        return new Response(
+          JSON.stringify({ error: profileError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          status: "updated",
+          userId,
+          email: newEmail,
+          full_name: newFullName,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // ── CREATE / INVITE ─────────────────────────────────────
     // Two sub-modes:
     //   - `method: 'password'` (default) → admin.createUser with an

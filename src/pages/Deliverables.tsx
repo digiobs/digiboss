@@ -13,7 +13,10 @@ import {
   Zap,
   Layers,
   RefreshCw,
+  Database,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +65,7 @@ export default function Deliverables() {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [reindexing, setReindexing] = useState(false);
 
   const clientFilter = isAllClientsSelected ? null : (currentClient?.id ?? null);
   const { data: deliverables = [], isLoading, refetch } = useDeliverables({ clientId: clientFilter, type: selectedType });
@@ -70,6 +74,35 @@ export default function Deliverables() {
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
+  };
+
+  const handleReindex = async () => {
+    setReindexing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('index-deliverables', { body: {} });
+      if (error) throw error;
+      const payload = data as {
+        indexed?: number;
+        updated?: number;
+        skipped?: number;
+        errors?: Array<{ path: string; error: string }>;
+        supabase_matched?: number;
+        onedrive_matched?: number;
+      } | null;
+      const indexed = payload?.indexed ?? 0;
+      const updated = payload?.updated ?? 0;
+      const skipped = payload?.skipped ?? 0;
+      const errorCount = payload?.errors?.length ?? 0;
+      toast.success(
+        `Réindexation : ${indexed} nouveaux, ${updated} mis à jour, ${skipped} ignorés${errorCount ? `, ${errorCount} erreurs` : ''}`,
+      );
+      await refetch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+      toast.error(`Échec de la réindexation : ${msg}`);
+    } finally {
+      setReindexing(false);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -113,10 +146,22 @@ export default function Deliverables() {
           </p>
         </div>
         {isAdmin && (
-          <Button variant="outline" className="gap-2" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Refreshing...' : 'Refresh Data'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={handleReindex}
+              disabled={reindexing || refreshing}
+              title="Balayer Supabase Storage + OneDrive et réenregistrer tous les livrables"
+            >
+              <Database className={`w-4 h-4 ${reindexing ? 'animate-pulse' : ''}`} />
+              {reindexing ? 'Réindexation...' : 'Réindexer'}
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={handleRefresh} disabled={refreshing || reindexing}>
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh Data'}
+            </Button>
+          </div>
         )}
       </div>
 

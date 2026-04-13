@@ -312,6 +312,10 @@ serve(async (req) => {
     const clientId = (body?.clientId as string | undefined) ?? null;
     const limit = Math.min(Math.max(Number(body?.limit ?? 50), 1), 200);
     const useClaudeSummary = Boolean(body?.useClaudeSummary ?? true);
+    // When draining a backlog, set `onlyPending: true` to skip rows that are
+    // already `ready` or `failed`. Without this, the default ordering keeps
+    // re-syncing the same N most-recent meetings.
+    const onlyPending = Boolean(body?.onlyPending ?? false);
     runStartedAt = Date.now();
 
     const TLDV_API_KEY = Deno.env.get("TLDV_API_KEY") ?? Deno.env.get("TLDV_ACCESS_TOKEN") ?? null;
@@ -322,7 +326,7 @@ serve(async (req) => {
       connector: "meetings",
       clientId,
       triggerType: "manual",
-      requestPayload: { limit, hasApiKey: Boolean(TLDV_API_KEY), useClaudeSummary },
+      requestPayload: { limit, hasApiKey: Boolean(TLDV_API_KEY), useClaudeSummary, onlyPending },
     });
 
     let query = supabase
@@ -331,6 +335,10 @@ serve(async (req) => {
       .order("happened_at", { ascending: false })
       .limit(limit);
     if (clientId) query = query.eq("client_id", clientId);
+    if (onlyPending) {
+      // Rows that have never been enriched (status null or still 'processing').
+      query = query.or("transcript_status.is.null,transcript_status.eq.processing");
+    }
 
     const { data: meetings, error: meetingsError } = await query;
     if (meetingsError) throw new Error(`Failed to read tldv_meetings: ${meetingsError.message}`);

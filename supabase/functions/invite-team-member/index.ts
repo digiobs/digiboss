@@ -55,6 +55,40 @@ serve(async (req) => {
       );
     }
 
+    // ── SET PASSWORD (admin-initiated, no email) ────────────
+    if (action === "set_password") {
+      const userId: string | undefined = body?.userId;
+      const newPassword: string | undefined = body?.password?.trim();
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: "userId is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (!newPassword || newPassword.length < 6) {
+        return new Response(
+          JSON.stringify({ error: "password must be at least 6 characters" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { error } = await supabase.auth.admin.updateUserById(userId, {
+        password: newPassword,
+      });
+      if (error) {
+        console.error("[invite-team-member] updateUserById error:", error);
+        return new Response(
+          JSON.stringify({ error: error.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ status: "password_updated", userId }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // ── CREATE / INVITE ─────────────────────────────────────
     // Two sub-modes:
     //   - `method: 'password'` (default) → admin.createUser with an

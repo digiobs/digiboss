@@ -55,15 +55,51 @@ serve(async (req) => {
       );
     }
 
-    // ── CREATE ──────────────────────────────────────────────
+    // ── CREATE / INVITE ─────────────────────────────────────
+    // Two sub-modes:
+    //   - `method: 'password'` (default) → admin.createUser with an
+    //     explicit initial password. No email is sent.
+    //   - `method: 'invite'` → admin.inviteUserByEmail. Supabase sends
+    //     the built-in invite email through whatever SMTP transport is
+    //     configured in the Supabase dashboard (Authentication → SMTP).
     const email: string | undefined = body?.email?.trim();
     const fullName: string | undefined = body?.full_name?.trim();
     const role: string = body?.role ?? "team_member";
+    const method: "password" | "invite" =
+      body?.method === "invite" ? "invite" : "password";
     const password: string | undefined = body?.password?.trim();
+    const redirectTo: string | undefined = body?.redirect_to?.trim();
 
     if (!email || !fullName) {
       return new Response(
         JSON.stringify({ error: "email and full_name are required" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (method === "invite") {
+      // Send invite email — user sets their own password via the
+      // magic link and lands on /reset-password.
+      const { data, error } = await supabase.auth.admin.inviteUserByEmail(
+        email,
+        {
+          data: { full_name: fullName, role },
+          redirectTo,
+        },
+      );
+
+      if (error) {
+        return new Response(
+          JSON.stringify({ error: error.message }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          status: "invited",
+          user: { id: data.user?.id, email: data.user?.email },
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

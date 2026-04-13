@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, Loader2, Shield, UserCog, Trash2, Mail } from 'lucide-react';
+import { Users, Plus, Loader2, Shield, UserCog, Trash2, Mail, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -38,6 +39,7 @@ export function TeamMembersPanel() {
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<'team_member' | 'admin'>('team_member');
   const [invitePassword, setInvitePassword] = useState('');
+  const [inviteMethod, setInviteMethod] = useState<'invite' | 'password'>('invite');
   const [isSending, setIsSending] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -71,41 +73,65 @@ export function TeamMembersPanel() {
       toast.error('Le nom est requis');
       return;
     }
+
     const password = invitePassword.trim();
-    if (!password || password.length < 6) {
+    if (inviteMethod === 'password' && (!password || password.length < 6)) {
       toast.error('Le mot de passe doit contenir au moins 6 caractères');
       return;
     }
 
     setIsSending(true);
     try {
+      const body: Record<string, unknown> = {
+        email,
+        full_name: name,
+        role: inviteRole,
+        method: inviteMethod,
+      };
+      if (inviteMethod === 'password') {
+        body.password = password;
+      } else {
+        body.redirect_to = `${window.location.origin}/reset-password`;
+      }
+
       const { data, error } = await supabase.functions.invoke(
         'invite-team-member',
-        {
-          body: {
-            email,
-            full_name: name,
-            role: inviteRole,
-            password,
-          },
-        },
+        { body },
       );
       if (error) throw error;
       const payload = data as { error?: string; user?: { id: string } };
       if (payload?.error) throw new Error(payload.error);
 
-      toast.success(`${name} a été ajouté(e) à l'équipe`);
+      toast.success(
+        inviteMethod === 'invite'
+          ? `Invitation envoyée à ${email}`
+          : `${name} a été ajouté(e) à l'équipe`,
+      );
       setIsInviteOpen(false);
       setInviteEmail('');
       setInviteName('');
       setInvitePassword('');
       setInviteRole('team_member');
+      setInviteMethod('invite');
       await fetchProfiles();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur inconnue';
       toast.error(`Impossible d'inviter : ${message}`);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleSendReset = async (targetEmail: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success(`Email de réinitialisation envoyé à ${targetEmail}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      toast.error(`Envoi impossible : ${message}`);
     }
   };
 
@@ -223,6 +249,16 @@ export function TeamMembersPanel() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
+                      title="Envoyer un email de réinitialisation"
+                      disabled={updatingId === p.id}
+                      onClick={() => handleSendReset(p.email)}
+                    >
+                      <KeyRound className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
                       title={
                         p.role === 'admin'
                           ? 'Rétrograder en membre'
@@ -266,6 +302,34 @@ export function TeamMembersPanel() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            <Tabs
+              value={inviteMethod}
+              onValueChange={(v) => setInviteMethod(v as 'invite' | 'password')}
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="invite">Email d'invitation</TabsTrigger>
+                <TabsTrigger value="password">Mot de passe initial</TabsTrigger>
+              </TabsList>
+              <TabsContent value="invite" className="pt-2">
+                <p className="text-xs text-muted-foreground">
+                  Un email sera envoyé avec un lien pour définir le mot de passe.
+                </p>
+              </TabsContent>
+              <TabsContent value="password" className="pt-2 space-y-2">
+                <Label htmlFor="invite-password">Mot de passe initial</Label>
+                <Input
+                  id="invite-password"
+                  type="password"
+                  value={invitePassword}
+                  onChange={(e) => setInvitePassword(e.target.value)}
+                  placeholder="Min. 6 caractères"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Aucun email envoyé. Communiquez le mot de passe manuellement.
+                </p>
+              </TabsContent>
+            </Tabs>
+
             <div className="space-y-2">
               <Label htmlFor="invite-name">Nom complet</Label>
               <Input
@@ -283,16 +347,6 @@ export function TeamMembersPanel() {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="prenom@digiobs.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invite-password">Mot de passe initial</Label>
-              <Input
-                id="invite-password"
-                type="password"
-                value={invitePassword}
-                onChange={(e) => setInvitePassword(e.target.value)}
-                placeholder="Min. 6 caractères"
               />
             </div>
             <div className="space-y-2">
@@ -319,7 +373,7 @@ export function TeamMembersPanel() {
             </Button>
             <Button onClick={handleInvite} disabled={isSending}>
               {isSending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Créer le compte
+              {inviteMethod === 'invite' ? 'Envoyer l\'invitation' : 'Créer le compte'}
             </Button>
           </DialogFooter>
         </DialogContent>

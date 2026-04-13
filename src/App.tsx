@@ -11,6 +11,7 @@ import { TeamAuthProvider, useTeamAuth } from "@/contexts/TeamAuthContext";
 import { TeamAuthGate } from "@/components/auth/TeamAuthGate";
 import Landing from "@/pages/Landing";
 import Auth from "@/pages/Auth";
+import ResetPassword from "@/pages/ResetPassword";
 import PreLogin from "@/pages/PreLogin";
 import MyWork from "@/pages/MyWork";
 import Home from "@/pages/Home";
@@ -68,6 +69,9 @@ const AppRoutes = () => {
       {/* Auth route — accessible without pre-auth so team members can
           sign in directly (e.g. from /admin/my-work redirect). */}
       <Route path="/auth" element={<Auth />} />
+
+      {/* Password reset landing for Supabase recovery & invite links */}
+      <Route path="/reset-password" element={<ResetPassword />} />
       
       {/* Redirect old dashboard route to home */}
       <Route path="/dashboard" element={<Navigate to="/home" replace />} />

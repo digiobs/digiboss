@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/table';
 import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
-import { useDeliverables, type Deliverable } from '@/hooks/useDeliverables';
+import { useDeliverables, getDeliverableUrl, type Deliverable } from '@/hooks/useDeliverables';
 
 const typeConfig: Record<string, { label: string; icon: typeof FileText; className: string }> = {
   'seo-strategy': { label: 'SEO Strategy', icon: Globe, className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
@@ -215,8 +215,19 @@ export default function Deliverables() {
               {filtered.map((d) => {
                 const config = getTypeConfig(d.type);
                 const Icon = config.icon;
+                const destination = getDeliverableUrl(d);
+                const openDestination = () => {
+                  if (destination) {
+                    window.open(destination.url, '_blank', 'noopener,noreferrer');
+                  }
+                };
                 return (
-                  <TableRow key={d.id}>
+                  <TableRow
+                    key={d.id}
+                    className={destination ? 'cursor-pointer' : undefined}
+                    onClick={destination ? openDestination : undefined}
+                    title={destination ? `Ouvrir dans ${destination.label}` : undefined}
+                  >
                     <TableCell className="text-sm">
                       {format(new Date(d.created_at), 'dd MMM yyyy', { locale: fr })}
                     </TableCell>
@@ -245,13 +256,19 @@ export default function Deliverables() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {d.notion_url && (
+                      {destination && (
                         <Button
                           variant="ghost"
                           size="sm"
                           asChild
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <a href={d.notion_url} target="_blank" rel="noopener noreferrer">
+                          <a
+                            href={destination.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Ouvrir dans ${destination.label}`}
+                          >
                             <ExternalLink className="w-4 h-4" />
                           </a>
                         </Button>

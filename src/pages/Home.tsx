@@ -6,6 +6,9 @@ import { HomeSeoSnapshot } from "@/components/home/HomeSeoSnapshot";
 import { HomeEditorialPipeline } from "@/components/home/HomeEditorialPipeline";
 import { HomeVeilleAlerts } from "@/components/home/HomeVeilleAlerts";
 import { HomeRecentMeetings } from "@/components/home/HomeRecentMeetings";
+import { HomeCalendarWeek } from "@/components/home/HomeCalendarWeek";
+import { HomeClientProposals } from "@/components/home/HomeClientProposals";
+import { HomeRecentDeliverables } from "@/components/home/HomeRecentDeliverables";
 import { type NextBestAction, dashboardKPIs } from "@/data/dashboardData";
 import { useHomeReportingKpis } from "@/hooks/useHomeData";
 import { TabDataStatusBanner } from "@/components/data/TabDataStatusBanner";
@@ -54,6 +57,146 @@ export default function Home() {
   const selectedClient = clients.find((client) => client.id === selectedClientId);
   const aiScopeLabel = isAllClientsSelected ? "global" : selectedClient?.name ?? "client";
   const aiContext = `Home dashboard generation scope: ${aiScopeLabel}. Prioritize high-impact opportunities for this scope.`;
+
+  // Client-focused homepage — shown when visibility mode is "client".
+  // Leads with calendar, last veille, and propositions awaiting decision,
+  // followed by a 2x2 grid of delivery / livrables / SEO / meetings.
+  if (!isAdmin) {
+    const clientLabel = isAllClientsSelected ? "Vue globale" : selectedClient?.name ?? "Client";
+    return (
+      <div className="space-y-6 animate-fade-in pb-6">
+        {/* Compact client hero */}
+        <div className="rounded-2xl border border-border bg-gradient-to-br from-background via-background to-primary/5 p-5 md:p-6">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              Vue client
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+                Bonjour {clientLabel}
+              </h1>
+              <p className="max-w-2xl text-sm text-muted-foreground">
+                Votre semaine, vos dernières alertes et les décisions à valider.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {heroKpis.map((kpi) => (
+              <Card key={kpi.id} className="border-border/60 bg-card/70 backdrop-blur">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-medium text-muted-foreground">{kpi.label}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="text-2xl font-semibold text-foreground">{kpi.value}</p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {kpi.delta >= 0 ? "+" : ""}
+                      {kpi.delta.toFixed(1)}%
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{kpi.deltaLabel}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="outline" className="gap-1">
+              <LayoutDashboard className="h-3 w-3" />
+              {clientLabel}
+            </Badge>
+            <Badge variant="outline" className="gap-1">
+              <ArrowUpRight className="h-3 w-3" />
+              KPIs en direct
+            </Badge>
+          </div>
+        </div>
+
+        <TabDataStatusBanner tab="home" />
+
+        {/* Row 1 — striking client info */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Cette semaine</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeCalendarWeek />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Dernière veille</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeVeilleAlerts />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Propositions à valider</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeClientProposals />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Row 2 — secondary 2x2 grid */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Avancement des tâches</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeTasksAvancement />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Livrables récents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeRecentDeliverables />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Aperçu SEO</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeSeoSnapshot />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Réunions récentes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HomeRecentMeetings />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Footer CTA */}
+        <div className="flex items-center justify-between rounded-xl border border-dashed border-border/80 bg-muted/30 px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            Besoin d'une analyse approfondie ? Consultez Reporting, Prospects ou Contenus pour une analyse par canal.
+          </p>
+          <Button variant="ghost" size="sm" className="text-xs">
+            Explorer les onglets
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in pb-6">

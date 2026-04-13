@@ -1,6 +1,6 @@
-import { useDeliverables } from "@/hooks/useDeliverables";
+import { useDeliverables, getDeliverableUrl } from "@/hooks/useDeliverables";
 import { Badge } from "@/components/ui/badge";
-import { FileText } from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   final: "default",
@@ -30,12 +30,18 @@ export function HomeRecentDeliverables() {
           month: "short",
         });
         const clientName = d.clients?.name;
+        const destination = getDeliverableUrl(d);
 
-        return (
-          <div key={d.id} className="flex items-start gap-2 rounded-md border px-3 py-2">
+        const body = (
+          <>
             <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">{d.title ?? d.filename ?? d.type}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="truncate text-sm">{d.title ?? d.filename ?? d.type}</p>
+                {destination && (
+                  <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
+                )}
+              </div>
               <div className="mt-1 flex items-center gap-2">
                 {clientName && <span className="text-[10px] text-muted-foreground">{clientName}</span>}
                 <span className="text-[10px] text-muted-foreground">{dateStr}</span>
@@ -44,6 +50,27 @@ export function HomeRecentDeliverables() {
                 </Badge>
               </div>
             </div>
+          </>
+        );
+
+        if (destination) {
+          return (
+            <a
+              key={d.id}
+              href={destination.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Ouvrir dans ${destination.label}`}
+              className="flex items-start gap-2 rounded-md border px-3 py-2 transition-colors hover:bg-muted/50"
+            >
+              {body}
+            </a>
+          );
+        }
+
+        return (
+          <div key={d.id} className="flex items-start gap-2 rounded-md border px-3 py-2">
+            {body}
           </div>
         );
       })}

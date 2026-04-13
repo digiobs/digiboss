@@ -55,6 +55,21 @@ function asNumber(value: unknown): number | null {
   return null;
 }
 
+// tl;dv API sometimes returns happenedAt as a JS Date.toString() format
+// ("Mon Apr 13 2026 14:00:00 GMT+0000 (...)") which Postgres timestamptz
+// rejects. Normalize anything parseable by the Date constructor into ISO 8601.
+function toIsoTimestamp(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  // Fast path: looks like ISO (has T separator), use as-is.
+  if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) return trimmed;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
 function extractMeetingCandidates(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   const root = asObject(payload);
@@ -335,7 +350,7 @@ serve(async (req) => {
       rows.push({
         id: meeting.id,
         name: meeting.name,
-        happened_at: meeting.happenedAt ?? meeting.createdAt ?? null,
+        happened_at: toIsoTimestamp(meeting.happenedAt ?? meeting.createdAt ?? null),
         duration_seconds: typeof meeting.duration === "number" ? meeting.duration : null,
         organizer_name: organizerName,
         organizer_email: organizerEmail,

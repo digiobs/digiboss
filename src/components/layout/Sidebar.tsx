@@ -7,7 +7,7 @@ import {
   Users,
   FolderOpen,
   BarChart3,
-  FileCheck,
+  ScrollText,
   MessageSquare,
   Settings,
   Plug,
@@ -58,7 +58,7 @@ const navItems = [
   { path: '/seo-geo', icon: Search, label: 'SEO / GEO' },
   { path: '/kpis', icon: Activity, label: 'KPIs' },
   { path: '/reporting', icon: BarChart3, label: 'Reporting' },
-  { path: '/deliverables', icon: FileCheck, label: 'Livrables' },
+  { path: '/journal', icon: ScrollText, label: 'Journal' },
   { path: '/chat', icon: MessageSquare, label: 'Talk to DigiObs' },
 ];
 

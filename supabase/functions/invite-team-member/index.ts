@@ -17,7 +17,7 @@ serve(async (req) => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(
       JSON.stringify({ error: "Missing Supabase runtime secrets" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
@@ -33,7 +33,7 @@ serve(async (req) => {
       if (!userId) {
         return new Response(
           JSON.stringify({ error: "userId is required for delete" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
@@ -45,7 +45,7 @@ serve(async (req) => {
       if (error) {
         return new Response(
           JSON.stringify({ error: error.message }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
@@ -73,7 +73,7 @@ serve(async (req) => {
     if (!email || !fullName) {
       return new Response(
         JSON.stringify({ error: "email and full_name are required" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -89,9 +89,10 @@ serve(async (req) => {
       );
 
       if (error) {
+        console.error("[invite-team-member] inviteUserByEmail error:", error);
         return new Response(
-          JSON.stringify({ error: error.message }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          JSON.stringify({ error: error.message, code: (error as { code?: string }).code }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
@@ -107,7 +108,7 @@ serve(async (req) => {
     if (!password || password.length < 6) {
       return new Response(
         JSON.stringify({ error: "password must be at least 6 characters" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -124,9 +125,10 @@ serve(async (req) => {
     });
 
     if (error) {
+      console.error("[invite-team-member] createUser error:", error);
       return new Response(
         JSON.stringify({ error: error.message }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -138,11 +140,11 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("[invite-team-member] error:", err);
+    console.error("[invite-team-member] unexpected error:", err);
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(
       JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

@@ -21,6 +21,19 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { FunctionsHttpError } from '@supabase/supabase-js';
+
+async function extractEdgeFunctionError(err: unknown): Promise<string> {
+  if (err instanceof FunctionsHttpError) {
+    try {
+      const body = await err.context.json();
+      if (body?.error) return String(body.error);
+    } catch {
+      // fallthrough
+    }
+  }
+  return err instanceof Error ? err.message : 'Erreur inconnue';
+}
 
 type Profile = {
   id: string;
@@ -115,7 +128,7 @@ export function TeamMembersPanel() {
       setInviteMethod('invite');
       await fetchProfiles();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      const message = await extractEdgeFunctionError(err);
       toast.error(`Impossible d'inviter : ${message}`);
     } finally {
       setIsSending(false);
@@ -175,7 +188,7 @@ export function TeamMembersPanel() {
       setProfiles((prev) => prev.filter((p) => p.id !== profile.id));
       toast.success(`${profile.full_name} a été supprimé(e)`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      const message = await extractEdgeFunctionError(err);
       toast.error(`Suppression impossible : ${message}`);
     } finally {
       setUpdatingId(null);

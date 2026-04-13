@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, Loader2, Shield, UserCog, Trash2, Mail, KeyRound } from 'lucide-react';
+import { Users, Plus, Loader2, Shield, UserCog, Trash2, Mail, KeyRound, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,10 @@ export function TeamMembersPanel() {
   const [inviteMethod, setInviteMethod] = useState<'invite' | 'password'>('invite');
   const [isSending, setIsSending] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordTarget, setPasswordTarget] = useState<Profile | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   const fetchProfiles = useCallback(async () => {
     setIsLoading(true);
@@ -132,6 +136,49 @@ export function TeamMembersPanel() {
       toast.error(`Impossible d'inviter : ${message}`);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const openPasswordDialog = (profile: Profile) => {
+    setPasswordTarget(profile);
+    setNewPassword('');
+    setPasswordDialogOpen(true);
+  };
+
+  const handleSetPassword = async () => {
+    if (!passwordTarget) return;
+    const pwd = newPassword.trim();
+    if (pwd.length < 6) {
+      toast.error('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+    setIsUpdatingPassword(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'invite-team-member',
+        {
+          body: {
+            action: 'set_password',
+            userId: passwordTarget.id,
+            password: pwd,
+          },
+        },
+      );
+      if (error) throw error;
+      const payload = data as { error?: string };
+      if (payload?.error) throw new Error(payload.error);
+
+      toast.success(
+        `Mot de passe mis à jour pour ${passwordTarget.full_name}`,
+      );
+      setPasswordDialogOpen(false);
+      setPasswordTarget(null);
+      setNewPassword('');
+    } catch (err) {
+      const message = await extractEdgeFunctionError(err);
+      toast.error(`Mise à jour impossible : ${message}`);
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -272,6 +319,16 @@ export function TeamMembersPanel() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
+                      title="Définir un mot de passe (sans email)"
+                      disabled={updatingId === p.id}
+                      onClick={() => openPasswordDialog(p)}
+                    >
+                      <Lock className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
                       title={
                         p.role === 'admin'
                           ? 'Rétrograder en membre'
@@ -387,6 +444,57 @@ export function TeamMembersPanel() {
             <Button onClick={handleInvite} disabled={isSending}>
               {isSending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {inviteMethod === 'invite' ? 'Envoyer l\'invitation' : 'Créer le compte'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set password dialog (admin, no email) */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5" />
+              Définir le mot de passe
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {passwordTarget && (
+              <p className="text-sm text-muted-foreground">
+                Pour{' '}
+                <span className="font-medium text-foreground">
+                  {passwordTarget.full_name}
+                </span>{' '}
+                ({passwordTarget.email})
+              </p>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="set-password">Nouveau mot de passe</Label>
+              <Input
+                id="set-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min. 6 caractères"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Aucun email envoyé. Communiquez le mot de passe manuellement à l'utilisateur.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPasswordDialogOpen(false)}
+            >
+              Annuler
+            </Button>
+            <Button onClick={handleSetPassword} disabled={isUpdatingPassword}>
+              {isUpdatingPassword && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -60,8 +60,8 @@ serve(async (req) => {
     //   - `method: 'password'` (default) → admin.createUser with an
     //     explicit initial password. No email is sent.
     //   - `method: 'invite'` → admin.inviteUserByEmail. Supabase sends
-    //     the built-in invite email (configure SMTP to Brevo in the
-    //     Supabase dashboard so it goes through your own transport).
+    //     the built-in invite email through whatever SMTP transport is
+    //     configured in the Supabase dashboard (Authentication → SMTP).
     const email: string | undefined = body?.email?.trim();
     const fullName: string | undefined = body?.full_name?.trim();
     const role: string = body?.role ?? "team_member";

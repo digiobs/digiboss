@@ -152,8 +152,9 @@ créer une nouvelle (upsert via index uniques partiels).
    pointe vers un dossier qui contient déjà le sous-répertoire `livrables/`.
 4. Déployer `supabase/functions/index-deliverables` pour que le réindexeur
    connaisse le nouveau dossier.
-5. Ajouter l'icône et le label dans `src/pages/Deliverables.tsx` → `typeConfig`
-   pour un joli rendu dans l'UI.
+5. Aucun changement UI nécessaire : la page `/journal` affiche tous les
+   livrables sous la source `deliverable` avec le `skill_name` en sous-titre
+   et le `status` comme badge.
 
 ---
 
@@ -165,9 +166,9 @@ il peut être rejoué sans risque.
 
 **Manuellement, depuis l'UI :**
 
-1. Aller sur `/deliverables`
-2. Mode **admin** → cliquer sur le bouton **Réindexer** à côté de *Refresh Data*
-3. Une notification affiche `{ indexed, skipped, errors }`
+1. Aller sur `/journal`
+2. Mode **admin** → cliquer sur le bouton **Réindexer livrables** à côté de *Actualiser*
+3. Une notification affiche `{ indexed, updated, skipped, errors }`
 
 **Manuellement, en CLI :**
 

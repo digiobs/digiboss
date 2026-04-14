@@ -8,6 +8,11 @@ export interface PlanTaskContentRow {
   title: string;
   description: string | null;
   task_type: string | null;
+  task_nature: string | null;
+  idea_source: string | null;
+  idea_source_detail: string | null;
+  idea_source_url: string | null;
+  source_proposal_id: string | null;
   status: string;
   priority: string;
   canal: string | null;
@@ -31,6 +36,7 @@ export interface PlanTaskContentRow {
   content_type: string | null;
   content_status: string | null;
   funnel_stage: string | null;
+  period: string | null;
   created_at: string;
   updated_at: string;
 }

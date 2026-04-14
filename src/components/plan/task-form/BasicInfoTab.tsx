@@ -10,8 +10,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { STATUS_OPTIONS, type TaskFormData } from '@/types/tasks';
-import { useState } from 'react';
+import {
+  STATUS_OPTIONS,
+  TASK_NATURE_OPTIONS,
+  IDEA_SOURCE_OPTIONS,
+  type TaskFormData,
+  type TaskNature,
+  type IdeaSource,
+} from '@/types/tasks';
+import { useMemo, useState } from 'react';
 
 interface BasicInfoTabProps {
   form: UseFormReturn<TaskFormData>;
@@ -21,6 +28,16 @@ interface BasicInfoTabProps {
 export function BasicInfoTab({ form, clientName }: BasicInfoTabProps) {
   const [tagInput, setTagInput] = useState('');
   const tags = form.watch('tags');
+  const currentTaskType = form.watch('taskType');
+  const currentIdeaSource = form.watch('ideaSource');
+
+  // Nature options filtered by the coarse task_type, so switching "Type de
+  // tâche" keeps the Nature picker relevant. Fallback: show everything if the
+  // filter removes all options.
+  const natureOptions = useMemo(() => {
+    const filtered = TASK_NATURE_OPTIONS.filter((o) => o.group === currentTaskType);
+    return filtered.length > 0 ? filtered : TASK_NATURE_OPTIONS;
+  }, [currentTaskType]);
 
   const handleAddTag = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && tagInput.trim()) {
@@ -70,6 +87,70 @@ export function BasicInfoTab({ form, clientName }: BasicInfoTabProps) {
           <Input value={clientName} disabled className="bg-muted" />
         </div>
       )}
+
+      {/* Nature précise de la tâche (Wrike-aligned) */}
+      <div className="grid gap-2">
+        <Label>Nature précise</Label>
+        <Select
+          value={form.watch('taskNature') ?? ''}
+          onValueChange={(v) =>
+            form.setValue('taskNature', v ? (v as TaskNature) : null)
+          }
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Sélectionner (post LinkedIn, audit SEO, rapport data...)" />
+          </SelectTrigger>
+          <SelectContent>
+            {natureOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[11px] text-muted-foreground">
+          Reprend les types d'éléments personnalisés Wrike (post LinkedIn, audit SEO,
+          rapport data, …).
+        </p>
+      </div>
+
+      {/* Source de l'idée */}
+      <div className="grid gap-2">
+        <Label>Source de l'idée</Label>
+        <div className="grid grid-cols-2 gap-2">
+          <Select
+            value={form.watch('ideaSource') ?? ''}
+            onValueChange={(v) =>
+              form.setValue('ideaSource', v ? (v as IdeaSource) : null)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="D'où vient cette idée ?" />
+            </SelectTrigger>
+            <SelectContent>
+              {IDEA_SOURCE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            placeholder={
+              currentIdeaSource === 'meeting'
+                ? 'Nom du meeting...'
+                : currentIdeaSource === 'veille'
+                  ? 'Article de veille...'
+                  : 'Précision sur la source'
+            }
+            {...form.register('ideaSourceDetail')}
+          />
+        </div>
+        <Input
+          placeholder="URL de la source (optionnel)"
+          {...form.register('ideaSourceUrl')}
+        />
+      </div>
 
       {/* Status & Priority */}
       <div className="grid grid-cols-2 gap-4">

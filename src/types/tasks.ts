@@ -7,6 +7,111 @@ export type TaskType = 'contenu' | 'seo' | 'design' | 'social_media' | 'strategi
 export type Canal = 'LinkedIn' | 'Blog' | 'YouTube' | 'Newsletter' | 'Email' | 'Site web';
 export type ContentFormat = 'Article' | 'Post' | 'Carrousel' | 'Vidéo' | 'Infographie' | 'Story' | 'Podcast';
 
+/**
+ * Precise nature of a task, inspired by Wrike's custom element types.
+ * `task_type` is the coarse grouping (used for workflow & section colors)
+ * while `task_nature` identifies exactly what kind of deliverable the task
+ * is — a LinkedIn post, an SEO audit, a data report, …
+ */
+export type TaskNature =
+  | 'linkedin_post'
+  | 'linkedin_carousel'
+  | 'linkedin_video'
+  | 'blog_article'
+  | 'newsletter'
+  | 'email_campaign'
+  | 'landing_page'
+  | 'seo_audit'
+  | 'seo_optimization'
+  | 'seo_keywords'
+  | 'seo_backlinks'
+  | 'data_analytics'
+  | 'data_report'
+  | 'data_dashboard'
+  | 'design_visual'
+  | 'design_identity'
+  | 'ads_campaign'
+  | 'strategy_workshop'
+  | 'strategy_editorial'
+  | 'video_production'
+  | 'podcast'
+  | 'other';
+
+export const TASK_NATURE_OPTIONS: {
+  value: TaskNature;
+  label: string;
+  /** Coarse task_type this nature is attached to. */
+  group: TaskType;
+}[] = [
+  // Social media
+  { value: 'linkedin_post', label: 'Post LinkedIn', group: 'social_media' },
+  { value: 'linkedin_carousel', label: 'Carrousel LinkedIn', group: 'social_media' },
+  { value: 'linkedin_video', label: 'Vidéo LinkedIn', group: 'social_media' },
+  // Content
+  { value: 'blog_article', label: 'Article de blog', group: 'contenu' },
+  { value: 'newsletter', label: 'Newsletter', group: 'contenu' },
+  { value: 'email_campaign', label: 'Campagne email', group: 'contenu' },
+  { value: 'landing_page', label: 'Landing page', group: 'contenu' },
+  { value: 'video_production', label: 'Production vidéo', group: 'contenu' },
+  { value: 'podcast', label: 'Podcast', group: 'contenu' },
+  // SEO
+  { value: 'seo_audit', label: 'Audit SEO', group: 'seo' },
+  { value: 'seo_optimization', label: 'Optimisation SEO', group: 'seo' },
+  { value: 'seo_keywords', label: 'Recherche mots-clés', group: 'seo' },
+  { value: 'seo_backlinks', label: 'Netlinking / Backlinks', group: 'seo' },
+  // Data
+  { value: 'data_analytics', label: 'Analytics / Data', group: 'strategie' },
+  { value: 'data_report', label: 'Rapport de données', group: 'strategie' },
+  { value: 'data_dashboard', label: 'Dashboard', group: 'strategie' },
+  // Design
+  { value: 'design_visual', label: 'Visuel / Création', group: 'design' },
+  { value: 'design_identity', label: 'Identité visuelle', group: 'design' },
+  // Strategy
+  { value: 'ads_campaign', label: 'Campagne Ads', group: 'strategie' },
+  { value: 'strategy_workshop', label: 'Atelier stratégique', group: 'strategie' },
+  { value: 'strategy_editorial', label: 'Stratégie éditoriale', group: 'strategie' },
+  // Fallback
+  { value: 'other', label: 'Autre', group: 'autre' },
+];
+
+/**
+ * Where an idea comes from. Mirrors the insight taxonomy used across
+ * DigiObs so every action on the /actions page can be traced back to
+ * its origin.
+ */
+export type IdeaSource =
+  | 'proposal'
+  | 'meeting'
+  | 'veille'
+  | 'kpi_insight'
+  | 'client_request'
+  | 'ai_suggestion'
+  | 'manual'
+  | 'marronnier'
+  | 'other';
+
+export const IDEA_SOURCE_OPTIONS: { value: IdeaSource; label: string }[] = [
+  { value: 'proposal', label: 'Proposition créative' },
+  { value: 'meeting', label: 'Meeting / Réunion' },
+  { value: 'veille', label: 'Veille' },
+  { value: 'kpi_insight', label: 'Insight KPI' },
+  { value: 'client_request', label: 'Demande client' },
+  { value: 'ai_suggestion', label: 'Suggestion IA' },
+  { value: 'marronnier', label: 'Marronnier' },
+  { value: 'manual', label: 'Saisie manuelle' },
+  { value: 'other', label: 'Autre' },
+];
+
+export function getTaskNatureLabel(nature: string | null | undefined): string {
+  if (!nature) return '';
+  return TASK_NATURE_OPTIONS.find((o) => o.value === nature)?.label ?? nature;
+}
+
+export function getIdeaSourceLabel(source: string | null | undefined): string {
+  if (!source) return '';
+  return IDEA_SOURCE_OPTIONS.find((o) => o.value === source)?.label ?? source;
+}
+
 export interface TeamMemberRef {
   id: string;
   name: string;
@@ -110,6 +215,16 @@ export interface TaskFormData {
   title: string;
   description: string;
   taskType: TaskType;
+  /** Precise nature of the task (e.g. `linkedin_post`, `seo_audit`). */
+  taskNature?: TaskNature | null;
+  /** Origin of the idea (proposal, meeting, veille, …). */
+  ideaSource?: IdeaSource | null;
+  /** Free-text clarification about the source (e.g. meeting name). */
+  ideaSourceDetail?: string | null;
+  /** Optional URL to the underlying insight (veille article, post). */
+  ideaSourceUrl?: string | null;
+  /** Linked creative_proposal id when the task was born from a proposal. */
+  sourceProposalId?: string | null;
   clientId: string;
   canal: Canal | '';
   format: ContentFormat | '';

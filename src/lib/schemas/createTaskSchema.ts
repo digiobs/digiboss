@@ -16,6 +16,50 @@ export const createTaskSchema = z.object({
   title: z.string().min(3, 'Le titre doit contenir au moins 3 caractères'),
   description: z.string().default(''),
   taskType: z.enum(['contenu', 'seo', 'design', 'social_media', 'strategie', 'autre']).default('autre'),
+  taskNature: z
+    .enum([
+      'linkedin_post',
+      'linkedin_carousel',
+      'linkedin_video',
+      'blog_article',
+      'newsletter',
+      'email_campaign',
+      'landing_page',
+      'seo_audit',
+      'seo_optimization',
+      'seo_keywords',
+      'seo_backlinks',
+      'data_analytics',
+      'data_report',
+      'data_dashboard',
+      'design_visual',
+      'design_identity',
+      'ads_campaign',
+      'strategy_workshop',
+      'strategy_editorial',
+      'video_production',
+      'podcast',
+      'other',
+    ])
+    .nullable()
+    .optional(),
+  ideaSource: z
+    .enum([
+      'proposal',
+      'meeting',
+      'veille',
+      'kpi_insight',
+      'client_request',
+      'ai_suggestion',
+      'marronnier',
+      'manual',
+      'other',
+    ])
+    .nullable()
+    .optional(),
+  ideaSourceDetail: z.string().nullable().optional(),
+  ideaSourceUrl: z.string().url('URL invalide').or(z.literal('')).nullable().optional(),
+  sourceProposalId: z.string().nullable().optional(),
   clientId: z.string().min(1, 'Client requis'),
   canal: z.union([
     z.enum(['LinkedIn', 'Blog', 'YouTube', 'Newsletter', 'Email', 'Site web']),

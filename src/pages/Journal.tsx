@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { format, isToday, isYesterday, differenceInCalendarDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -74,8 +74,8 @@ const SOURCE_CONFIG: Record<JournalSource, SourceConfig> = {
 
 const SOURCES: JournalSource[] = ['veille', 'meeting', 'proposal', 'editorial', 'deliverable', 'task'];
 
-function dayLabel(iso: string): string {
-  const date = new Date(iso);
+function dayLabel(ts: number): string {
+  const date = new Date(ts);
   if (isToday(date)) return "Aujourd'hui";
   if (isYesterday(date)) return 'Hier';
   const diff = differenceInCalendarDays(new Date(), date);
@@ -83,9 +83,13 @@ function dayLabel(iso: string): string {
   return format(date, 'EEEE d MMMM yyyy', { locale: fr });
 }
 
-function dayKey(iso: string): string {
-  return format(new Date(iso), 'yyyy-MM-dd');
+function dayKey(ts: number): string {
+  return format(new Date(ts), 'yyyy-MM-dd');
 }
+
+/** How many entries to render before showing a "Show more" button. Rendering
+ *  hundreds of rows synchronously is the main culprit for a slow journal. */
+const PAGE_SIZE = 60;
 
 export default function Journal() {
   const { clients, currentClient, setCurrentClient, isAllClientsSelected } = useClient();
@@ -94,11 +98,18 @@ export default function Journal() {
 
   const [selectedSources, setSelectedSources] = useState<JournalSource[]>(SOURCES);
   const [search, setSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [refreshing, setRefreshing] = useState(false);
   const [reindexing, setReindexing] = useState(false);
 
   const clientFilter = isAllClientsSelected ? null : currentClient?.id ?? null;
   const { entries, countsBySource, isLoading, refetch } = useJournal({ clientId: clientFilter });
+
+  // Reset pagination whenever filters/search change — otherwise the user could
+  // land on a paginated view that's already past the end of the filtered list.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [selectedSources, search, clientFilter]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -150,20 +161,27 @@ export default function Journal() {
     });
   }, [entries, selectedSources, search]);
 
+  const totalFiltered = filtered.length;
+  const hasMore = visibleCount < totalFiltered;
+
+  // Group only the *visible* slice — this is the single biggest perf win:
+  // a fresh tab shows ~60 rows instead of ~900, and grouping stays cheap.
   const grouped = useMemo(() => {
     const groups: Array<{ key: string; label: string; entries: JournalEntry[] }> = [];
+    const limit = Math.min(visibleCount, filtered.length);
     let currentKey = '';
-    for (const entry of filtered) {
-      const key = dayKey(entry.occurred_at);
+    for (let i = 0; i < limit; i++) {
+      const entry = filtered[i];
+      const key = dayKey(entry.occurred_ts);
       if (key !== currentKey) {
-        groups.push({ key, label: dayLabel(entry.occurred_at), entries: [entry] });
+        groups.push({ key, label: dayLabel(entry.occurred_ts), entries: [entry] });
         currentKey = key;
       } else {
         groups[groups.length - 1].entries.push(entry);
       }
     }
     return groups;
-  }, [filtered]);
+  }, [filtered, visibleCount]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -309,16 +327,26 @@ export default function Journal() {
               </div>
             </section>
           ))}
+          {hasMore && (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+              >
+                Afficher plus ({totalFiltered - visibleCount} restantes)
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function JournalRow({ entry }: { entry: JournalEntry }) {
+const JournalRow = memo(function JournalRow({ entry }: { entry: JournalEntry }) {
   const cfg = SOURCE_CONFIG[entry.source];
   const Icon = cfg.icon;
-  const time = format(new Date(entry.occurred_at), 'HH:mm', { locale: fr });
+  const time = format(new Date(entry.occurred_ts), 'HH:mm', { locale: fr });
   const clickable = Boolean(entry.href);
 
   const body = (
@@ -374,4 +402,4 @@ function JournalRow({ entry }: { entry: JournalEntry }) {
   }
 
   return <div className={commonClasses}>{body}</div>;
-}
+});

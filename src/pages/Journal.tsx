@@ -103,7 +103,9 @@ export default function Journal() {
   const [reindexing, setReindexing] = useState(false);
 
   const clientFilter = isAllClientsSelected ? null : currentClient?.id ?? null;
-  const { entries, countsBySource, isLoading, refetch } = useJournal({ clientId: clientFilter });
+  const { entries, countsBySource, isLoading, isFetching, refetch } = useJournal({
+    clientId: clientFilter,
+  });
 
   // Reset pagination whenever filters/search change — otherwise the user could
   // land on a paginated view that's already past the end of the filtered list.
@@ -299,6 +301,16 @@ export default function Journal() {
           />
         </div>
       </div>
+
+      {/* Background-fetch hint: once at least one source has loaded, we render
+          whatever's available and surface a discreet inline indicator while
+          the remaining sources stream in. */}
+      {isFetching && !isLoading && entries.length > 0 && (
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
+          <RefreshCw className="w-3 h-3 animate-spin" />
+          Mise à jour en cours...
+        </div>
+      )}
 
       {/* Timeline */}
       {isLoading ? (

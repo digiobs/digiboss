@@ -32,6 +32,8 @@ export interface JournalEntry {
   source: JournalSource;
   /** ISO timestamp used for sorting */
   occurred_at: string;
+  /** Pre-parsed epoch ms of `occurred_at` — avoids re-parsing in hot sort/group loops */
+  occurred_ts: number;
   title: string;
   subtitle?: string;
   /** Optional deep link to the corresponding destination (Supabase/OneDrive/etc.) */
@@ -40,6 +42,13 @@ export interface JournalEntry {
   badge?: string;
   client_id: string | null;
   client_name?: string | null;
+}
+
+/** Parse an ISO string into epoch ms, defaulting to 0 for falsy/invalid input. */
+function toTs(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? 0 : t;
 }
 
 type ClientJoin = { name: string } | null;
@@ -128,6 +137,7 @@ async function fetchVeille(clientId: string | null): Promise<JournalEntry[]> {
     id: `veille:${r.id}`,
     source: 'veille' as const,
     occurred_at: r.created_at,
+    occurred_ts: toTs(r.created_at),
     title: r.title ?? 'Veille',
     subtitle: r.summary ?? r.source ?? undefined,
     href: r.source_url ?? undefined,
@@ -155,6 +165,7 @@ async function fetchMeetings(clientId: string | null): Promise<JournalEntry[]> {
       id: `meeting:${r.id}`,
       source: 'meeting' as const,
       occurred_at: when,
+      occurred_ts: toTs(when),
       title: r.name ?? 'Réunion',
       subtitle: subtitleParts.join(' · ') || undefined,
       href: r.meeting_url ?? undefined,
@@ -176,6 +187,7 @@ async function fetchProposals(clientId: string | null): Promise<JournalEntry[]> 
     id: `proposal:${r.id}`,
     source: 'proposal' as const,
     occurred_at: r.created_at,
+    occurred_ts: toTs(r.created_at),
     title: r.title ?? 'Proposition',
     subtitle: r.source_skill ?? undefined,
     badge: r.status ?? undefined,
@@ -200,6 +212,7 @@ async function fetchEditorial(clientId: string | null): Promise<JournalEntry[]> 
       id: `editorial:${r.id}`,
       source: 'editorial' as const,
       occurred_at: r.created_at,
+      occurred_ts: toTs(r.created_at),
       title: r.title ?? 'Contenu',
       subtitle: subtitleParts.join(' · ') || undefined,
       badge: r.status ?? undefined,
@@ -223,6 +236,7 @@ async function fetchDeliverables(clientId: string | null): Promise<JournalEntry[
       id: `deliverable:${r.id}`,
       source: 'deliverable' as const,
       occurred_at: r.created_at,
+      occurred_ts: toTs(r.created_at),
       title: r.title ?? r.filename ?? r.type,
       subtitle: r.skill_name ?? r.type,
       href: dest?.url,
@@ -241,17 +255,21 @@ async function fetchTasks(clientId: string | null): Promise<JournalEntry[]> {
     .limit(150);
   const { data, error } = await withClientFilter(base, clientId);
   if (error) throw error;
-  return ((data ?? []) as unknown as TaskRow[]).map((r) => ({
-    id: `task:${r.id}`,
-    source: 'task' as const,
-    // tasks mutate over time — use updated_at so status changes bump the entry
-    occurred_at: r.updated_at ?? r.created_at,
-    title: r.title ?? 'Tâche',
-    subtitle: r.priority ? `Priorité ${r.priority}` : undefined,
-    badge: r.status ?? undefined,
-    client_id: r.client_id,
-    client_name: r.clients?.name ?? null,
-  }));
+  return ((data ?? []) as unknown as TaskRow[]).map((r) => {
+    const when = r.updated_at ?? r.created_at;
+    return {
+      id: `task:${r.id}`,
+      source: 'task' as const,
+      // tasks mutate over time — use updated_at so status changes bump the entry
+      occurred_at: when,
+      occurred_ts: toTs(when),
+      title: r.title ?? 'Tâche',
+      subtitle: r.priority ? `Priorité ${r.priority}` : undefined,
+      badge: r.status ?? undefined,
+      client_id: r.client_id,
+      client_name: r.clients?.name ?? null,
+    };
+  });
 }
 
 export interface UseJournalResult {
@@ -272,14 +290,18 @@ export function useJournal(options?: { clientId?: string | null }): UseJournalRe
         ? null
         : currentClient?.id ?? null;
 
+  // 2 min cache: the journal is a historical feed — slightly stale data is fine,
+  // and this avoids refetching ~900 rows every time the page mounts.
+  const STALE_TIME = 2 * 60 * 1000;
+
   const queries = useQueries({
     queries: [
-      { queryKey: ['journal', 'veille', filterClientId],      queryFn: () => fetchVeille(filterClientId) },
-      { queryKey: ['journal', 'meeting', filterClientId],     queryFn: () => fetchMeetings(filterClientId) },
-      { queryKey: ['journal', 'proposal', filterClientId],    queryFn: () => fetchProposals(filterClientId) },
-      { queryKey: ['journal', 'editorial', filterClientId],   queryFn: () => fetchEditorial(filterClientId) },
-      { queryKey: ['journal', 'deliverable', filterClientId], queryFn: () => fetchDeliverables(filterClientId) },
-      { queryKey: ['journal', 'task', filterClientId],        queryFn: () => fetchTasks(filterClientId) },
+      { queryKey: ['journal', 'veille', filterClientId],      queryFn: () => fetchVeille(filterClientId),      staleTime: STALE_TIME },
+      { queryKey: ['journal', 'meeting', filterClientId],     queryFn: () => fetchMeetings(filterClientId),    staleTime: STALE_TIME },
+      { queryKey: ['journal', 'proposal', filterClientId],    queryFn: () => fetchProposals(filterClientId),   staleTime: STALE_TIME },
+      { queryKey: ['journal', 'editorial', filterClientId],   queryFn: () => fetchEditorial(filterClientId),   staleTime: STALE_TIME },
+      { queryKey: ['journal', 'deliverable', filterClientId], queryFn: () => fetchDeliverables(filterClientId),staleTime: STALE_TIME },
+      { queryKey: ['journal', 'task', filterClientId],        queryFn: () => fetchTasks(filterClientId),       staleTime: STALE_TIME },
     ],
   });
 
@@ -294,11 +316,8 @@ export function useJournal(options?: { clientId?: string | null }): UseJournalRe
       ...(deliverableQ.data ?? []),
       ...(taskQ.data ?? []),
     ];
-    return all.sort((a, b) => {
-      const ta = new Date(a.occurred_at).getTime();
-      const tb = new Date(b.occurred_at).getTime();
-      return tb - ta;
-    });
+    // Use precomputed occurred_ts to avoid O(n log n) Date allocations.
+    return all.sort((a, b) => b.occurred_ts - a.occurred_ts);
   }, [veilleQ.data, meetingQ.data, proposalQ.data, editorialQ.data, deliverableQ.data, taskQ.data]);
 
   const countsBySource = useMemo<Record<JournalSource, number>>(

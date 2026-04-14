@@ -2,7 +2,7 @@ import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { PlanTaskContentRow } from './useContentTasks';
 import type { CalendarEntry } from './useEditorialCalendar';
-import type { CreativeProposal } from './useCreativeProposals';
+import type { CreativeProposal, Convergence } from './useCreativeProposals';
 
 /**
  * Fetches every action belonging to a client for a given range of monthly
@@ -99,10 +99,33 @@ async function fetchProposalsForClient(
   return data ?? [];
 }
 
+async function fetchConvergencesForClient(
+  clientId: string | null,
+): Promise<Convergence[]> {
+  if (!clientId) return [];
+  const query = sb
+    .from('creative_proposal_convergences')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false });
+  const { data, error } = (await query) as unknown as {
+    data: Convergence[] | null;
+    error: { message: string } | null;
+  };
+  if (error) {
+    // Table may not exist in older deployments — fail soft instead of
+    // breaking the whole /actions page.
+    console.warn('[useMonthlyActions] convergences fetch failed:', error.message);
+    return [];
+  }
+  return data ?? [];
+}
+
 export interface UseMonthlyActionsResult {
   planTasks: PlanTaskContentRow[];
   editorialEntries: CalendarEntry[];
   proposals: CreativeProposal[];
+  convergences: Convergence[];
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -139,15 +162,22 @@ export function useMonthlyActions(options: {
         staleTime: STALE_TIME,
         enabled: Boolean(clientId),
       },
+      {
+        queryKey: ['monthly-actions', 'convergences', clientId],
+        queryFn: () => fetchConvergencesForClient(clientId),
+        staleTime: STALE_TIME,
+        enabled: Boolean(clientId),
+      },
     ],
   });
 
-  const [planTasksQ, editorialQ, proposalsQ] = queries;
+  const [planTasksQ, editorialQ, proposalsQ, convergencesQ] = queries;
 
   return {
     planTasks: (planTasksQ.data as PlanTaskContentRow[] | undefined) ?? [],
     editorialEntries: (editorialQ.data as CalendarEntry[] | undefined) ?? [],
     proposals: (proposalsQ.data as CreativeProposal[] | undefined) ?? [],
+    convergences: (convergencesQ.data as Convergence[] | undefined) ?? [],
     isLoading: queries.some((q) => q.isLoading) && !queries.some((q) => q.data !== undefined),
     isFetching: queries.some((q) => q.isFetching),
     isError: queries.some((q) => q.isError),

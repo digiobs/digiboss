@@ -21,7 +21,12 @@ import { PlanningTab } from './task-form/PlanningTab';
 import { ProductionTab } from './task-form/ProductionTab';
 import { AdminFinanceTab } from './task-form/AdminFinanceTab';
 import { TeamMemberPicker } from './task-form/TeamMemberPicker';
-import type { TaskFormData, TaskType } from '@/types/tasks';
+import type {
+  TaskFormData,
+  TaskType,
+  TaskNature,
+  IdeaSource,
+} from '@/types/tasks';
 import type { ContentType, ContentStatus, FunnelStage } from '@/types/content';
 import { Loader2, LayoutGrid } from 'lucide-react';
 
@@ -54,6 +59,11 @@ interface PlanTaskRow {
   content_type?: string | null;
   content_status?: string | null;
   funnel_stage?: string | null;
+  task_nature?: string | null;
+  idea_source?: string | null;
+  idea_source_detail?: string | null;
+  idea_source_url?: string | null;
+  source_proposal_id?: string | null;
 }
 
 interface CreateTaskDialogProps {
@@ -83,6 +93,11 @@ function getDefaultValues(
       title: task.title || '',
       description: task.description || '',
       taskType: (task.task_type as TaskType) || 'autre',
+      taskNature: (task.task_nature as TaskNature | null) ?? null,
+      ideaSource: (task.idea_source as IdeaSource | null) ?? null,
+      ideaSourceDetail: task.idea_source_detail ?? null,
+      ideaSourceUrl: task.idea_source_url ?? null,
+      sourceProposalId: task.source_proposal_id ?? null,
       clientId: task.client_id || defaultClientId || '',
       canal: (task.canal as TaskFormData['canal']) || '',
       format: (task.format as TaskFormData['format']) || '',
@@ -114,6 +129,11 @@ function getDefaultValues(
     title: '',
     description: '',
     taskType: 'autre',
+    taskNature: null,
+    ideaSource: 'manual',
+    ideaSourceDetail: null,
+    ideaSourceUrl: null,
+    sourceProposalId: null,
     clientId: defaultClientId || '',
     canal: '',
     format: '',

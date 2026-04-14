@@ -24,7 +24,6 @@ import Admin from "@/pages/Admin";
 import Journal from "@/pages/Journal";
 import Actions from "@/pages/Actions";
 import Veille from "@/pages/Veille";
-import Proposals from "@/pages/Proposals";
 import EditorialCalendar from "@/pages/EditorialCalendar";
 import KpiDashboard from "@/pages/KpiDashboard";
 import SeoGeo from "@/pages/SeoGeo";
@@ -93,7 +92,10 @@ const AppRoutes = () => {
         <Route path="/actions" element={<Actions />} />
         <Route path="/deliverables" element={<Navigate to="/journal" replace />} />
         <Route path="/veille" element={<Veille />} />
-        <Route path="/proposals" element={<Proposals />} />
+        {/* /proposals was merged into /actions — keep the path for backwards
+            compatibility so old links and bookmarks still land on the right
+            page. */}
+        <Route path="/proposals" element={<Navigate to="/actions" replace />} />
         <Route path="/calendar" element={<EditorialCalendar />} />
         <Route path="/kpis" element={<KpiDashboard />} />
         <Route path="/seo-geo" element={<SeoGeo />} />

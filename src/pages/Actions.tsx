@@ -2,16 +2,11 @@ import { useMemo, useState } from 'react';
 import {
   CheckSquare,
   Search,
-  Palette,
-  Share2,
-  Target,
-  FileText,
-  Newspaper,
-  MoreHorizontal,
-  CalendarDays,
   RefreshCw,
   ExternalLink,
-  type LucideIcon,
+  Lightbulb,
+  ChevronsDown,
+  ChevronsUp,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,50 +19,24 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import {
   useMonthlyActions,
   useUpdateActionStatus,
   currentPeriod,
+  buildPeriodRange,
+  proposalPeriod,
 } from '@/hooks/useMonthlyActions';
 import { CreateTaskDialog } from '@/components/plan/CreateTaskDialog';
-import { ActionsGroupCard, type ActionsGroupRow } from '@/components/actions/ActionsGroupCard';
-import {
-  getWorkflow,
-  getTaskTypeLabel,
-  EDITORIAL_WORKFLOW,
-} from '@/types/taskWorkflows';
+import { MonthlyPackage } from '@/components/actions/MonthlyPackage';
+import { useCreativeProposals, type CreativeProposal } from '@/hooks/useCreativeProposals';
 import type { TaskType, TaskFormData } from '@/types/tasks';
 import type { PlanTaskContentRow } from '@/hooks/useContentTasks';
+import type { CalendarEntry } from '@/hooks/useEditorialCalendar';
 
-const TASK_TYPE_ICONS: Record<string, LucideIcon> = {
-  seo: Search,
-  contenu: FileText,
-  design: Palette,
-  social_media: Share2,
-  strategie: Target,
-  autre: MoreHorizontal,
-};
-
-const TASK_TYPE_ORDER: string[] = [
-  'seo',
-  'social_media',
-  'design',
-  'strategie',
-  'contenu',
-  'autre',
-];
-
-function formatPeriodLabel(period: string): string {
-  const [yStr, mStr] = period.split('-');
-  const year = Number(yStr);
-  const month = Number(mStr);
-  if (!year || !month) return period;
-  // Build a Date at UTC midnight of the first day so locale formatting is stable
-  const date = new Date(Date.UTC(year, month - 1, 1));
-  return date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-}
+const DEFAULT_MONTH_COUNT = 6;
 
 export default function Actions() {
   const { clients, currentClient, setCurrentClient, isAllClientsSelected } = useClient();
@@ -75,16 +44,28 @@ export default function Actions() {
   const selectedClientId = currentClient?.id ?? ALL_CLIENTS_ID;
   const clientId = isAllClientsSelected ? null : currentClient?.id ?? null;
 
-  const [period, setPeriod] = useState<string>(() => currentPeriod());
+  // Anchor = most recent month shown at the top of the stack. Users can still
+  // "paginate" backwards by changing the anchor via the month picker.
+  const [anchor, setAnchor] = useState<string>(() => currentPeriod());
+  const [monthCount, setMonthCount] = useState<number>(DEFAULT_MONTH_COUNT);
   const [search, setSearch] = useState('');
   const [showEditorial, setShowEditorial] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [prefill, setPrefill] = useState<Partial<TaskFormData> | undefined>();
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  const { planTasks, editorialEntries, isLoading, isFetching, refetch } = useMonthlyActions({
-    clientId,
-    period,
-  });
+  const periods = useMemo(() => buildPeriodRange(anchor, monthCount), [anchor, monthCount]);
+
+  const { planTasks, editorialEntries, proposals, isLoading, isFetching, refetch } =
+    useMonthlyActions({ clientId, periods });
+
+  // Proposal mutations still live in useCreativeProposals so approved items
+  // push to Wrike consistently with the old /proposals page.
+  const {
+    approveAndPushToWrike,
+    updateProposalStatus,
+    refetch: refetchProposals,
+  } = useCreativeProposals();
 
   const updateStatus = useUpdateActionStatus();
 
@@ -92,64 +73,162 @@ export default function Actions() {
     updateStatus.mutate({ id, status: next });
   };
 
-  const openCreate = (taskType: TaskType) => {
-    setPrefill({ taskType, period });
+  const openCreate = (taskType: TaskType, periodForCreate?: string) => {
+    setPrefill({
+      taskType,
+      period: periodForCreate ?? anchor,
+      ideaSource: 'manual',
+    });
     setDialogOpen(true);
   };
 
-  // Group plan_tasks by task_type, respecting TASK_TYPE_ORDER and honoring
-  // the free-text search filter.
-  const groupedPlanTasks = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const filtered = q
-      ? planTasks.filter((t) => {
-          return (
-            t.title.toLowerCase().includes(q) ||
-            t.description?.toLowerCase().includes(q) ||
-            t.thematique?.toLowerCase().includes(q)
-          );
-        })
-      : planTasks;
+  const urgencyToPriority = (urgency: string): TaskFormData['priority'] => {
+    if (urgency.includes('Critique') || urgency.includes('Urgent')) return 'high';
+    if (urgency.includes('Important')) return 'medium';
+    return 'low';
+  };
 
-    const byType = new Map<string, PlanTaskContentRow[]>();
-    for (const t of filtered) {
-      const key = t.task_type ?? 'autre';
-      const arr = byType.get(key) ?? [];
+  const handleApproveProposal = async (id: string) => {
+    try {
+      const result = await approveAndPushToWrike(id);
+      if (result?.status === 'ok') {
+        toast.success('Proposition validée · tâche Wrike créée');
+      } else if (result?.status === 'approved_without_wrike') {
+        toast.warning(
+          `Proposition validée, mais Wrike indisponible (${result.error ?? 'erreur inconnue'}).`,
+        );
+      } else {
+        toast.success('Proposition validée');
+      }
+      refetch();
+    } catch (err) {
+      console.error(err);
+      toast.error('Erreur lors de la validation');
+    }
+  };
+
+  const handleRejectProposal = async (id: string) => {
+    try {
+      await updateProposalStatus(id, 'rejected');
+      toast.success('Proposition rejetée');
+      refetch();
+    } catch {
+      toast.error('Erreur lors du rejet');
+    }
+  };
+
+  const handleEditProposal = (p: CreativeProposal) => {
+    const descriptionParts = [
+      p.description,
+      p.rationale ? `\n\nJustification:\n${p.rationale}` : '',
+      p.source_insight ? `\n\nInsight source:\n${p.source_insight}` : '',
+      p.source_url ? `\n\nSource: ${p.source_url}` : '',
+      p.draft_content ? `\n\nBrouillon:\n${p.draft_content}` : '',
+    ]
+      .filter(Boolean)
+      .join('');
+
+    setPrefill({
+      title: p.title,
+      description: descriptionParts,
+      taskType: 'contenu',
+      clientId: p.client_id,
+      priority: urgencyToPriority(p.urgency),
+      status: 'backlog',
+      tags: Array.isArray(p.tags) ? p.tags.map(String) : [],
+      contentStatus: 'idea',
+      ideaSource: 'proposal',
+      ideaSourceDetail: p.source_skill,
+      ideaSourceUrl: p.source_url ?? null,
+      sourceProposalId: p.id,
+      period: proposalPeriod(p),
+    });
+    setDialogOpen(true);
+  };
+
+  const toggleCollapsed = (period: string) => {
+    setCollapsed((prev) => ({ ...prev, [period]: !prev[period] }));
+  };
+
+  const expandAll = () => {
+    const next: Record<string, boolean> = {};
+    for (const p of periods) next[p] = false;
+    setCollapsed(next);
+  };
+  const collapseAll = () => {
+    const next: Record<string, boolean> = {};
+    for (const p of periods) next[p] = true;
+    setCollapsed(next);
+  };
+
+  // ---- Search filter applied to every source before grouping by period ----
+  const q = search.trim().toLowerCase();
+
+  const filterTask = (t: PlanTaskContentRow) =>
+    !q ||
+    t.title.toLowerCase().includes(q) ||
+    t.description?.toLowerCase().includes(q) ||
+    t.thematique?.toLowerCase().includes(q) ||
+    t.canal?.toLowerCase().includes(q) ||
+    t.task_nature?.toLowerCase().includes(q) ||
+    t.idea_source?.toLowerCase().includes(q);
+
+  const filterEditorial = (e: CalendarEntry) =>
+    !q ||
+    e.title.toLowerCase().includes(q) ||
+    e.canal?.toLowerCase().includes(q) ||
+    e.content_type?.toLowerCase().includes(q);
+
+  const filterProposal = (p: CreativeProposal) =>
+    !q ||
+    p.title.toLowerCase().includes(q) ||
+    p.description?.toLowerCase().includes(q) ||
+    p.source_skill?.toLowerCase().includes(q) ||
+    p.source_insight?.toLowerCase().includes(q);
+
+  // ---- Index everything by period so MonthlyPackage can render in order ----
+  const { tasksByPeriod, editorialByPeriod, proposalsByPeriod } = useMemo(() => {
+    const tByP = new Map<string, PlanTaskContentRow[]>();
+    for (const t of planTasks.filter(filterTask)) {
+      const key = t.period ?? currentPeriod();
+      const arr = tByP.get(key) ?? [];
       arr.push(t);
-      byType.set(key, arr);
+      tByP.set(key, arr);
     }
 
-    // Sort the entries in an order that feels natural, putting unknown types
-    // at the end.
-    const entries = Array.from(byType.entries()).sort(([a], [b]) => {
-      const ia = TASK_TYPE_ORDER.indexOf(a);
-      const ib = TASK_TYPE_ORDER.indexOf(b);
-      if (ia === -1 && ib === -1) return a.localeCompare(b);
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
-      return ia - ib;
-    });
+    const eByP = new Map<string, CalendarEntry[]>();
+    if (showEditorial) {
+      for (const e of editorialEntries.filter(filterEditorial)) {
+        // derive `YYYY-MM` from the entry's date
+        const d = new Date(e.date);
+        const key = Number.isNaN(d.getTime())
+          ? currentPeriod()
+          : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+        const arr = eByP.get(key) ?? [];
+        arr.push(e);
+        eByP.set(key, arr);
+      }
+    }
 
-    return entries;
-  }, [planTasks, search]);
+    const pByP = new Map<string, CreativeProposal[]>();
+    for (const p of proposals.filter(filterProposal)) {
+      const key = proposalPeriod(p);
+      const arr = pByP.get(key) ?? [];
+      arr.push(p);
+      pByP.set(key, arr);
+    }
 
-  const filteredEditorial = useMemo(() => {
-    if (!showEditorial) return [];
-    const q = search.trim().toLowerCase();
-    return q
-      ? editorialEntries.filter(
-          (e) =>
-            e.title.toLowerCase().includes(q) ||
-            e.canal?.toLowerCase().includes(q) ||
-            e.content_type?.toLowerCase().includes(q),
-        )
-      : editorialEntries;
-  }, [editorialEntries, showEditorial, search]);
+    return {
+      tasksByPeriod: tByP,
+      editorialByPeriod: eByP,
+      proposalsByPeriod: pByP,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planTasks, editorialEntries, proposals, showEditorial, search]);
 
-  const hasAnything =
-    groupedPlanTasks.length > 0 || (showEditorial && filteredEditorial.length > 0);
-
-  const periodLabel = formatPeriodLabel(period);
+  const totalTasks = planTasks.length;
+  const totalProposals = proposals.length;
+  const nowPeriod = currentPeriod();
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -158,12 +237,24 @@ export default function Actions() {
         <div>
           <div className="flex items-center gap-2">
             <CheckSquare className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Actions du mois</h1>
+            <h1 className="text-2xl font-bold text-foreground">Actions &amp; Propositions</h1>
           </div>
           <p className="text-muted-foreground mt-1">
-            Toutes les actions prévues pour un client sur un mois donné : tâches à cocher,
-            contenus en production, articles éditoriaux.
+            Le package mensuel du client : propositions créatives, tâches à cocher,
+            contenus en production, articles éditoriaux — tous les mois les uns à la
+            suite des autres, avec la nature précise de la tâche et la source de
+            chaque idée.
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={expandAll} className="gap-1.5">
+            <ChevronsDown className="w-3.5 h-3.5" />
+            Tout ouvrir
+          </Button>
+          <Button variant="outline" size="sm" onClick={collapseAll} className="gap-1.5">
+            <ChevronsUp className="w-3.5 h-3.5" />
+            Tout fermer
+          </Button>
         </div>
       </div>
 
@@ -193,14 +284,37 @@ export default function Actions() {
         </Select>
 
         <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-muted-foreground" />
+          <Label htmlFor="anchor" className="text-xs text-muted-foreground">
+            Mois le plus récent
+          </Label>
           <Input
+            id="anchor"
             type="month"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value || currentPeriod())}
-            className="w-[180px]"
-            aria-label="Mois"
+            value={anchor}
+            onChange={(e) => setAnchor(e.target.value || currentPeriod())}
+            className="w-[160px]"
           />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Label htmlFor="month-count" className="text-xs text-muted-foreground">
+            Mois affichés
+          </Label>
+          <Select
+            value={String(monthCount)}
+            onValueChange={(v) => setMonthCount(Number(v) || DEFAULT_MONTH_COUNT)}
+          >
+            <SelectTrigger id="month-count" className="w-[110px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[3, 6, 9, 12].map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n} mois
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-2">
@@ -217,7 +331,7 @@ export default function Actions() {
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Rechercher une action..."
+            placeholder="Rechercher une action, une proposition, une nature..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -225,10 +339,11 @@ export default function Actions() {
         </div>
       </div>
 
-      {/* Month label + inline fetching indicator */}
-      <div className="flex items-center gap-3 text-sm">
+      {/* Summary row */}
+      <div className="flex items-center gap-3 text-sm flex-wrap">
         <span className="text-muted-foreground">
-          Lot <span className="font-medium text-foreground capitalize">{periodLabel}</span>
+          {periods.length} packages mensuels · <span className="font-medium text-foreground">{totalTasks}</span> actions ·{' '}
+          <span className="font-medium text-foreground">{totalProposals}</span> propositions
         </span>
         {isFetching && !isLoading && (
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -244,82 +359,54 @@ export default function Actions() {
           <CheckSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">Sélectionnez un client</h3>
           <p className="text-muted-foreground">
-            Choisissez un client dans la liste pour afficher ses actions du mois.
+            Choisissez un client dans la liste pour afficher ses packages mensuels.
           </p>
         </div>
       ) : isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">Chargement des actions...</div>
-      ) : !hasAnything ? (
+        <div className="text-center py-12 text-muted-foreground">Chargement des packages...</div>
+      ) : totalTasks === 0 && totalProposals === 0 ? (
         <div className="text-center py-12 bg-card rounded-xl border border-border">
-          <CheckSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">Aucune action ce mois-ci</h3>
+          <Lightbulb className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">
+            Aucune action ni proposition sur la plage affichée
+          </h3>
           <p className="text-muted-foreground">
-            Créez une première action pour alimenter le lot de {periodLabel}.
+            Créez une première action pour alimenter ces packages.
           </p>
           <div className="mt-4 flex justify-center gap-2 flex-wrap">
-            {(['seo', 'contenu', 'design'] as TaskType[]).map((t) => (
+            {(['seo', 'contenu', 'social_media'] as TaskType[]).map((t) => (
               <Button
                 key={t}
                 variant="outline"
                 size="sm"
-                onClick={() => openCreate(t)}
-                className="gap-1.5"
+                onClick={() => openCreate(t, anchor)}
               >
-                {getTaskTypeLabel(t)}
+                Nouvelle action {t}
               </Button>
             ))}
           </div>
         </div>
       ) : (
         <div className="space-y-4">
-          {groupedPlanTasks.map(([taskType, rows]) => {
-            const workflow = getWorkflow(taskType);
-            const label = getTaskTypeLabel(taskType);
-            const Icon = TASK_TYPE_ICONS[taskType] ?? MoreHorizontal;
-            const mapped: ActionsGroupRow[] = rows.map((r) => ({
-              id: r.id,
-              title: r.title,
-              subtitle: r.description ?? r.thematique ?? r.canal ?? null,
-              priority: r.priority,
-              assignee: r.assignee,
-              dueDate: r.due_date,
-              status: r.status,
-            }));
-            return (
-              <ActionsGroupCard
-                key={taskType}
-                title={label}
-                icon={Icon}
-                rows={mapped}
-                workflow={workflow}
-                taskType={taskType}
-                onStatusChange={handleStatusChange}
-                onCreate={() => openCreate(taskType as TaskType)}
-                createLabel="Nouvelle action"
-                emptyLabel={`Aucune action ${label.toLowerCase()} pour ${periodLabel}.`}
-              />
-            );
-          })}
-
-          {showEditorial && filteredEditorial.length > 0 && (
-            <ActionsGroupCard
-              title="Articles éditoriaux"
-              icon={Newspaper}
-              rows={filteredEditorial.map<ActionsGroupRow>((e) => ({
-                id: e.id,
-                title: e.title,
-                subtitle: [e.canal, e.content_type].filter(Boolean).join(' · ') || null,
-                priority: e.priority,
-                assignee: e.owner,
-                dueDate: e.date,
-                status: e.status,
-                editHref: '/calendar',
-              }))}
-              workflow={EDITORIAL_WORKFLOW}
-              readOnly
-              emptyLabel="Aucun article éditorial pour ce mois."
+          {periods.map((p) => (
+            <MonthlyPackage
+              key={p}
+              period={p}
+              planTasks={tasksByPeriod.get(p) ?? []}
+              editorialEntries={editorialByPeriod.get(p) ?? []}
+              proposals={proposalsByPeriod.get(p) ?? []}
+              collapsed={collapsed[p] ?? false}
+              onToggleCollapsed={toggleCollapsed}
+              onStatusChange={handleStatusChange}
+              onCreateTask={openCreate}
+              onApproveProposal={handleApproveProposal}
+              onRejectProposal={handleRejectProposal}
+              onEditProposal={handleEditProposal}
+              showEditorial={showEditorial}
+              isCurrent={p === nowPeriod}
+              isAdmin={isAdmin}
             />
-          )}
+          ))}
 
           {/* Footer helper linking back to Journal */}
           <div className="text-xs text-muted-foreground text-center pt-2">
@@ -337,13 +424,14 @@ export default function Actions() {
           setDialogOpen(o);
           if (!o) {
             refetch();
+            refetchProposals();
           }
         }}
         isAdmin={isAdmin}
         defaultClientId={clientId ?? undefined}
         clientName={currentClient?.name}
         prefill={prefill}
-        defaultPeriod={period}
+        defaultPeriod={anchor}
       />
     </div>
   );

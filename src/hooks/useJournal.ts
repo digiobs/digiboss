@@ -223,9 +223,13 @@ async function fetchEditorial(clientId: string | null): Promise<JournalEntry[]> 
 }
 
 async function fetchDeliverables(clientId: string | null): Promise<JournalEntry[]> {
+  // Slim select: only the columns the Journal row actually consumes
+  // (`getDeliverableUrl` + title/status/skill/filename). The full deliverables
+  // row has ~16 columns including `description`, `tags`, `period`, etc. — we
+  // don't need them here, and dropping them noticeably cuts payload size.
   const base = sb
     .from('deliverables')
-    .select('id,client_id,type,title,description,status,skill_name,channel,sub_type,notion_url,sharepoint_url,onedrive_path,filename,period,tags,created_at,clients(name)')
+    .select('id,client_id,type,title,status,skill_name,notion_url,sharepoint_url,onedrive_path,filename,created_at,clients(name)')
     .order('created_at', { ascending: false })
     .limit(150);
   const { data, error } = await withClientFilter(base, clientId);
@@ -276,7 +280,10 @@ export interface UseJournalResult {
   entries: JournalEntry[];
   /** Count of raw entries (before any filtering) per source */
   countsBySource: Record<JournalSource, number>;
+  /** True only on the very first load when no source has produced data yet. */
   isLoading: boolean;
+  /** True while at least one source is still fetching in the background. */
+  isFetching: boolean;
   isError: boolean;
   refetch: () => void;
 }
@@ -332,10 +339,19 @@ export function useJournal(options?: { clientId?: string | null }): UseJournalRe
     [veilleQ.data, meetingQ.data, proposalQ.data, editorialQ.data, deliverableQ.data, taskQ.data],
   );
 
+  // Progressive rendering: only block the UI on the *initial* load when no
+  // source has produced any data yet. Once at least one source returns, we
+  // render whatever's available and let the rest stream in. This avoids the
+  // slowest of the 6 parallel queries holding the whole page hostage.
+  const anyDataReady = queries.some((q) => q.data !== undefined);
+  const isLoading = !anyDataReady && queries.some((q) => q.isLoading);
+  const isFetching = queries.some((q) => q.isFetching);
+
   return {
     entries,
     countsBySource,
-    isLoading: queries.some((q) => q.isLoading),
+    isLoading,
+    isFetching,
     isError: queries.some((q) => q.isError),
     refetch: () => {
       queries.forEach((q) => q.refetch());

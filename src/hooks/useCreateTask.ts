@@ -16,6 +16,16 @@ export function useCreateTask({ onSuccess }: UseCreateTaskOptions = {}) {
       const assigneeString = data.assigneeIds.map((a) => a.name).join(', ');
       const isEdit = !!data.id;
 
+      // Derive monthly batch id from dueDate (falls back to today) when the
+      // caller didn't explicitly set it — keeps the /actions view populated
+      // for tasks created through the existing UI paths.
+      const derivePeriod = (): string | null => {
+        if (data.period) return data.period;
+        const source = data.dueDate ? new Date(data.dueDate) : new Date();
+        if (Number.isNaN(source.getTime())) return null;
+        return `${source.getFullYear()}-${String(source.getMonth() + 1).padStart(2, '0')}`;
+      };
+
       const row = {
         client_id: data.clientId,
         title: data.title,
@@ -44,6 +54,7 @@ export function useCreateTask({ onSuccess }: UseCreateTaskOptions = {}) {
         content_type: data.contentType || null,
         content_status: data.contentStatus || null,
         funnel_stage: data.funnelStage || null,
+        period: derivePeriod(),
       };
 
       if (isEdit) {
@@ -82,9 +93,11 @@ export function useCreateTask({ onSuccess }: UseCreateTaskOptions = {}) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plan-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['plan-tasks-by-type'] });
       queryClient.invalidateQueries({ queryKey: ['wrike-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['client-avancement'] });
       queryClient.invalidateQueries({ queryKey: ['content-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly-actions'] });
       toast.success('Tâche enregistrée avec succès');
       onSuccess?.();
     },

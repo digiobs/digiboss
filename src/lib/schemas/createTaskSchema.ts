@@ -53,6 +53,12 @@ export const createTaskSchema = z.object({
     .nullable()
     .optional(),
   funnelStage: z.enum(['awareness', 'consideration', 'conversion']).nullable().optional(),
+  // Monthly batch — `YYYY-MM`. Optional; derived from dueDate at persist time.
+  period: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/, 'Période invalide (YYYY-MM)')
+    .nullable()
+    .optional(),
 }).superRefine((data, ctx) => {
   // Canal required for content and social_media tasks
   if ((data.taskType === 'contenu' || data.taskType === 'social_media') && !data.canal) {

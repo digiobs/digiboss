@@ -67,12 +67,16 @@ interface CreateTaskDialogProps {
    *  with fields pre-filled from this partial payload. Used to edit a
    *  content opportunity before saving it as a task. */
   prefill?: Partial<TaskFormData>;
+  /** Monthly batch id (`YYYY-MM`) to assign to the new task. Used by the
+   *  /actions page so new tasks land in the currently-viewed month. */
+  defaultPeriod?: string;
 }
 
 function getDefaultValues(
   defaultClientId?: string,
   task?: PlanTaskRow,
   prefill?: Partial<TaskFormData>,
+  defaultPeriod?: string,
 ): TaskFormData {
   if (task) {
     return {
@@ -102,6 +106,7 @@ function getDefaultValues(
       contentType: (task.content_type as ContentType) || null,
       contentStatus: (task.content_status as ContentStatus) || null,
       funnelStage: (task.funnel_stage as FunnelStage) || null,
+      period: (task as PlanTaskRow & { period?: string | null }).period ?? null,
     };
   }
 
@@ -132,6 +137,7 @@ function getDefaultValues(
     contentType: null,
     contentStatus: null,
     funnelStage: null,
+    period: defaultPeriod ?? null,
   };
 
   return prefill ? { ...base, ...prefill } : base;
@@ -145,28 +151,29 @@ export function CreateTaskDialog({
   clientName,
   task,
   prefill,
+  defaultPeriod,
 }: CreateTaskDialogProps) {
   const isEdit = !!task;
 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(createTaskSchema),
-    defaultValues: getDefaultValues(defaultClientId, task, prefill),
+    defaultValues: getDefaultValues(defaultClientId, task, prefill, defaultPeriod),
   });
 
   const { mutate, isPending } = useCreateTask({
     onSuccess: () => {
       onOpenChange(false);
-      form.reset(getDefaultValues(defaultClientId));
+      form.reset(getDefaultValues(defaultClientId, undefined, undefined, defaultPeriod));
     },
   });
 
   // Reset form when dialog opens with different task or prefill
   useEffect(() => {
     if (open) {
-      form.reset(getDefaultValues(defaultClientId, task, prefill));
+      form.reset(getDefaultValues(defaultClientId, task, prefill, defaultPeriod));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, task?.id, defaultClientId, prefill]);
+  }, [open, task?.id, defaultClientId, prefill, defaultPeriod]);
 
   const onSubmit = (data: TaskFormData) => {
     if (isEdit && task) {

@@ -134,6 +134,9 @@ export interface TaskFormData {
   contentType?: ContentType | null;
   contentStatus?: ContentStatus | null;
   funnelStage?: FunnelStage | null;
+  /** Monthly batch id (`YYYY-MM`). Used by the /actions page to group a
+   *  client's work by month. Derived from `dueDate` if left empty. */
+  period?: string | null;
 }
 
 export const mockTasks: Task[] = [

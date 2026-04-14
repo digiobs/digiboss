@@ -22,6 +22,7 @@ import Reporting from "@/pages/Reporting";
 import Chat from "@/pages/Chat";
 import Admin from "@/pages/Admin";
 import Journal from "@/pages/Journal";
+import Actions from "@/pages/Actions";
 import Veille from "@/pages/Veille";
 import Proposals from "@/pages/Proposals";
 import EditorialCalendar from "@/pages/EditorialCalendar";
@@ -89,6 +90,7 @@ const AppRoutes = () => {
         <Route path="/assets" element={<Assets />} />
         <Route path="/reporting" element={<Reporting />} />
         <Route path="/journal" element={<Journal />} />
+        <Route path="/actions" element={<Actions />} />
         <Route path="/deliverables" element={<Navigate to="/journal" replace />} />
         <Route path="/veille" element={<Veille />} />
         <Route path="/proposals" element={<Proposals />} />

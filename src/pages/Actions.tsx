@@ -31,6 +31,7 @@ import {
 } from '@/hooks/useMonthlyActions';
 import { CreateTaskDialog } from '@/components/plan/CreateTaskDialog';
 import { MonthlyPackage } from '@/components/actions/MonthlyPackage';
+import { ConvergencesPanel } from '@/components/actions/ConvergencesPanel';
 import { useCreativeProposals, type CreativeProposal } from '@/hooks/useCreativeProposals';
 import type { TaskType, TaskFormData } from '@/types/tasks';
 import type { PlanTaskContentRow } from '@/hooks/useContentTasks';
@@ -56,8 +57,15 @@ export default function Actions() {
 
   const periods = useMemo(() => buildPeriodRange(anchor, monthCount), [anchor, monthCount]);
 
-  const { planTasks, editorialEntries, proposals, isLoading, isFetching, refetch } =
-    useMonthlyActions({ clientId, periods });
+  const {
+    planTasks,
+    editorialEntries,
+    proposals,
+    convergences,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useMonthlyActions({ clientId, periods });
 
   // Proposal mutations still live in useCreativeProposals so approved items
   // push to Wrike consistently with the old /proposals page.
@@ -365,29 +373,33 @@ export default function Actions() {
       ) : isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Chargement des packages...</div>
       ) : totalTasks === 0 && totalProposals === 0 ? (
-        <div className="text-center py-12 bg-card rounded-xl border border-border">
-          <Lightbulb className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">
-            Aucune action ni proposition sur la plage affichée
-          </h3>
-          <p className="text-muted-foreground">
-            Créez une première action pour alimenter ces packages.
-          </p>
-          <div className="mt-4 flex justify-center gap-2 flex-wrap">
-            {(['seo', 'contenu', 'social_media'] as TaskType[]).map((t) => (
-              <Button
-                key={t}
-                variant="outline"
-                size="sm"
-                onClick={() => openCreate(t, anchor)}
-              >
-                Nouvelle action {t}
-              </Button>
-            ))}
+        <div className="space-y-4">
+          <ConvergencesPanel convergences={convergences} />
+          <div className="text-center py-12 bg-card rounded-xl border border-border">
+            <Lightbulb className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              Aucune action ni proposition sur la plage affichée
+            </h3>
+            <p className="text-muted-foreground">
+              Créez une première action pour alimenter ces packages.
+            </p>
+            <div className="mt-4 flex justify-center gap-2 flex-wrap">
+              {(['seo', 'contenu', 'social_media'] as TaskType[]).map((t) => (
+                <Button
+                  key={t}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openCreate(t, anchor)}
+                >
+                  Nouvelle action {t}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
       ) : (
         <div className="space-y-4">
+          <ConvergencesPanel convergences={convergences} />
           {periods.map((p) => (
             <MonthlyPackage
               key={p}

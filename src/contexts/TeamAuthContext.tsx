@@ -68,26 +68,41 @@ export function TeamAuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Listen for auth state changes.
+    let cancelled = false;
+
+    const handleSession = async (authUser: User | null) => {
+      if (cancelled) return;
+      await resolveSession(authUser);
+      if (!cancelled) setIsLoading(false);
+    };
+
+    // Listen for auth state changes. IMPORTANT: the Supabase SDK holds a
+    // NavigatorLock while firing subscribers, so any `supabase.from(...)`
+    // or `supabase.auth.signOut()` call awaited synchronously here will
+    // deadlock and abort with `AbortError: signal is aborted without reason`.
+    // We must defer all async work out of the callback with setTimeout(0).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         // When a new sign-in fires, set loading=true so PreAuthGuard
         // waits for the profile check instead of redirecting to /login.
         if (event === 'SIGNED_IN') {
           setIsLoading(true);
         }
-        await resolveSession(session?.user ?? null);
-        setIsLoading(false);
+        setTimeout(() => {
+          handleSession(session?.user ?? null);
+        }, 0);
       },
     );
 
     // Check existing session on mount.
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      await resolveSession(session?.user ?? null);
-      setIsLoading(false);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {

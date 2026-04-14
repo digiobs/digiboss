@@ -101,7 +101,7 @@ interface EditorialRow {
   clients?: ClientJoin;
 }
 
-interface DeliverableRow extends Deliverable {}
+type DeliverableRow = Deliverable;
 
 interface TaskRow {
   id: string;

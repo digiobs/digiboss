@@ -1,6 +1,9 @@
-project_id = "cdidlnlytaomnpoirwuz"
+project_id = "sjjgxiovhbmkwsytscrc"
 
 [functions.market-news]
+verify_jwt = false
+
+[functions.lemlist-sync]
 verify_jwt = false
 
 [functions.dashboard-news]

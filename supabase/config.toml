@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.lemlist-sync]
 verify_jwt = false
 
+[functions.lemlist-list-campaigns]
+verify_jwt = false
+
 [functions.dashboard-news]
 verify_jwt = false
 

@@ -8,8 +8,17 @@ export interface LemlistMapping {
   client_id: string;
   external_account_id: string;
   external_account_name: string | null;
+  external_workspace_id: string | null;
   is_active: boolean;
   updated_at: string | null;
+}
+
+/** Shape accepted by `connect` — matches what the picker emits. */
+export interface LemlistPickableCampaign {
+  id: string;
+  name: string;
+  team_id: string | null;
+  team_name: string | null;
 }
 
 const sb = supabase as unknown as {
@@ -50,7 +59,9 @@ export function useLemlistCampaignMapping() {
       if (!clientId) return null;
       const result = await sb
         .from('client_data_mappings')
-        .select('id,client_id,external_account_id,external_account_name,is_active,updated_at')
+        .select(
+          'id,client_id,external_account_id,external_account_name,external_workspace_id,is_active,updated_at',
+        )
         .eq('client_id', clientId)
         .eq('provider', 'lemlist')
         .eq('connector', 'campaigns')
@@ -63,7 +74,7 @@ export function useLemlistCampaignMapping() {
   });
 
   const connect = useMutation({
-    mutationFn: async (campaign: { id: string; name: string }) => {
+    mutationFn: async (campaign: LemlistPickableCampaign) => {
       if (!clientId || isAllClientsSelected) {
         throw new Error('Sélectionnez un client avant de connecter une campagne.');
       }
@@ -75,6 +86,9 @@ export function useLemlistCampaignMapping() {
           connector: 'campaigns',
           external_account_id: campaign.id,
           external_account_name: campaign.name,
+          // Store the lemlist team id so lemlist-sync can route to the right
+          // API key when multiple LEMLIST_API_KEYS are configured.
+          external_workspace_id: campaign.team_id,
           status: 'connected',
           is_active: true,
           mapping_strategy: 'manual_picker',

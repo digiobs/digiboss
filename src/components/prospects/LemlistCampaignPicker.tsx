@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useLemlistCampaignList } from '@/hooks/useLemlistCampaignList';
+import { useLemlistCampaignList, type LemlistCampaign } from '@/hooks/useLemlistCampaignList';
 import type { LemlistMapping } from '@/hooks/useLemlistCampaignMapping';
 
 interface LemlistCampaignPickerProps {
@@ -18,7 +18,7 @@ interface LemlistCampaignPickerProps {
   clientName: string | null;
   isConnecting: boolean;
   isDisconnecting: boolean;
-  onConnect: (campaign: { id: string; name: string }) => void;
+  onConnect: (campaign: LemlistCampaign) => void;
   onDisconnect: () => void;
 }
 
@@ -55,16 +55,40 @@ export function LemlistCampaignPicker({
       .filter((t) => t.length >= 3);
   }, [clientName]);
 
-  const matchedCampaigns = useMemo(() => {
-    if (clientTokens.length === 0) return campaigns;
-    return campaigns.filter((c) => {
+  // Two-stage matching:
+  //   1. Prefer campaigns whose *team name* matches the client (multi-team
+  //      setups: "Team Acme" ↔ client "Acme Co").
+  //   2. Fall back to the legacy *campaign name* match when no team matches.
+  // The stage 1 result is preferred whenever non-empty so routing stays
+  // deterministic even when a campaign happens to include client tokens
+  // across multiple teams.
+  const { matchedCampaigns, matchKind } = useMemo<{
+    matchedCampaigns: typeof campaigns;
+    matchKind: 'team' | 'name' | 'none';
+  }>(() => {
+    if (clientTokens.length === 0) {
+      return { matchedCampaigns: campaigns, matchKind: 'none' };
+    }
+    const byTeam = campaigns.filter((c) => {
+      const normalized = normalizeText(c.team_name ?? '');
+      if (!normalized) return false;
+      return clientTokens.some((token) => normalized.includes(token));
+    });
+    if (byTeam.length > 0) {
+      return { matchedCampaigns: byTeam, matchKind: 'team' };
+    }
+    const byName = campaigns.filter((c) => {
       const normalized = normalizeText(c.name);
       return clientTokens.some((token) => normalized.includes(token));
     });
+    if (byName.length > 0) {
+      return { matchedCampaigns: byName, matchKind: 'name' };
+    }
+    return { matchedCampaigns: campaigns, matchKind: 'none' };
   }, [campaigns, clientTokens]);
 
-  const displayedCampaigns = showAll || matchedCampaigns.length === 0 ? campaigns : matchedCampaigns;
-  const hasClientFilter = clientTokens.length > 0 && matchedCampaigns.length !== campaigns.length;
+  const displayedCampaigns = showAll || matchKind === 'none' ? campaigns : matchedCampaigns;
+  const hasClientFilter = matchKind !== 'none' && matchedCampaigns.length !== campaigns.length;
 
   const selected = displayedCampaigns.find((c) => c.id === selectedId) ?? null;
 
@@ -108,7 +132,14 @@ export function LemlistCampaignPicker({
           <SelectContent>
             {displayedCampaigns.map((c) => (
               <SelectItem key={c.id} value={c.id} className="text-xs">
-                {c.name}
+                {c.team_name ? (
+                  <span>
+                    <span className="text-muted-foreground">{c.team_name} · </span>
+                    {c.name}
+                  </span>
+                ) : (
+                  c.name
+                )}
               </SelectItem>
             ))}
             {displayedCampaigns.length === 0 && !isLoading && (
@@ -146,7 +177,9 @@ export function LemlistCampaignPicker({
           <span>
             {showAll
               ? `${campaigns.length} campagne${campaigns.length > 1 ? 's' : ''} au total`
-              : `${matchedCampaigns.length} correspondance${matchedCampaigns.length > 1 ? 's' : ''} pour « ${clientName} » sur ${campaigns.length}`}
+              : `${matchedCampaigns.length} correspondance${matchedCampaigns.length > 1 ? 's' : ''} ${
+                  matchKind === 'team' ? 'par équipe' : 'par nom'
+                } pour « ${clientName} » sur ${campaigns.length}`}
           </span>
           <button
             type="button"

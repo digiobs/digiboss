@@ -5,7 +5,10 @@ import {
   safeString,
   startIntegrationRun,
 } from "../_shared/ingestion.ts";
-import { fetchCampaigns } from "../_shared/lemlist.ts";
+import {
+  fetchCampaignsAcrossTeams,
+  loadLemlistClients,
+} from "../_shared/lemlist.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -59,27 +62,50 @@ serve(async (req) => {
       requestPayload: { source: "lemlist-list-campaigns" },
     });
 
-    const apiKey = Deno.env.get("LEMLIST_API_KEY");
-    if (!apiKey) {
-      throw new Error("LEMLIST_API_KEY is not configured.");
+    const clients = await loadLemlistClients();
+    if (clients.length === 0) {
+      throw new Error(
+        "No lemlist API key configured (set LEMLIST_API_KEYS or LEMLIST_API_KEY).",
+      );
     }
 
-    const campaigns = await fetchCampaigns(apiKey);
+    const campaigns = await fetchCampaignsAcrossTeams(clients);
+
+    // Frontend picker expects a flat list of `{id, name, team_id, team_name}`.
+    // Sort teams first so campaigns group naturally in the dropdown.
+    const responseCampaigns = campaigns
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        team_id: c.teamId,
+        team_name: c.teamName,
+      }))
+      .sort((a, b) => {
+        const teamCmp = (a.team_name ?? "").localeCompare(b.team_name ?? "");
+        if (teamCmp !== 0) return teamCmp;
+        return a.name.localeCompare(b.name);
+      });
 
     await finishIntegrationRun(supabase, runId, {
       status: "success",
       metrics: {
-        recordsFetched: campaigns.length,
+        recordsFetched: responseCampaigns.length,
         recordsUpserted: 0,
         recordsFailed: 0,
         durationMs: Date.now() - startedAt,
       },
-      samplePayload: campaigns[0] ? { firstCampaign: campaigns[0] } : null,
+      samplePayload: responseCampaigns[0]
+        ? { firstCampaign: responseCampaigns[0], teamCount: clients.length }
+        : { teamCount: clients.length },
     });
 
-    return new Response(JSON.stringify({ campaigns }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        campaigns: responseCampaigns,
+        teams: clients.map((c) => ({ team_id: c.teamId, team_name: c.teamName })),
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (error) {
     await finishIntegrationRun(supabase, runId, {
       status: "failed",

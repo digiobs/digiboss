@@ -6,9 +6,11 @@ import {
   startIntegrationRun,
 } from "../_shared/ingestion.ts";
 import {
-  fetchCampaigns,
+  fetchCampaignsAcrossTeams,
   fetchLeadsForCampaign,
   type LemlistLead,
+  type LemlistTeamClient,
+  loadLemlistClients,
   normalizeText,
 } from "../_shared/lemlist.ts";
 
@@ -30,6 +32,8 @@ type ContactRow = {
   synced_at: string;
   campaign_id: string | null;
   campaign_name: string | null;
+  team_id: string | null;
+  team_name: string | null;
   emails_sent: number;
   emails_opened: number;
   emails_clicked: number;
@@ -44,6 +48,8 @@ function toContactRow(
   clientId: string,
   campaignId: string | null,
   campaignName: string | null,
+  teamId: string | null,
+  teamName: string | null,
 ): ContactRow {
   return {
     client_id: clientId,
@@ -58,6 +64,8 @@ function toContactRow(
     synced_at: new Date().toISOString(),
     campaign_id: campaignId,
     campaign_name: campaignName,
+    team_id: teamId,
+    team_name: teamName,
     emails_sent: lead.emailsSent,
     emails_opened: lead.emailsOpened,
     emails_clicked: lead.emailsClicked,
@@ -66,6 +74,24 @@ function toContactRow(
     last_event_type: lead.lastEventType,
     last_event_at: lead.lastEventAt,
   };
+}
+
+/**
+ * Pick the right lemlist API client for a mapping. The mapping row stores the
+ * team id in `external_workspace_id`; when it's missing (old mappings created
+ * before multi-team support) we fall back to the first configured client,
+ * which mirrors the legacy single-key behaviour.
+ */
+function pickTeamClient(
+  clients: LemlistTeamClient[],
+  workspaceId: string | null,
+): LemlistTeamClient | null {
+  if (clients.length === 0) return null;
+  if (workspaceId) {
+    const match = clients.find((c) => c.teamId === workspaceId);
+    if (match) return match;
+  }
+  return clients[0];
 }
 
 serve(async (req) => {
@@ -79,22 +105,35 @@ serve(async (req) => {
     const clientId = safeString(body?.clientId);
     const bootstrapMappings = Boolean(body?.bootstrapMappings);
     const limit = Math.min(Math.max(Number(body?.limit ?? 100), 1), 500);
-    const apiKey = Deno.env.get("LEMLIST_API_KEY");
+
+    // Resolve every configured lemlist team up-front. loadLemlistClients()
+    // already handles LEMLIST_API_KEYS (JSON) → LEMLIST_API_KEY fallback, so a
+    // non-empty result guarantees we have at least one usable API key.
+    const teamClients = await loadLemlistClients();
+    const hasLiveApi = teamClients.length > 0;
 
     runId = await startIntegrationRun(supabase, {
       provider: "lemlist",
       connector: "contacts",
       clientId,
       triggerType: "manual",
-      requestPayload: { limit, clientId, hasApiKey: Boolean(apiKey), bootstrapMappings },
+      requestPayload: {
+        limit,
+        clientId,
+        hasApiKey: hasLiveApi,
+        teamCount: teamClients.length,
+        bootstrapMappings,
+      },
     });
 
     if (bootstrapMappings) {
-      if (!apiKey) {
-        throw new Error("LEMLIST_API_KEY is required to bootstrap mappings.");
+      if (!hasLiveApi) {
+        throw new Error(
+          "LEMLIST_API_KEYS or LEMLIST_API_KEY is required to bootstrap mappings.",
+        );
       }
 
-      const campaigns = await fetchCampaigns(apiKey);
+      const campaigns = await fetchCampaignsAcrossTeams(teamClients);
       const { data: clients, error: clientsError } = await supabase
         .from("clients")
         .select("id,name");
@@ -113,22 +152,37 @@ serve(async (req) => {
 
       const matchedMappings = campaigns.flatMap((campaign) => {
         const normalizedCampaign = normalizeText(campaign.name);
-        const matchingClients = normalizedClients.filter(
-          (client) =>
+        const normalizedTeam = normalizeText(campaign.teamName ?? "");
+        // Prefer team-name matches so multi-team setups route to the right
+        // workspace, then fall back to campaign-name similarity.
+        const matchingClients = normalizedClients.filter((client) => {
+          if (!client.normalized) return false;
+          if (
+            normalizedTeam &&
+            (normalizedTeam.includes(client.normalized) ||
+              client.normalized.includes(normalizedTeam))
+          ) {
+            return true;
+          }
+          return (
             normalizedCampaign.includes(client.normalized) ||
-            client.normalized.includes(normalizedCampaign),
-        );
+            client.normalized.includes(normalizedCampaign)
+          );
+        });
         return matchingClients.map((client) => ({
           client_id: client.id,
           provider: "lemlist",
           connector: "campaigns",
           external_account_id: campaign.id,
           external_account_name: campaign.name,
+          external_workspace_id: campaign.teamId,
           status: "connected",
           is_active: true,
           mapping_strategy: "name_fallback",
           is_manual_override: false,
-          notes: "Auto-mapped from Lemlist campaigns by name similarity.",
+          notes: campaign.teamName
+            ? `Auto-mapped from Lemlist team « ${campaign.teamName} » by name similarity.`
+            : "Auto-mapped from Lemlist campaigns by name similarity.",
           updated_at: new Date().toISOString(),
         }));
       });
@@ -168,7 +222,7 @@ serve(async (req) => {
     let mappingQuery = supabase
       .from("client_data_mappings")
       .select(
-        "client_id,external_account_id,external_account_name,alias_external_ids,mapping_strategy,is_active",
+        "client_id,external_account_id,external_account_name,external_workspace_id,alias_external_ids,mapping_strategy,is_active",
       )
       .eq("provider", "lemlist")
       .eq("connector", "campaigns")
@@ -199,11 +253,16 @@ serve(async (req) => {
       if (!mappedClientId) continue;
       const campaignId = safeString(mapping.external_account_id);
       const campaignName = safeString(mapping.external_account_name);
+      const workspaceId = safeString(mapping.external_workspace_id);
 
-      if (!apiKey) {
-        // No live API key: seed a few obvious mocks so the UI isn't empty in
-        // dev. These go through the same columns as real data so the table
-        // renders correctly.
+      // Route to the right API key based on the team id stored on the mapping.
+      // Falls back to the first configured team if we can't find a match.
+      const teamClient = pickTeamClient(teamClients, workspaceId);
+
+      if (!teamClient) {
+        // No live API key at all: seed a few obvious mocks so the UI isn't
+        // empty in dev. These go through the same columns as real data so the
+        // table renders correctly.
         for (let i = 1; i <= Math.min(limit, 5); i += 1) {
           records.push({
             client_id: mappedClientId,
@@ -218,6 +277,8 @@ serve(async (req) => {
             synced_at: new Date().toISOString(),
             campaign_id: campaignId,
             campaign_name: campaignName,
+            team_id: workspaceId || null,
+            team_name: null,
             emails_sent: 0,
             emails_opened: 0,
             emails_clicked: 0,
@@ -231,9 +292,18 @@ serve(async (req) => {
       }
 
       if (!campaignId) continue;
-      const leads = await fetchLeadsForCampaign(apiKey, campaignId, limit);
+      const leads = await fetchLeadsForCampaign(teamClient.apiKey, campaignId, limit);
       leads.forEach((lead) => {
-        records.push(toContactRow(lead, mappedClientId, campaignId, campaignName));
+        records.push(
+          toContactRow(
+            lead,
+            mappedClientId,
+            campaignId,
+            campaignName,
+            teamClient.teamId,
+            teamClient.teamName,
+          ),
+        );
       });
     }
 
@@ -260,7 +330,11 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ synced: records.length, usedLiveApi: Boolean(apiKey) }),
+      JSON.stringify({
+        synced: records.length,
+        usedLiveApi: hasLiveApi,
+        teamCount: teamClients.length,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {

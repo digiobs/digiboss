@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link2, Unlink, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,24 +15,58 @@ import type { LemlistMapping } from '@/hooks/useLemlistCampaignMapping';
 interface LemlistCampaignPickerProps {
   mapping: LemlistMapping | null;
   enabled: boolean;
+  clientName: string | null;
   isConnecting: boolean;
   isDisconnecting: boolean;
   onConnect: (campaign: { id: string; name: string }) => void;
   onDisconnect: () => void;
 }
 
+/** Strip accents, lowercase, reduce non-alphanumerics to single spaces. */
+function normalizeText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 export function LemlistCampaignPicker({
   mapping,
   enabled,
+  clientName,
   isConnecting,
   isDisconnecting,
   onConnect,
   onDisconnect,
 }: LemlistCampaignPickerProps) {
   const [selectedId, setSelectedId] = useState<string>('');
+  const [showAll, setShowAll] = useState(false);
   const { campaigns, isLoading, error, refetch } = useLemlistCampaignList(enabled);
 
-  const selected = campaigns.find((c) => c.id === selectedId) ?? null;
+  // Tokens from the client name that we'll use to prefilter. Keep tokens of
+  // length >= 3 so single letters and noise like "de", "la" don't match
+  // everything.
+  const clientTokens = useMemo(() => {
+    if (!clientName) return [] as string[];
+    return normalizeText(clientName)
+      .split(/\s+/)
+      .filter((t) => t.length >= 3);
+  }, [clientName]);
+
+  const matchedCampaigns = useMemo(() => {
+    if (clientTokens.length === 0) return campaigns;
+    return campaigns.filter((c) => {
+      const normalized = normalizeText(c.name);
+      return clientTokens.some((token) => normalized.includes(token));
+    });
+  }, [campaigns, clientTokens]);
+
+  const displayedCampaigns = showAll || matchedCampaigns.length === 0 ? campaigns : matchedCampaigns;
+  const hasClientFilter = clientTokens.length > 0 && matchedCampaigns.length !== campaigns.length;
+
+  const selected = displayedCampaigns.find((c) => c.id === selectedId) ?? null;
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
@@ -72,12 +106,12 @@ export function LemlistCampaignPicker({
             />
           </SelectTrigger>
           <SelectContent>
-            {campaigns.map((c) => (
+            {displayedCampaigns.map((c) => (
               <SelectItem key={c.id} value={c.id} className="text-xs">
                 {c.name}
               </SelectItem>
             ))}
-            {campaigns.length === 0 && !isLoading && (
+            {displayedCampaigns.length === 0 && !isLoading && (
               <div className="px-3 py-2 text-xs text-muted-foreground">
                 Aucune campagne disponible
               </div>
@@ -106,6 +140,23 @@ export function LemlistCampaignPicker({
           </Button>
         )}
       </div>
+
+      {hasClientFilter && !isLoading && campaigns.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {showAll
+              ? `${campaigns.length} campagne${campaigns.length > 1 ? 's' : ''} au total`
+              : `${matchedCampaigns.length} correspondance${matchedCampaigns.length > 1 ? 's' : ''} pour « ${clientName} » sur ${campaigns.length}`}
+          </span>
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-foreground"
+            onClick={() => setShowAll((prev) => !prev)}
+          >
+            {showAll ? 'Filtrer par client' : 'Voir toutes les campagnes'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

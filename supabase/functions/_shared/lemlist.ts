@@ -64,31 +64,59 @@ async function fetchWithFallbacks(
 }
 
 export async function fetchCampaigns(apiKey: string): Promise<LemlistCampaign[]> {
-  const urls = [
-    "https://api.lemlist.com/api/campaigns?limit=200",
-    "https://api.lemlist.com/api/campaigns?offset=0&limit=200",
-    "https://api.lemlist.com/api/campaigns",
-  ];
-  const { text, url } = await fetchWithFallbacks(urls, apiKey);
+  // Lemlist historically caps `/api/campaigns` at 100 rows per call regardless
+  // of the `limit` we pass, so we always paginate. Stop when a page is empty,
+  // shorter than the page size, or repeats IDs we already saw (which means the
+  // workspace doesn't actually honor `offset` and we're looping on page 0).
+  const pageSize = 100;
+  const maxPages = 20;
+  const seen = new Map<string, LemlistCampaign>();
 
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Error(`Invalid JSON from ${url}: ${text.slice(0, 240)}`);
+  for (let page = 0; page < maxPages; page += 1) {
+    const offset = page * pageSize;
+    const urls = [
+      `https://api.lemlist.com/api/campaigns?version=v2&limit=${pageSize}&offset=${offset}`,
+      `https://api.lemlist.com/api/campaigns?limit=${pageSize}&offset=${offset}`,
+      `https://api.lemlist.com/api/campaigns?limit=${pageSize}&page=${page}`,
+      `https://api.lemlist.com/api/campaigns?limit=${pageSize}`,
+    ];
+
+    let text: string;
+    try {
+      const result = await fetchWithFallbacks(urls, apiKey);
+      text = result.text;
+    } catch (error) {
+      if (page === 0) throw error;
+      break;
+    }
+
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      break;
+    }
+
+    const rows = asArray(asObject(json)?.["campaigns"] ?? json);
+    const pageCampaigns = rows
+      .map((item) => asObject(item))
+      .filter((item): item is Record<string, unknown> => Boolean(item))
+      .map((item) => {
+        const id = safeString(item.id ?? item._id);
+        const name = safeString(item.name ?? item.title);
+        if (!id || !name) return null;
+        return { id, name };
+      })
+      .filter((c): c is LemlistCampaign => Boolean(c));
+
+    if (pageCampaigns.length === 0) break;
+    const hasNew = pageCampaigns.some((c) => !seen.has(c.id));
+    if (!hasNew) break; // API ignored `offset` — stop to avoid an infinite loop.
+    for (const c of pageCampaigns) seen.set(c.id, c);
+    if (pageCampaigns.length < pageSize) break;
   }
 
-  const rows = asArray(asObject(json)?.["campaigns"] ?? json);
-  return rows
-    .map((item) => asObject(item))
-    .filter((item): item is Record<string, unknown> => Boolean(item))
-    .map((item) => {
-      const id = safeString(item.id ?? item._id);
-      const name = safeString(item.name ?? item.title);
-      if (!id || !name) return null;
-      return { id, name };
-    })
-    .filter((c): c is LemlistCampaign => Boolean(c));
+  return Array.from(seen.values());
 }
 
 function toCount(value: unknown): number {

@@ -154,6 +154,7 @@ export default function Prospects() {
         <LemlistCampaignPicker
           mapping={mapping}
           enabled={showPicker}
+          clientName={currentClient?.name ?? null}
           isConnecting={connect.isPending}
           isDisconnecting={disconnect.isPending}
           onConnect={(campaign) => connect.mutate(campaign)}

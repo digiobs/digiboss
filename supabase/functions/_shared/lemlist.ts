@@ -31,13 +31,15 @@ export type LemlistLead = {
 
 function buildHeaderVariants(apiKey: string): Array<Record<string, string>> {
   return [
-    { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    { "x-api-key": apiKey, "Content-Type": "application/json" },
-    // Lemlist legacy basic auth: login is any string, password is the API key.
+    // Lemlist's public API uses HTTP Basic with any username + API key as
+    // password. Keep the Bearer / x-api-key variants as fallbacks for
+    // workspaces that might accept them.
     {
       Authorization: `Basic ${btoa(`user:${apiKey}`)}`,
       "Content-Type": "application/json",
     },
+    { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    { "x-api-key": apiKey, "Content-Type": "application/json" },
   ];
 }
 
@@ -102,11 +104,9 @@ function toCount(value: unknown): number {
 function pickFirstNumber(payload: Record<string, unknown>, keys: string[]): number {
   for (const key of keys) {
     if (key in payload) {
-      const n = toCount(payload[key]);
-      if (n > 0) return n;
-      // Still return the zero from the first present key, so we don't mask
-      // explicit zeros with undefined counters further down.
-      return n;
+      // First key present wins, even if zero, so we don't mask explicit zeros
+      // with undefined counters further down the list.
+      return toCount(payload[key]);
     }
   }
   return 0;

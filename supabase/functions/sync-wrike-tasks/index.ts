@@ -15,16 +15,31 @@ const CUSTOM_FIELD_LINKS: Record<string, string> = {
   IEAETAZKJUAGUNSK: "page",
 };
 
-// Custom field IDs that map to tags
-const CUSTOM_FIELD_TAGS: string[] = [
-  "IEAETAZKJUAIJ7IP", // SEO keyword
-  "IEAETAZKJUAGUPRZ", // Category
-];
+// Custom field IDs that map to dedicated plan_tasks columns
+const CUSTOM_FIELD_COLUMNS: Record<string, string> = {
+  IEAETAZKJUAGUPRZ: "canal",
+  IEAETAZKJUAGU5LL: "format",
+  IEAETAZKJUAE3VV2: "thematique",
+  IEAETAZKJUAIJ7IP: "mot_cle_cible",
+  IEAETAZKJUAIJ7LK: "nombre_mots",
+  IEAETAZKJUAI5LO7: "effort_reserve",
+  IEAETAZKJUAIWUH6: "budget_tache",
+  IEAETAZKJUAJDXQF: "tarif_catalogue",
+  IEAETAZKJUAJKEXT: "forfait_mensuel",
+  IEAETAZKJUAJNUSE: "sous_traitance",
+  IEAETAZKJUAJDXT2: "marge",
+};
 
-// Ignored custom fields
-const CUSTOM_FIELD_IGNORE: string[] = [
-  "IEAETAZKJUAJDXT2", // Score (numeric)
-];
+// Numeric custom field column names (need parseFloat)
+const NUMERIC_COLUMNS = new Set([
+  "nombre_mots",
+  "effort_reserve",
+  "budget_tache",
+  "tarif_catalogue",
+  "forfait_mensuel",
+  "sous_traitance",
+  "marge",
+]);
 
 // Status mapping: Wrike → plan_tasks
 const STATUS_MAP: Record<string, string> = {
@@ -109,15 +124,17 @@ serve(async (req) => {
       );
     }
 
-    // Fetch workflows (to resolve custom status → status group)
+    // Fetch workflows (to resolve custom status → status group + name)
     const workflowsResp = await wrikeFetch(
       `${WRIKE_BASE}/workflows`,
       WRIKE_TOKEN
     );
-    const statusMap = new Map<string, string>();
+    const statusGroupMap = new Map<string, string>();
+    const statusNameMap = new Map<string, string>();
     for (const wf of workflowsResp.data || []) {
       for (const cs of (wf as WrikeWorkflow).customStatuses || []) {
-        statusMap.set(cs.id, cs.group); // group = Active, Completed, Deferred, Cancelled
+        statusGroupMap.set(cs.id, cs.group);
+        statusNameMap.set(cs.id, cs.name);
       }
     }
 
@@ -169,9 +186,14 @@ serve(async (req) => {
       try {
         // Resolve status
         const statusGroup = task.customStatusId
-          ? statusMap.get(task.customStatusId) || "Active"
+          ? statusGroupMap.get(task.customStatusId) || "Active"
           : task.status || "Active";
         const mappedStatus = STATUS_MAP[statusGroup] || "active";
+
+        // Resolve custom status name (French workflow step)
+        const wrikeCustomStatus = task.customStatusId
+          ? statusNameMap.get(task.customStatusId) || null
+          : null;
 
         // Resolve importance
         const imp = IMPORTANCE_MAP[task.importance] || IMPORTANCE_MAP.Normal;
@@ -181,14 +203,26 @@ serve(async (req) => {
           .map((id) => contactMap.get(id) || id)
           .join(", ");
 
-        // Extract resource links from custom fields
+        // Extract resource links and column values from custom fields
         const resourceLinks: { type: string; url: string; label: string }[] =
           [];
         const extraTags: string[] = [];
+        const columnValues: Record<string, string | number | null> = {
+          canal: null,
+          format: null,
+          thematique: null,
+          mot_cle_cible: null,
+          nombre_mots: null,
+          effort_reserve: null,
+          budget_tache: null,
+          tarif_catalogue: null,
+          forfait_mensuel: null,
+          sous_traitance: null,
+          marge: null,
+        };
 
         for (const cf of task.customFields || []) {
-          if (CUSTOM_FIELD_IGNORE.includes(cf.id)) continue;
-
+          // Resource links
           if (CUSTOM_FIELD_LINKS[cf.id] && cf.value) {
             const linkType = CUSTOM_FIELD_LINKS[cf.id];
             const label =
@@ -200,8 +234,26 @@ serve(async (req) => {
             resourceLinks.push({ type: linkType, url: cf.value, label });
           }
 
-          if (CUSTOM_FIELD_TAGS.includes(cf.id) && cf.value) {
-            extraTags.push(cf.value);
+          // Dedicated column values
+          const colName = CUSTOM_FIELD_COLUMNS[cf.id];
+          if (colName && cf.value != null && cf.value !== "") {
+            if (NUMERIC_COLUMNS.has(colName)) {
+              const num = parseFloat(String(cf.value));
+              columnValues[colName] = isNaN(num) ? null : num;
+            } else {
+              // String fields — handle arrays (e.g. multi-select dropdowns)
+              columnValues[colName] = Array.isArray(cf.value)
+                ? (cf.value as unknown as string[]).join(", ")
+                : String(cf.value);
+            }
+          }
+
+          // Also keep mot_cle_cible and canal in tags for backwards compat
+          if (cf.id === "IEAETAZKJUAIJ7IP" && cf.value) {
+            extraTags.push(String(cf.value));
+          }
+          if (cf.id === "IEAETAZKJUAGUPRZ" && cf.value) {
+            extraTags.push(String(cf.value));
           }
         }
 
@@ -235,6 +287,19 @@ serve(async (req) => {
           p_wrike_project_id: wrikeProjectId,
           p_resource_links: resourceLinks,
           p_tags: extraTags,
+          // Custom fields → dedicated columns
+          p_canal: columnValues.canal as string | null,
+          p_format: columnValues.format as string | null,
+          p_thematique: columnValues.thematique as string | null,
+          p_mot_cle_cible: columnValues.mot_cle_cible as string | null,
+          p_nombre_mots: columnValues.nombre_mots as number | null,
+          p_effort_reserve: columnValues.effort_reserve as number | null,
+          p_budget_tache: columnValues.budget_tache as number | null,
+          p_tarif_catalogue: columnValues.tarif_catalogue as number | null,
+          p_forfait_mensuel: columnValues.forfait_mensuel as number | null,
+          p_sous_traitance: columnValues.sous_traitance as number | null,
+          p_marge: columnValues.marge as number | null,
+          p_wrike_custom_status: wrikeCustomStatus,
         });
 
         if (error) {

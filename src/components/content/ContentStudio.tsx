@@ -25,17 +25,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { 
-  ContentOpportunity, 
-  ContentType, 
+import {
+  ContentOpportunity,
+  ContentType,
 } from '@/types/content';
 import { contentTemplates } from '@/data/contentData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { LinkedInPostVisual, type LinkedInPostContent } from './LinkedInPostVisual';
 
 interface ContentStudioProps {
   opportunity?: ContentOpportunity;
   contentType: ContentType;
+  clientId?: string | null;
+  clientName?: string | null;
   onBack: () => void;
   onSave: (content: Record<string, string>) => void;
   onSendToPlan: (content: Record<string, string>) => void;
@@ -66,12 +69,14 @@ const mockBrandTone = [
   'Include actionable takeaways',
 ];
 
-export function ContentStudio({ 
-  opportunity, 
-  contentType, 
-  onBack, 
-  onSave, 
-  onSendToPlan 
+export function ContentStudio({
+  opportunity,
+  contentType,
+  clientId,
+  clientName,
+  onBack,
+  onSave,
+  onSendToPlan,
 }: ContentStudioProps) {
   const template = contentTemplates.find(t => t.contentType === contentType);
   const Icon = contentTypeIcons[contentType] || FileText;
@@ -256,10 +261,27 @@ export function ContentStudio({
           </div>
         </div>
 
-        {/* Context Panel */}
-        <div className="w-80 border-l border-border bg-muted/30 overflow-auto">
+        {/* Side Panel */}
+        <div className={cn(
+          'border-l border-border bg-muted/30 overflow-auto',
+          contentType === 'linkedin-post' ? 'w-96' : 'w-80',
+        )}>
           <ScrollArea className="h-full">
             <div className="p-4 space-y-6">
+              {/* LinkedIn Visual Preview */}
+              {contentType === 'linkedin-post' && (
+                <LinkedInPostVisual
+                  content={{
+                    hook: content.hook || '',
+                    body: content.body || '',
+                    cta: content.cta || '',
+                    hashtags: content.hashtags || '',
+                  } satisfies LinkedInPostContent}
+                  clientId={clientId}
+                  clientName={clientName}
+                />
+              )}
+
               {/* Related Insights */}
               <Card>
                 <CardHeader className="pb-3">

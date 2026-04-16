@@ -335,6 +335,8 @@ export default function ContentCreator() {
         <ContentStudio
           opportunity={selectedOpportunity || undefined}
           contentType={selectedContentType}
+          clientId={clientId}
+          clientName={isAllClientsSelected ? undefined : currentClient?.name}
           onBack={() => setStudioOpen(false)}
           onSave={handleSaveDraft}
           onSendToPlan={handleSendToPlan}

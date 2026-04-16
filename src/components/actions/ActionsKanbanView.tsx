@@ -57,6 +57,8 @@ interface KanbanItem {
   canal?: string;
   contentType?: string;
   date?: string;
+  // original refs for click handlers
+  _task?: PlanTaskContentRow;
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +173,7 @@ const PRIORITY_DOT: Record<string, string> = {
 // Item card
 // ---------------------------------------------------------------------------
 
-function KanbanItemCard({ item }: { item: KanbanItem }) {
+function KanbanItemCard({ item, onClick }: { item: KanbanItem; onClick?: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const sourceConf = SOURCE_CONFIG[item.source];
   const Icon =
@@ -185,7 +187,7 @@ function KanbanItemCard({ item }: { item: KanbanItem }) {
     PRIORITY_DOT[item.priority ?? ''] ?? PRIORITY_DOT.normal;
 
   return (
-    <Card className="mb-2 hover:shadow-md transition-shadow">
+    <Card className={cn('mb-2 hover:shadow-md transition-shadow', onClick && 'cursor-pointer')} onClick={onClick}>
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
           <Icon className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
@@ -244,7 +246,7 @@ function KanbanItemCard({ item }: { item: KanbanItem }) {
           {item.subtitle && (
             <button
               type="button"
-              onClick={() => setExpanded((v) => !v)}
+              onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
               className="shrink-0 p-0.5 hover:bg-accent rounded"
             >
               {expanded ? (
@@ -269,6 +271,7 @@ export interface ActionsKanbanViewProps {
   proposals: CreativeProposal[];
   editorialEntries: CalendarEntry[];
   showEditorial: boolean;
+  onTaskClick?: (task: PlanTaskContentRow) => void;
 }
 
 export function ActionsKanbanView({
@@ -276,6 +279,7 @@ export function ActionsKanbanView({
   proposals,
   editorialEntries,
   showEditorial,
+  onTaskClick,
 }: ActionsKanbanViewProps) {
   const items = useMemo(() => {
     const result: KanbanItem[] = [];
@@ -302,6 +306,7 @@ export function ActionsKanbanView({
         taskType: t.task_type,
         assignee: t.assignee,
         dueDate: t.due_date,
+        _task: t,
       });
     }
 
@@ -377,7 +382,11 @@ export function ActionsKanbanView({
                 </p>
               ) : (
                 colItems.map((item) => (
-                  <KanbanItemCard key={`${item.source}-${item.id}`} item={item} />
+                  <KanbanItemCard
+                    key={`${item.source}-${item.id}`}
+                    item={item}
+                    onClick={item._task && onTaskClick ? () => onTaskClick(item._task!) : undefined}
+                  />
                 ))
               )}
             </div>

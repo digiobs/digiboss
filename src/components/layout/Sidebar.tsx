@@ -52,7 +52,7 @@ const navItems = [
   { path: '/veille', icon: Newspaper, label: 'Veille' },
   { path: '/prospects', icon: Users, label: 'Prospects' },
   { path: '/assets', icon: FolderOpen, label: 'Assets' },
-  { path: '/actions', icon: CheckSquare, label: 'Actions & Propositions' },
+  { path: '/actions', icon: CheckSquare, label: 'Contenus' },
   { path: '/seo-geo', icon: Search, label: 'SEO / GEO' },
   { path: '/kpis', icon: Activity, label: 'KPIs' },
   { path: '/reporting', icon: BarChart3, label: 'Reporting' },

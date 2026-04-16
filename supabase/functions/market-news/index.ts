@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { finishIntegrationRun, startIntegrationRun } from "../_shared/ingestion.ts";
+import {
+  createServiceClient,
+  finishIntegrationRun,
+  safeString,
+  asArray,
+  asObject,
+  startIntegrationRun,
+} from "../_shared/ingestion.ts";
 import { callClaudeJson } from "../_shared/claude.ts";
 
 const corsHeaders = {
@@ -8,209 +14,100 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface NewsArticle {
-  id: string;
+interface VeilleArticle {
   title: string;
   summary: string;
   source: string;
-  timestamp: string;
   category: string;
-  citations: string[];
-  imageUrl?: string;
-  url?: string;
   skill: string;
   severity: string;
   is_actionable: boolean;
+  citations: string[];
+  url?: string;
 }
 
-const CACHE_DURATION_HOURS = 4;
+type ClientConfig = {
+  client_id: string;
+  industry: string | null;
+  competitors: unknown;
+  market_news_keywords: unknown;
+};
 
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
+const VALID_SKILLS = new Set([
+  "veille",
+  "market_intelligence",
+  "seo",
+  "ads",
+  "social",
+  "concurrence",
+  "reputation",
+  "compliance",
+]);
+const VALID_SEVERITIES = new Set(["alert", "warning", "opportunity", "info"]);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function safeStringArray(value: unknown): string[] {
+  return asArray(value).filter((x): x is string => typeof x === "string" && x.trim().length > 0);
 }
 
-function asObject(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function generateCacheKey(category: string, industry: string, competitors: string[], keywords: string[]): string {
-  const parts = [
-    "market-news-claude",
-    category || "default",
-    industry || "default",
-    competitors.sort().join(","),
-    keywords.sort().join(","),
-  ];
-  return parts.join("|").toLowerCase();
-}
-
-function buildSearchQuery(category: string, industry: string, competitors: string[], keywords: string[]): string {
-  if (category === "competitor" && competitors.length > 0) {
-    return `Competitor monitoring on: ${competitors.join(", ")}. Focus on launches, strategic moves, pricing, partnerships, and go-to-market changes.`;
+function buildSearchQuery(industry: string, competitors: string[], keywords: string[]): string {
+  const parts: string[] = [];
+  if (competitors.length > 0) {
+    parts.push(`Competitor monitoring on: ${competitors.join(", ")}. Focus on launches, strategic moves, pricing, partnerships, and go-to-market changes.`);
   }
-  if (category === "industry" && industry) {
-    return `Industry monitoring for ${industry}. Focus on recent trends, demand shifts, regulations, and tactical marketing opportunities.`;
+  if (industry) {
+    parts.push(`Industry monitoring for ${industry}. Focus on recent trends, demand shifts, regulations, and tactical marketing opportunities.`);
   }
   if (keywords.length > 0) {
-    return `Track strategic signals around: ${keywords.join(", ")}.`;
+    parts.push(`Track strategic signals around: ${keywords.join(", ")}.`);
   }
-  const defaults: Record<string, string> = {
-    marketing: "B2B marketing signals: paid media, SEO, content distribution, and attribution shifts.",
-    technology: "Technology signals: AI product launches, martech updates, and automation workflows.",
-    finance: "Business and finance signals affecting marketing budgets and acquisition efficiency.",
-    industry: "Industry signals relevant for growth and demand generation.",
-    competitor: "Competitive intelligence signals for adjacent players.",
-  };
-  return defaults[category] || defaults.marketing;
+  if (parts.length > 0) return parts.join("\n");
+  return "B2B marketing signals: paid media, SEO, content distribution, and attribution shifts.";
 }
 
-function normalizeArticles(raw: unknown, category: string): NewsArticle[] {
-  const rows = asArray(raw);
-  return rows
-    .map((item, index) => {
+function normalizeArticles(raw: unknown): VeilleArticle[] {
+  return asArray(raw)
+    .map((item) => {
       const row = asObject(item);
       if (!row) return null;
       const title = typeof row.title === "string" ? row.title.trim() : "";
       const summary = typeof row.summary === "string" ? row.summary.trim() : "";
       if (!title || !summary) return null;
-      const citations = asArray(row.citations).filter((c): c is string => typeof c === "string");
-      const VALID_SKILLS = ["veille","market_intelligence","seo","ads","social","concurrence","reputation","compliance"];
-      const VALID_SEVERITIES = ["alert","warning","opportunity","info"];
       const rawSkill = typeof row.skill === "string" ? row.skill : "";
       const rawSeverity = typeof row.severity === "string" ? row.severity : "";
       return {
-        id: `news-${Date.now()}-${index}`,
         title,
         summary,
         source: typeof row.source === "string" ? row.source : "Claude AI",
-        timestamp: new Date().toISOString(),
-        category: typeof row.category === "string" ? row.category : category || "industry",
-        citations,
-        imageUrl: typeof row.imageUrl === "string" ? row.imageUrl : undefined,
-        url: typeof row.url === "string" ? row.url : undefined,
-        skill: VALID_SKILLS.includes(rawSkill) ? rawSkill : "veille",
-        severity: VALID_SEVERITIES.includes(rawSeverity) ? rawSeverity : "info",
+        category: typeof row.category === "string" ? row.category : "industry",
+        skill: VALID_SKILLS.has(rawSkill) ? rawSkill : "veille",
+        severity: VALID_SEVERITIES.has(rawSeverity) ? rawSeverity : "info",
         is_actionable: typeof row.is_actionable === "boolean" ? row.is_actionable : false,
-      } satisfies NewsArticle;
+        citations: safeStringArray(row.citations),
+        url: typeof row.url === "string" && row.url ? row.url : undefined,
+      } satisfies VeilleArticle;
     })
-    .filter((row): row is NewsArticle => Boolean(row));
+    .filter((row): row is VeilleArticle => Boolean(row));
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+// ---------------------------------------------------------------------------
+// Generate veille articles for a single client via Claude
+// ---------------------------------------------------------------------------
 
-  let runId: string | null = null;
-  let runStartedAt = Date.now();
-  let runSupabase: ReturnType<typeof createClient> | null = null;
-  try {
-    const { category = "marketing", competitors = [], keywords = [], industry = "", clientId } = await req.json();
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+async function generateForClient(
+  industry: string,
+  competitors: string[],
+  keywords: string[],
+): Promise<{ articles: VeilleArticle[]; modelUsed: string }> {
+  const searchQuery = buildSearchQuery(industry, competitors, keywords);
 
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Missing Supabase runtime secrets");
+  const systemPrompt =
+    "You are a market intelligence analyst. Produce concise, tactical French monitoring insights for a marketing team.";
 
-    const safeCategory = typeof category === "string" ? category : "marketing";
-    let safeIndustry = typeof industry === "string" ? industry : "";
-    let safeCompetitors = asArray(competitors).filter((x): x is string => typeof x === "string");
-    let safeKeywords = asArray(keywords).filter((x): x is string => typeof x === "string");
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    // When called from Veille page with a clientId, enrich context from client_configs
-    if (clientId) {
-      const { data: config } = await supabase
-        .from("client_configs")
-        .select("industry, competitors, market_news_keywords")
-        .eq("client_id", clientId)
-        .maybeSingle();
-
-      if (config) {
-        if (!safeIndustry && typeof config.industry === "string" && config.industry.trim()) {
-          safeIndustry = config.industry.trim();
-        }
-        const cfgComp = asArray(config.competitors).filter((x): x is string => typeof x === "string");
-        const cfgKw = asArray(config.market_news_keywords).filter((x): x is string => typeof x === "string");
-        safeCompetitors = [...new Set([...safeCompetitors, ...cfgComp])];
-        safeKeywords = [...new Set([...safeKeywords, ...cfgKw])];
-      }
-    }
-
-    runSupabase = supabase;
-    runStartedAt = Date.now();
-    runId = await startIntegrationRun(supabase, {
-      provider: "market-news",
-      connector: safeCategory,
-      triggerType: "manual",
-      requestPayload: {
-        industry: safeIndustry,
-        competitorsCount: safeCompetitors.length,
-        keywordsCount: safeKeywords.length,
-      },
-    });
-    const cacheKey = generateCacheKey(safeCategory, safeIndustry, safeCompetitors, safeKeywords);
-
-    const { data: cachedData, error: cacheError } = await supabase
-      .from("news_cache")
-      .select("articles, expires_at")
-      .eq("cache_key", cacheKey)
-      .maybeSingle();
-
-    if (!cacheError && cachedData?.expires_at && new Date(cachedData.expires_at) > new Date()) {
-      // Cache hit — but if veille_items is empty for this client, backfill from cache
-      if (clientId) {
-        const { count } = await supabase
-          .from("veille_items")
-          .select("id", { count: "exact", head: true })
-          .eq("client_id", clientId);
-
-        if (!count || count === 0) {
-          const cachedArticles = normalizeArticles(
-            Array.isArray(cachedData.articles) ? cachedData.articles : [],
-            safeCategory,
-          );
-          if (cachedArticles.length > 0) {
-            const rows = cachedArticles.map((a) => ({
-              client_id: clientId,
-              title: a.title,
-              summary: a.summary,
-              skill: a.skill,
-              source: a.source || null,
-              source_url: a.url || null,
-              severity: a.severity,
-              is_actionable: a.is_actionable,
-              details: {
-                source_function: "market-news",
-                category: a.category,
-                citations: a.citations || [],
-              },
-            }));
-            await supabase.from("veille_items").insert(rows);
-          }
-        }
-      }
-
-      await finishIntegrationRun(supabase, runId, {
-        status: "success",
-        metrics: {
-          recordsFetched: Array.isArray(cachedData.articles) ? cachedData.articles.length : 0,
-          recordsUpserted: 0,
-          recordsFailed: 0,
-          durationMs: Date.now() - runStartedAt,
-        },
-      });
-      return new Response(JSON.stringify({ articles: cachedData.articles, cached: true, model: "claude" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const searchQuery = buildSearchQuery(safeCategory, safeIndustry, safeCompetitors, safeKeywords);
-    const systemPrompt =
-      "You are a market intelligence analyst. Produce concise, tactical French monitoring insights for a marketing team.";
-    const userPrompt = `
+  const userPrompt = `
 Create 5 monitoring items for this context:
 ${searchQuery}
 
@@ -235,104 +132,164 @@ Severity: alert=urgent threat, warning=needs attention, opportunity=growth poten
 No markdown. No extra keys.
 `;
 
-    const { data: claudePayload, modelUsed, rawText } = await callClaudeJson<{ articles: unknown[] }>({
-      systemPrompt,
-      userPrompt,
-    });
-    const articles = normalizeArticles(claudePayload?.articles ?? [], safeCategory);
+  const { data: payload, modelUsed, rawText } = await callClaudeJson<{ articles: unknown[] }>({
+    systemPrompt,
+    userPrompt,
+  });
 
-    const finalArticles =
-      articles.length > 0
-        ? articles
-        : [
-            {
-              id: `news-${Date.now()}-fallback`,
-              title: "Veille update",
-              summary: rawText.slice(0, 300) || "No structured output returned by Claude.",
-              source: "Claude AI",
-              timestamp: new Date().toISOString(),
-              category: safeCategory,
-              citations: [],
-              imageUrl: undefined,
-              url: undefined,
-              skill: "veille",
-              severity: "info",
-              is_actionable: false,
-            },
-          ];
+  const articles = normalizeArticles(payload?.articles ?? []);
 
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + CACHE_DURATION_HOURS);
-    await supabase.from("news_cache").upsert(
+  if (articles.length > 0) return { articles, modelUsed };
+
+  // Fallback: return single info item from raw text
+  return {
+    articles: [
       {
-        cache_key: cacheKey,
-        articles: finalArticles,
-        expires_at: expiresAt.toISOString(),
+        title: "Veille update",
+        summary: rawText.slice(0, 300) || "No structured output returned by Claude.",
+        source: "Claude AI",
+        category: "industry",
+        skill: "veille",
+        severity: "info",
+        is_actionable: false,
+        citations: [],
       },
-      { onConflict: "cache_key" },
-    );
+    ],
+    modelUsed,
+  };
+}
 
-    // Persist veille items into the veille_items table so the Veille page can display them
-    if (clientId && finalArticles.length > 0) {
-      const veilleRows = finalArticles.map((a) => ({
-        client_id: clientId,
-        title: a.title,
-        summary: a.summary,
-        skill: a.skill,
-        source: a.source || null,
-        source_url: a.url || null,
-        severity: a.severity,
-        is_actionable: a.is_actionable,
-        details: {
-          source_function: "market-news",
-          category: a.category,
-          citations: a.citations || [],
-        },
-      }));
+// ---------------------------------------------------------------------------
+// Persist articles into veille_items (delete-then-insert per client to dedup)
+// ---------------------------------------------------------------------------
 
-      const { error: insertError } = await supabase
-        .from("veille_items")
-        .insert(veilleRows);
+async function upsertVeilleItems(
+  supabase: ReturnType<typeof createServiceClient>,
+  clientId: string,
+  articles: VeilleArticle[],
+): Promise<number> {
+  if (articles.length === 0) return 0;
 
-      if (insertError) {
-        console.error("Failed to insert veille_items:", insertError);
-      }
+  // Remove previous market-news items for this client to avoid duplicates
+  await supabase
+    .from("veille_items")
+    .delete()
+    .eq("client_id", clientId)
+    .eq("details->>source_function", "market-news");
+
+  const rows = articles.map((a) => ({
+    client_id: clientId,
+    title: a.title,
+    summary: a.summary,
+    skill: a.skill,
+    source: a.source || null,
+    source_url: a.url || null,
+    severity: a.severity,
+    is_actionable: a.is_actionable,
+    details: {
+      source_function: "market-news",
+      category: a.category,
+      citations: a.citations,
+    },
+  }));
+
+  const { error } = await supabase.from("veille_items").insert(rows);
+  if (error) {
+    console.error("Failed to insert veille_items:", error);
+    return 0;
+  }
+  return rows.length;
+}
+
+// ---------------------------------------------------------------------------
+// Main handler — mirrors the tldv-sync-meetings pattern
+// ---------------------------------------------------------------------------
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  let runId: string | null = null;
+  const startedAt = Date.now();
+  const supabase = createServiceClient();
+
+  try {
+    const body = await req.json().catch(() => ({}));
+    const filterClientId = safeString(body?.clientId);
+
+    runId = await startIntegrationRun(supabase, {
+      provider: "market-news",
+      connector: "veille-sync",
+      clientId: filterClientId,
+      triggerType: "manual",
+      requestPayload: { filterClientId },
+    });
+
+    // Load client configs — either one client or all active clients with configs
+    let configs: ClientConfig[];
+    if (filterClientId) {
+      const { data, error } = await supabase
+        .from("client_configs")
+        .select("client_id, industry, competitors, market_news_keywords")
+        .eq("client_id", filterClientId);
+      if (error) throw new Error(`Failed to load client_configs: ${error.message}`);
+      configs = (data ?? []) as ClientConfig[];
+    } else {
+      // All clients mode — fetch every config that has at least one useful field
+      const { data, error } = await supabase
+        .from("client_configs")
+        .select("client_id, industry, competitors, market_news_keywords");
+      if (error) throw new Error(`Failed to load client_configs: ${error.message}`);
+      configs = (data ?? []) as ClientConfig[];
+    }
+
+    // If a specific client was requested but has no config, still generate with defaults
+    if (configs.length === 0 && filterClientId) {
+      configs = [{ client_id: filterClientId, industry: null, competitors: null, market_news_keywords: null }];
+    }
+
+    let totalFetched = 0;
+    let totalUpserted = 0;
+    let clientsSynced = 0;
+
+    for (const config of configs) {
+      const industry = typeof config.industry === "string" ? config.industry.trim() : "";
+      const competitors = safeStringArray(config.competitors);
+      const keywords = safeStringArray(config.market_news_keywords);
+
+      const { articles } = await generateForClient(industry, competitors, keywords);
+      totalFetched += articles.length;
+
+      const upserted = await upsertVeilleItems(supabase, config.client_id, articles);
+      totalUpserted += upserted;
+      clientsSynced += 1;
     }
 
     await finishIntegrationRun(supabase, runId, {
       status: "success",
       metrics: {
-        recordsFetched: finalArticles.length,
-        recordsUpserted: finalArticles.length,
+        recordsFetched: totalFetched,
+        recordsUpserted: totalUpserted,
         recordsFailed: 0,
-        durationMs: Date.now() - runStartedAt,
+        durationMs: Date.now() - startedAt,
       },
-      samplePayload: finalArticles[0] as Record<string, unknown> | undefined,
     });
 
     return new Response(
-      JSON.stringify({
-        articles: finalArticles,
-        cached: false,
-        model: "claude",
-        modelUsed,
-      }),
+      JSON.stringify({ fetched: totalFetched, upserted: totalUpserted, clientsSynced }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
     console.error("market-news error:", error);
-    if (runSupabase) {
-      await finishIntegrationRun(runSupabase, runId, {
-        status: "failed",
-        metrics: {
-          durationMs: Date.now() - runStartedAt,
-        },
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    await finishIntegrationRun(supabase, runId, {
+      status: "failed",
+      metrics: { durationMs: Date.now() - startedAt },
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
     });
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 });

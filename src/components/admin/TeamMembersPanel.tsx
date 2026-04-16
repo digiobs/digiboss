@@ -8,6 +8,10 @@ import {
   Mail,
   KeyRound,
   Lock,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +57,8 @@ type Profile = {
   created_at: string;
 };
 
+type ClientLite = { id: string; name: string };
+type UserClient = { id: string; user_id: string; client_id: string };
 type BusyKind = 'role' | 'reset' | 'password' | 'delete' | 'profile' | null;
 
 function initials(name: string): string {
@@ -66,23 +72,36 @@ function initials(name: string): string {
 
 function ProfileCard({
   profile,
+  clients,
+  assignments,
   onRoleChange,
   onSendReset,
   onSetPassword,
   onUpdateProfile,
   onDelete,
+  onToggleClient,
 }: {
   profile: Profile;
+  clients: ClientLite[];
+  assignments: UserClient[];
   onRoleChange: (role: 'team_member' | 'admin') => Promise<void>;
   onSendReset: () => Promise<void>;
   onSetPassword: (pwd: string) => Promise<void>;
   onUpdateProfile: (fullName: string, email: string) => Promise<void>;
   onDelete: () => Promise<void>;
+  onToggleClient: (clientId: string) => Promise<void>;
 }) {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState(profile.full_name);
   const [email, setEmail] = useState(profile.email);
   const [busy, setBusy] = useState<BusyKind>(null);
+  const [showClients, setShowClients] = useState(false);
+  const [togglingClientId, setTogglingClientId] = useState<string | null>(null);
+
+  const userClientIds = new Set(
+    assignments.filter((a) => a.user_id === profile.id).map((a) => a.client_id),
+  );
+  const assignedCount = userClientIds.size;
 
   useEffect(() => {
     setFullName(profile.full_name);
@@ -274,12 +293,85 @@ function ProfileCard({
           </div>
         </div>
       </div>
+
+      {/* Client access section */}
+      <div className="border-t border-border pt-3">
+        <button
+          type="button"
+          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground w-full"
+          onClick={() => setShowClients(!showClients)}
+        >
+          <Building2 className="w-4 h-4" />
+          Accès clients
+          {profile.role === 'admin' ? (
+            <Badge variant="outline" className="text-[10px] h-4 ml-1">Admin (tous)</Badge>
+          ) : (
+            <Badge variant="secondary" className="text-[10px] h-4 ml-1">
+              {assignedCount}/{clients.length}
+            </Badge>
+          )}
+          {showClients ? (
+            <ChevronUp className="w-3.5 h-3.5 ml-auto" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5 ml-auto" />
+          )}
+        </button>
+
+        {showClients && (
+          <div className="mt-2 space-y-1">
+            {profile.role === 'admin' ? (
+              <p className="text-xs text-muted-foreground italic py-1">
+                Les administrateurs ont accès à tous les clients automatiquement.
+              </p>
+            ) : clients.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-1">
+                Aucun client disponible.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                {clients.map((client) => {
+                  const assigned = userClientIds.has(client.id);
+                  const toggling = togglingClientId === client.id;
+                  return (
+                    <button
+                      key={client.id}
+                      type="button"
+                      disabled={toggling || isBusy}
+                      className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors text-left ${
+                        assigned
+                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                          : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                      }`}
+                      onClick={async () => {
+                        setTogglingClientId(client.id);
+                        await onToggleClient(client.id);
+                        setTogglingClientId(null);
+                      }}
+                    >
+                      {toggling ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                      ) : assigned ? (
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                      ) : (
+                        <div className="w-3.5 h-3.5 rounded border border-muted-foreground/40 shrink-0" />
+                      )}
+                      <span className="truncate">{client.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 export function TeamMembersPanel() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [allClients, setAllClients] = useState<ClientLite[]>([]);
+  const [allAssignments, setAllAssignments] = useState<UserClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -295,15 +387,29 @@ export function TeamMembersPanel() {
 
   const fetchProfiles = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, email, full_name, role, avatar_url, created_at')
-      .order('created_at', { ascending: true });
+    const [profilesRes, clientsRes, assignmentsRes] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, email, full_name, role, avatar_url, created_at')
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('clients')
+        .select('id, name')
+        .eq('status', 'active')
+        .order('name'),
+      supabase.from('user_clients').select('id, user_id, client_id'),
+    ]);
 
-    if (error) {
-      console.warn('Failed to load profiles:', error.message);
+    if (!profilesRes.error) {
+      setProfiles((profilesRes.data ?? []) as Profile[]);
     } else {
-      setProfiles((data ?? []) as Profile[]);
+      console.warn('Failed to load profiles:', profilesRes.error.message);
+    }
+    if (!clientsRes.error) {
+      setAllClients((clientsRes.data ?? []) as ClientLite[]);
+    }
+    if (!assignmentsRes.error) {
+      setAllAssignments((assignmentsRes.data ?? []) as UserClient[]);
     }
     setIsLoading(false);
   }, []);
@@ -480,6 +586,47 @@ export function TeamMembersPanel() {
     }
   };
 
+  const handleToggleClient = async (userId: string, clientId: string) => {
+    const existing = allAssignments.find(
+      (a) => a.user_id === userId && a.client_id === clientId,
+    );
+
+    if (existing) {
+      const { error } = await supabase
+        .from('user_clients')
+        .delete()
+        .eq('id', existing.id);
+
+      if (error) {
+        toast.error("Impossible de retirer l'accès");
+        return;
+      }
+      setAllAssignments((prev) => prev.filter((a) => a.id !== existing.id));
+      const clientName =
+        allClients.find((c) => c.id === clientId)?.name ?? clientId;
+      toast.success(`Accès retiré pour ${clientName}`);
+    } else {
+      const { data, error } = await (
+        supabase as unknown as { from: (t: string) => Record<string, unknown> }
+      )
+        .from('user_clients')
+        .insert({ user_id: userId, client_id: clientId })
+        .select('id, user_id, client_id')
+        .single();
+
+      if (error) {
+        toast.error("Impossible d'ajouter l'accès");
+        return;
+      }
+      if (data) {
+        setAllAssignments((prev) => [...prev, data as UserClient]);
+        const clientName =
+          allClients.find((c) => c.id === clientId)?.name ?? clientId;
+        toast.success(`Accès ajouté pour ${clientName}`);
+      }
+    }
+  };
+
   const handleDelete = async (profile: Profile) => {
     if (
       !confirm(
@@ -535,6 +682,8 @@ export function TeamMembersPanel() {
               <ProfileCard
                 key={p.id}
                 profile={p}
+                clients={allClients}
+                assignments={allAssignments}
                 onRoleChange={(role) => handleRoleChange(p.id, role)}
                 onSendReset={() => handleSendReset(p.email)}
                 onSetPassword={(pwd) => handleSetPassword(p, pwd)}
@@ -542,6 +691,9 @@ export function TeamMembersPanel() {
                   handleUpdateProfile(p, name, email)
                 }
                 onDelete={() => handleDelete(p)}
+                onToggleClient={(clientId) =>
+                  handleToggleClient(p.id, clientId)
+                }
               />
             ))}
           </div>

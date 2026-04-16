@@ -119,8 +119,9 @@ serve(async (req) => {
       metrics: { durationMs: Date.now() - startedAt },
       errorMessage: message,
     });
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
+    // Return 200 so supabase.functions.invoke() surfaces the error body
+    // instead of a generic "Edge Function returned a non-2xx status code".
+    return new Response(JSON.stringify({ campaigns: [], error: message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -1,5 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -78,7 +77,6 @@ function getSeverityConfig(severity: string) {
 export default function Veille() {
   const { clients, currentClient, setCurrentClient, isAllClientsSelected } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const queryClient = useQueryClient();
   const selectedClientId = currentClient?.id ?? ALL_CLIENTS_ID;
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
@@ -86,29 +84,8 @@ export default function Veille() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
-  const syncMarketNews = useCallback(async () => {
-    if (isAllClientsSelected) {
-      toast.error('Sélectionnez un client pour synchroniser la veille');
-      return;
-    }
-    setSyncing(true);
-    try {
-      const { error } = await supabase.functions.invoke('market-news', {
-        body: { clientId: selectedClientId },
-      });
-      if (error) throw error;
-      toast.success('Veille synchronisée');
-      await queryClient.invalidateQueries({ queryKey: ['veille-items'] });
-    } catch (error) {
-      console.error('market-news sync failed:', error);
-      toast.error('Échec de la synchronisation veille');
-    } finally {
-      setSyncing(false);
-    }
-  }, [isAllClientsSelected, selectedClientId, queryClient]);
-
   const clientFilter = isAllClientsSelected ? null : selectedClientId;
-  const { data: items = [], isLoading } = useVeilleItems({
+  const { data: items = [], isLoading, refetch } = useVeilleItems({
     clientId: clientFilter,
     skill: selectedSkill,
     severity: selectedSeverity,
@@ -126,6 +103,23 @@ export default function Veille() {
         item.clients?.name?.toLowerCase().includes(q)
     );
   }, [items, search]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    const body = isAllClientsSelected ? {} : { clientId: currentClient?.id };
+    const { data, error } = await supabase.functions.invoke('market-news', { body });
+    if (error) {
+      toast.error(error.message || 'Échec de la synchronisation veille');
+      setSyncing(false);
+      return;
+    }
+    const result = data as { fetched?: number; upserted?: number; clientsSynced?: number } | null;
+    toast.success(
+      `Veille synchronisée. ${result?.upserted ?? 0} signaux, ${result?.clientsSynced ?? 0} client(s).`,
+    );
+    refetch();
+    setSyncing(false);
+  };
 
   // Stats
   const stats = useMemo(() => {
@@ -149,7 +143,7 @@ export default function Veille() {
           </p>
         </div>
         {isAdmin && (
-          <Button variant="outline" className="gap-2" onClick={syncMarketNews} disabled={syncing}>
+          <Button variant="outline" className="gap-2" onClick={handleSync} disabled={syncing}>
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Syncing...' : 'Sync Veille'}
           </Button>

@@ -91,7 +91,7 @@ export function useLemlistCampaignMapping() {
           external_workspace_id: campaign.team_id,
           status: 'connected',
           is_active: true,
-          mapping_strategy: 'manual_picker',
+          mapping_strategy: 'manual_override',
           is_manual_override: true,
           updated_at: now,
         },

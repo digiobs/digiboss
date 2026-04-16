@@ -5,7 +5,9 @@ import {
   startIntegrationRun,
 } from "../_shared/ingestion.ts";
 import {
+  fetchCampaigns,
   fetchCampaignsAcrossTeams,
+  type LemlistCampaign,
   loadLemlistClients,
 } from "../_shared/lemlist.ts";
 
@@ -42,46 +44,44 @@ serve(async (req) => {
       requestPayload: { source: "lemlist-list-campaigns" },
     });
 
-    // Detect which secrets are present so the error message can say exactly
-    // what's missing when the API call inevitably fails.
-    const hasMultiKey = Boolean(Deno.env.get("LEMLIST_API_KEYS"));
-    const hasLegacyKey = Boolean(Deno.env.get("LEMLIST_API_KEY"));
+    // Two paths:
+    //   1. LEMLIST_API_KEYS is set → multi-team: resolve teams via /api/team
+    //      and aggregate campaigns across all workspaces.
+    //   2. Only LEMLIST_API_KEY → legacy single-key: fetch campaigns directly
+    //      without calling /api/team (the endpoint that broke single-key
+    //      setups). This preserves the exact behaviour that was working before
+    //      multi-team support was introduced.
+    const multiKeyRaw = Deno.env.get("LEMLIST_API_KEYS");
+    const legacyKey = Deno.env.get("LEMLIST_API_KEY");
 
-    let clients: Awaited<ReturnType<typeof loadLemlistClients>>;
-    try {
-      clients = await loadLemlistClients();
-    } catch (loadError) {
-      const detail = loadError instanceof Error ? loadError.message : String(loadError);
-      throw new Error(
-        `loadLemlistClients failed (LEMLIST_API_KEYS=${hasMultiKey}, LEMLIST_API_KEY=${hasLegacyKey}): ${detail}`,
-      );
-    }
+    let campaigns: LemlistCampaign[];
 
-    if (clients.length === 0) {
-      throw new Error(
-        `No lemlist API key configured (LEMLIST_API_KEYS=${hasMultiKey}, LEMLIST_API_KEY=${hasLegacyKey}). ` +
-          "Set at least one in Supabase Edge Function secrets.",
-      );
-    }
-
-    let campaigns: Awaited<ReturnType<typeof fetchCampaignsAcrossTeams>>;
-    try {
+    if (multiKeyRaw && multiKeyRaw.trim()) {
+      // Multi-team path.
+      const clients = await loadLemlistClients();
+      if (clients.length === 0) {
+        throw new Error(
+          "LEMLIST_API_KEYS is set but no valid key could be resolved.",
+        );
+      }
       campaigns = await fetchCampaignsAcrossTeams(clients);
-    } catch (fetchError) {
-      const detail = fetchError instanceof Error ? fetchError.message : String(fetchError);
+    } else if (legacyKey) {
+      // Single-key path — no /api/team call.
+      campaigns = await fetchCampaigns(legacyKey);
+    } else {
       throw new Error(
-        `fetchCampaigns failed for ${clients.length} team(s): ${detail}`,
+        "No lemlist API key configured. Set LEMLIST_API_KEY (or " +
+          "LEMLIST_API_KEYS for multi-team) in Supabase Edge Function secrets.",
       );
     }
 
-    // Frontend picker expects a flat list of `{id, name, team_id, team_name}`.
-    // Sort teams first so campaigns group naturally in the dropdown.
+    // Frontend picker expects `{id, name, team_id, team_name}`.
     const responseCampaigns = campaigns
       .map((c) => ({
         id: c.id,
         name: c.name,
-        team_id: c.teamId,
-        team_name: c.teamName,
+        team_id: c.teamId ?? null,
+        team_name: c.teamName ?? null,
       }))
       .sort((a, b) => {
         const teamCmp = (a.team_name ?? "").localeCompare(b.team_name ?? "");
@@ -98,15 +98,12 @@ serve(async (req) => {
         durationMs: Date.now() - startedAt,
       },
       samplePayload: responseCampaigns[0]
-        ? { firstCampaign: responseCampaigns[0], teamCount: clients.length }
-        : { teamCount: clients.length },
+        ? { firstCampaign: responseCampaigns[0] }
+        : null,
     });
 
     return new Response(
-      JSON.stringify({
-        campaigns: responseCampaigns,
-        teams: clients.map((c) => ({ team_id: c.teamId, team_name: c.teamName })),
-      }),
+      JSON.stringify({ campaigns: responseCampaigns }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {

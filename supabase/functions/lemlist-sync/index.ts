@@ -6,9 +6,9 @@ import {
   startIntegrationRun,
 } from "../_shared/ingestion.ts";
 import {
+  fetchCampaigns,
   fetchCampaignsAcrossTeams,
   fetchLeadsForCampaign,
-  type LemlistLead,
   type LemlistTeamClient,
   loadLemlistClients,
   normalizeText,
@@ -106,10 +106,21 @@ serve(async (req) => {
     const bootstrapMappings = Boolean(body?.bootstrapMappings);
     const limit = Math.min(Math.max(Number(body?.limit ?? 100), 1), 500);
 
-    // Resolve every configured lemlist team up-front. loadLemlistClients()
-    // already handles LEMLIST_API_KEYS (JSON) → LEMLIST_API_KEY fallback, so a
-    // non-empty result guarantees we have at least one usable API key.
-    const teamClients = await loadLemlistClients();
+    // Two modes:
+    //   - LEMLIST_API_KEYS set → multi-team: resolve teams via /api/team.
+    //   - Only LEMLIST_API_KEY → single-key: skip /api/team entirely to avoid
+    //     breaking setups where that endpoint is unreachable.
+    const multiKeyRaw = Deno.env.get("LEMLIST_API_KEYS");
+    const legacyKey = Deno.env.get("LEMLIST_API_KEY");
+    const isMultiTeam = Boolean(multiKeyRaw && multiKeyRaw.trim());
+
+    let teamClients: LemlistTeamClient[] = [];
+    if (isMultiTeam) {
+      teamClients = await loadLemlistClients();
+    } else if (legacyKey) {
+      // Synthetic single-key client — no /api/team call.
+      teamClients = [{ apiKey: legacyKey, teamId: "default", teamName: "Lemlist" }];
+    }
     const hasLiveApi = teamClients.length > 0;
 
     runId = await startIntegrationRun(supabase, {
@@ -133,7 +144,9 @@ serve(async (req) => {
         );
       }
 
-      const campaigns = await fetchCampaignsAcrossTeams(teamClients);
+      const campaigns = isMultiTeam
+        ? await fetchCampaignsAcrossTeams(teamClients)
+        : await fetchCampaigns(legacyKey!);
       const { data: clients, error: clientsError } = await supabase
         .from("clients")
         .select("id,name");

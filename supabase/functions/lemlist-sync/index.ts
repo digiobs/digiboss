@@ -370,9 +370,11 @@ serve(async (req) => {
       metrics: { durationMs: Date.now() - startedAt },
       errorMessage: error instanceof Error ? error.message : "Unknown error",
     });
+    // Return 200 so supabase.functions.invoke() surfaces the error body
+    // instead of a generic "Edge Function returned a non-2xx status code".
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({ synced: 0, error: error instanceof Error ? error.message : "Unknown error" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

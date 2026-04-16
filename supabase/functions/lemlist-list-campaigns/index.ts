@@ -4,12 +4,7 @@ import {
   finishIntegrationRun,
   startIntegrationRun,
 } from "../_shared/ingestion.ts";
-import {
-  fetchCampaigns,
-  fetchCampaignsAcrossTeams,
-  type LemlistCampaign,
-  loadLemlistClients,
-} from "../_shared/lemlist.ts";
+import { fetchCampaigns } from "../_shared/lemlist.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,10 +17,8 @@ const corsHeaders = {
  * picker can render the "connect a campaign to this client" dropdown. Read-only
  * — the only side effect is a single `integration_sync_runs` audit row.
  *
- * Auth note: JWT verification is disabled in config.toml and the manual admin
- * gate was removed because supabase.auth.getUser(jwt) consistently fails in
- * Edge Functions with the service-role client. The endpoint only returns
- * campaign names which are not sensitive; write-side authorization lives in RLS
+ * Auth note: JWT verification is disabled in config.toml. The endpoint only
+ * returns campaign names (not sensitive); write-side authorization lives in RLS
  * on client_data_mappings.
  */
 serve(async (req) => {
@@ -45,29 +38,49 @@ serve(async (req) => {
     });
 
     // Two paths:
-    //   1. LEMLIST_API_KEYS is set → multi-team: resolve teams via /api/team
-    //      and aggregate campaigns across all workspaces.
-    //   2. Only LEMLIST_API_KEY → legacy single-key: fetch campaigns directly
-    //      without calling /api/team (the endpoint that broke single-key
-    //      setups). This preserves the exact behaviour that was working before
-    //      multi-team support was introduced.
+    //   1. LEMLIST_API_KEYS set → multi-team via lemlist-multi.ts
+    //   2. Only LEMLIST_API_KEY  → single-key via lemlist.ts (original code)
     const multiKeyRaw = Deno.env.get("LEMLIST_API_KEYS");
     const legacyKey = Deno.env.get("LEMLIST_API_KEY");
 
-    let campaigns: LemlistCampaign[];
+    type CampaignRow = {
+      id: string;
+      name: string;
+      team_id: string | null;
+      team_name: string | null;
+    };
+    let responseCampaigns: CampaignRow[];
 
     if (multiKeyRaw && multiKeyRaw.trim()) {
-      // Multi-team path.
+      // Multi-team: dynamic import so compilation issues in lemlist-multi.ts
+      // can never break the single-key path.
+      const { loadLemlistClients, fetchCampaignsAcrossTeams } = await import(
+        "../_shared/lemlist-multi.ts"
+      );
       const clients = await loadLemlistClients();
       if (clients.length === 0) {
         throw new Error(
           "LEMLIST_API_KEYS is set but no valid key could be resolved.",
         );
       }
-      campaigns = await fetchCampaignsAcrossTeams(clients);
+      const campaigns = await fetchCampaignsAcrossTeams(clients);
+      responseCampaigns = campaigns.map(
+        (c: { id: string; name: string; teamId: string; teamName: string }) => ({
+          id: c.id,
+          name: c.name,
+          team_id: c.teamId ?? null,
+          team_name: c.teamName ?? null,
+        }),
+      );
     } else if (legacyKey) {
-      // Single-key path — no /api/team call.
-      campaigns = await fetchCampaigns(legacyKey);
+      // Single-key: exact same code path as before multi-team support.
+      const campaigns = await fetchCampaigns(legacyKey);
+      responseCampaigns = campaigns.map((c) => ({
+        id: c.id,
+        name: c.name,
+        team_id: null as string | null,
+        team_name: null as string | null,
+      }));
     } else {
       throw new Error(
         "No lemlist API key configured. Set LEMLIST_API_KEY (or " +
@@ -75,19 +88,11 @@ serve(async (req) => {
       );
     }
 
-    // Frontend picker expects `{id, name, team_id, team_name}`.
-    const responseCampaigns = campaigns
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        team_id: c.teamId ?? null,
-        team_name: c.teamName ?? null,
-      }))
-      .sort((a, b) => {
-        const teamCmp = (a.team_name ?? "").localeCompare(b.team_name ?? "");
-        if (teamCmp !== 0) return teamCmp;
-        return a.name.localeCompare(b.name);
-      });
+    responseCampaigns.sort((a, b) => {
+      const teamCmp = (a.team_name ?? "").localeCompare(b.team_name ?? "");
+      if (teamCmp !== 0) return teamCmp;
+      return a.name.localeCompare(b.name);
+    });
 
     await finishIntegrationRun(supabase, runId, {
       status: "success",

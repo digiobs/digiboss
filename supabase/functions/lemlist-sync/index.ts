@@ -7,10 +7,8 @@ import {
 } from "../_shared/ingestion.ts";
 import {
   fetchCampaigns,
-  fetchCampaignsAcrossTeams,
   fetchLeadsForCampaign,
-  type LemlistTeamClient,
-  loadLemlistClients,
+  type LemlistLead,
   normalizeText,
 } from "../_shared/lemlist.ts";
 
@@ -32,8 +30,8 @@ type ContactRow = {
   synced_at: string;
   campaign_id: string | null;
   campaign_name: string | null;
-  team_id: string | null;
-  team_name: string | null;
+  team_id?: string | null;
+  team_name?: string | null;
   emails_sent: number;
   emails_opened: number;
   emails_clicked: number;
@@ -48,10 +46,10 @@ function toContactRow(
   clientId: string,
   campaignId: string | null,
   campaignName: string | null,
-  teamId: string | null,
-  teamName: string | null,
+  teamId?: string | null,
+  teamName?: string | null,
 ): ContactRow {
-  return {
+  const row: ContactRow = {
     client_id: clientId,
     external_contact_id: lead.externalId,
     full_name: lead.fullName,
@@ -64,8 +62,6 @@ function toContactRow(
     synced_at: new Date().toISOString(),
     campaign_id: campaignId,
     campaign_name: campaignName,
-    team_id: teamId,
-    team_name: teamName,
     emails_sent: lead.emailsSent,
     emails_opened: lead.emailsOpened,
     emails_clicked: lead.emailsClicked,
@@ -74,24 +70,12 @@ function toContactRow(
     last_event_type: lead.lastEventType,
     last_event_at: lead.lastEventAt,
   };
-}
-
-/**
- * Pick the right lemlist API client for a mapping. The mapping row stores the
- * team id in `external_workspace_id`; when it's missing (old mappings created
- * before multi-team support) we fall back to the first configured client,
- * which mirrors the legacy single-key behaviour.
- */
-function pickTeamClient(
-  clients: LemlistTeamClient[],
-  workspaceId: string | null,
-): LemlistTeamClient | null {
-  if (clients.length === 0) return null;
-  if (workspaceId) {
-    const match = clients.find((c) => c.teamId === workspaceId);
-    if (match) return match;
+  // Only include team columns when they're relevant (multi-team mode).
+  if (teamId !== undefined) {
+    row.team_id = teamId;
+    row.team_name = teamName ?? null;
   }
-  return clients[0];
+  return row;
 }
 
 serve(async (req) => {
@@ -106,19 +90,20 @@ serve(async (req) => {
     const bootstrapMappings = Boolean(body?.bootstrapMappings);
     const limit = Math.min(Math.max(Number(body?.limit ?? 100), 1), 500);
 
-    // Two modes:
-    //   - LEMLIST_API_KEYS set → multi-team: resolve teams via /api/team.
-    //   - Only LEMLIST_API_KEY → single-key: skip /api/team entirely to avoid
-    //     breaking setups where that endpoint is unreachable.
+    // Detect multi-team vs single-key mode.
     const multiKeyRaw = Deno.env.get("LEMLIST_API_KEYS");
     const legacyKey = Deno.env.get("LEMLIST_API_KEY");
     const isMultiTeam = Boolean(multiKeyRaw && multiKeyRaw.trim());
 
-    let teamClients: LemlistTeamClient[] = [];
+    // In multi-team mode, resolve team clients via lemlist-multi.ts.
+    // In single-key mode, build a synthetic team client from LEMLIST_API_KEY.
+    type TeamClient = { apiKey: string; teamId: string; teamName: string };
+    let teamClients: TeamClient[] = [];
+
     if (isMultiTeam) {
+      const { loadLemlistClients } = await import("../_shared/lemlist-multi.ts");
       teamClients = await loadLemlistClients();
     } else if (legacyKey) {
-      // Synthetic single-key client — no /api/team call.
       teamClients = [{ apiKey: legacyKey, teamId: "default", teamName: "Lemlist" }];
     }
     const hasLiveApi = teamClients.length > 0;
@@ -144,9 +129,29 @@ serve(async (req) => {
         );
       }
 
-      const campaigns = isMultiTeam
-        ? await fetchCampaignsAcrossTeams(teamClients)
-        : await fetchCampaigns(legacyKey!);
+      // Fetch all campaigns (multi-team aggregated or single-key).
+      type CampaignWithTeam = {
+        id: string;
+        name: string;
+        teamId: string | null;
+        teamName: string | null;
+      };
+      let campaigns: CampaignWithTeam[];
+
+      if (isMultiTeam) {
+        const { fetchCampaignsAcrossTeams } = await import(
+          "../_shared/lemlist-multi.ts"
+        );
+        campaigns = await fetchCampaignsAcrossTeams(teamClients);
+      } else {
+        const raw = await fetchCampaigns(legacyKey!);
+        campaigns = raw.map((c) => ({
+          ...c,
+          teamId: null as string | null,
+          teamName: null as string | null,
+        }));
+      }
+
       const { data: clients, error: clientsError } = await supabase
         .from("clients")
         .select("id,name");
@@ -166,10 +171,9 @@ serve(async (req) => {
       const matchedMappings = campaigns.flatMap((campaign) => {
         const normalizedCampaign = normalizeText(campaign.name);
         const normalizedTeam = normalizeText(campaign.teamName ?? "");
-        // Prefer team-name matches so multi-team setups route to the right
-        // workspace, then fall back to campaign-name similarity.
         const matchingClients = normalizedClients.filter((client) => {
           if (!client.normalized) return false;
+          // Prefer team-name match in multi-team setups.
           if (
             normalizedTeam &&
             (normalizedTeam.includes(client.normalized) ||
@@ -232,6 +236,8 @@ serve(async (req) => {
       );
     }
 
+    // ── Contact sync mode ──────────────────────────────────────────────
+
     let mappingQuery = supabase
       .from("client_data_mappings")
       .select(
@@ -260,6 +266,20 @@ serve(async (req) => {
       );
     }
 
+    /**
+     * Pick the right API key for a mapping. In multi-team mode, route via the
+     * `external_workspace_id` stored on the mapping row. In single-key mode,
+     * always use the one available key.
+     */
+    function pickApiKey(workspaceId: string | null): TeamClient | null {
+      if (teamClients.length === 0) return null;
+      if (workspaceId) {
+        const match = teamClients.find((c) => c.teamId === workspaceId);
+        if (match) return match;
+      }
+      return teamClients[0];
+    }
+
     const records: ContactRow[] = [];
     for (const mapping of activeMappings) {
       const mappedClientId = safeString(mapping.client_id);
@@ -268,14 +288,10 @@ serve(async (req) => {
       const campaignName = safeString(mapping.external_account_name);
       const workspaceId = safeString(mapping.external_workspace_id);
 
-      // Route to the right API key based on the team id stored on the mapping.
-      // Falls back to the first configured team if we can't find a match.
-      const teamClient = pickTeamClient(teamClients, workspaceId);
+      const teamClient = pickApiKey(workspaceId);
 
       if (!teamClient) {
-        // No live API key at all: seed a few obvious mocks so the UI isn't
-        // empty in dev. These go through the same columns as real data so the
-        // table renders correctly.
+        // No live API key: seed mock data so the UI isn't empty in dev.
         for (let i = 1; i <= Math.min(limit, 5); i += 1) {
           records.push({
             client_id: mappedClientId,
@@ -290,8 +306,6 @@ serve(async (req) => {
             synced_at: new Date().toISOString(),
             campaign_id: campaignId,
             campaign_name: campaignName,
-            team_id: workspaceId || null,
-            team_name: null,
             emails_sent: 0,
             emails_opened: 0,
             emails_clicked: 0,
@@ -313,8 +327,8 @@ serve(async (req) => {
             mappedClientId,
             campaignId,
             campaignName,
-            teamClient.teamId,
-            teamClient.teamName,
+            isMultiTeam ? teamClient.teamId : undefined,
+            isMultiTeam ? teamClient.teamName : undefined,
           ),
         );
       });

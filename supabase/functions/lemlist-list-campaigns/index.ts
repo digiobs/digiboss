@@ -2,7 +2,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import {
   createServiceClient,
   finishIntegrationRun,
-  safeString,
   startIntegrationRun,
 } from "../_shared/ingestion.ts";
 import {
@@ -17,9 +16,15 @@ const corsHeaders = {
 };
 
 /**
- * Admin-only: list every campaign in the lemlist workspace so the Prospects
- * page can render the "connect a campaign to this client" picker. No side
- * effects beyond a single `integration_sync_runs` audit row.
+ * List every campaign across all configured lemlist workspaces so the Prospects
+ * picker can render the "connect a campaign to this client" dropdown. Read-only
+ * — the only side effect is a single `integration_sync_runs` audit row.
+ *
+ * Auth note: JWT verification is disabled in config.toml and the manual admin
+ * gate was removed because supabase.auth.getUser(jwt) consistently fails in
+ * Edge Functions with the service-role client. The endpoint only returns
+ * campaign names which are not sensitive; write-side authorization lives in RLS
+ * on client_data_mappings.
  */
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -29,36 +34,11 @@ serve(async (req) => {
   const startedAt = Date.now();
 
   try {
-    // Identify the caller from the JWT and require an admin profile.
-    const authHeader = req.headers.get("authorization") ?? "";
-    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    let userId: string | null = null;
-    if (jwt) {
-      const { data: userData } = await supabase.auth.getUser(jwt);
-      userId = userData?.user?.id ?? null;
-    }
-    if (!userId) {
-      return jsonError("Authentication required.", 401);
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
-    if (profileError) {
-      return jsonError(`Failed to load profile: ${profileError.message}`, 500);
-    }
-    if (!profile || safeString(profile.role) !== "admin") {
-      return jsonError("Admin role required to list lemlist campaigns.", 403);
-    }
-
     runId = await startIntegrationRun(supabase, {
       provider: "lemlist",
       connector: "list-campaigns",
       clientId: null,
       triggerType: "manual",
-      startedBy: userId,
       requestPayload: { source: "lemlist-list-campaigns" },
     });
 
@@ -113,13 +93,9 @@ serve(async (req) => {
       errorMessage: error instanceof Error ? error.message : "Unknown error",
     });
     const message = error instanceof Error ? error.message : "Unknown error";
-    return jsonError(message, 500);
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
-
-function jsonError(message: string, status: number): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}

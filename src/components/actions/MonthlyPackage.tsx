@@ -288,7 +288,7 @@ export function MonthlyPackage({
                 assignee: e.owner,
                 dueDate: e.date,
                 status: e.status,
-                editHref: '/calendar',
+                editHref: '/actions',
               }))}
               workflow={EDITORIAL_WORKFLOW}
               readOnly

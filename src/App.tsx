@@ -24,7 +24,8 @@ import Admin from "@/pages/Admin";
 import Journal from "@/pages/Journal";
 import Actions from "@/pages/Actions";
 import Veille from "@/pages/Veille";
-import EditorialCalendar from "@/pages/EditorialCalendar";
+// EditorialCalendar is now embedded as a tab in the Actions page.
+// The /calendar route redirects to /actions for backwards compatibility.
 import KpiDashboard from "@/pages/KpiDashboard";
 import SeoGeo from "@/pages/SeoGeo";
 import SettingsIntegrations from "@/pages/SettingsIntegrations";
@@ -96,7 +97,9 @@ const AppRoutes = () => {
             compatibility so old links and bookmarks still land on the right
             page. */}
         <Route path="/proposals" element={<Navigate to="/actions" replace />} />
-        <Route path="/calendar" element={<EditorialCalendar />} />
+        {/* /calendar was merged into /actions as a tab — keep the path
+            for backwards compatibility so old links still work. */}
+        <Route path="/calendar" element={<Navigate to="/actions" replace />} />
         <Route path="/kpis" element={<KpiDashboard />} />
         <Route path="/seo-geo" element={<SeoGeo />} />
         <Route path="/chat" element={<Chat />} />

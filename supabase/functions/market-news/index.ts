@@ -18,6 +18,9 @@ interface NewsArticle {
   citations: string[];
   imageUrl?: string;
   url?: string;
+  skill: string;
+  severity: string;
+  is_actionable: boolean;
 }
 
 const CACHE_DURATION_HOURS = 4;
@@ -73,6 +76,10 @@ function normalizeArticles(raw: unknown, category: string): NewsArticle[] {
       const summary = typeof row.summary === "string" ? row.summary.trim() : "";
       if (!title || !summary) return null;
       const citations = asArray(row.citations).filter((c): c is string => typeof c === "string");
+      const VALID_SKILLS = ["veille","market_intelligence","seo","ads","social","concurrence","reputation","compliance"];
+      const VALID_SEVERITIES = ["alert","warning","opportunity","info"];
+      const rawSkill = typeof row.skill === "string" ? row.skill : "";
+      const rawSeverity = typeof row.severity === "string" ? row.severity : "";
       return {
         id: `news-${Date.now()}-${index}`,
         title,
@@ -83,6 +90,9 @@ function normalizeArticles(raw: unknown, category: string): NewsArticle[] {
         citations,
         imageUrl: typeof row.imageUrl === "string" ? row.imageUrl : undefined,
         url: typeof row.url === "string" ? row.url : undefined,
+        skill: VALID_SKILLS.includes(rawSkill) ? rawSkill : "veille",
+        severity: VALID_SEVERITIES.includes(rawSeverity) ? rawSeverity : "info",
+        is_actionable: typeof row.is_actionable === "boolean" ? row.is_actionable : false,
       } satisfies NewsArticle;
     })
     .filter((row): row is NewsArticle => Boolean(row));
@@ -97,18 +107,38 @@ serve(async (req) => {
   let runStartedAt = Date.now();
   let runSupabase: ReturnType<typeof createClient> | null = null;
   try {
-    const { category = "marketing", competitors = [], keywords = [], industry = "" } = await req.json();
+    const { category = "marketing", competitors = [], keywords = [], industry = "", clientId } = await req.json();
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Missing Supabase runtime secrets");
 
     const safeCategory = typeof category === "string" ? category : "marketing";
-    const safeIndustry = typeof industry === "string" ? industry : "";
-    const safeCompetitors = asArray(competitors).filter((x): x is string => typeof x === "string");
-    const safeKeywords = asArray(keywords).filter((x): x is string => typeof x === "string");
+    let safeIndustry = typeof industry === "string" ? industry : "";
+    let safeCompetitors = asArray(competitors).filter((x): x is string => typeof x === "string");
+    let safeKeywords = asArray(keywords).filter((x): x is string => typeof x === "string");
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // When called from Veille page with a clientId, enrich context from client_configs
+    if (clientId) {
+      const { data: config } = await supabase
+        .from("client_configs")
+        .select("industry, competitors, market_news_keywords")
+        .eq("client_id", clientId)
+        .maybeSingle();
+
+      if (config) {
+        if (!safeIndustry && typeof config.industry === "string" && config.industry.trim()) {
+          safeIndustry = config.industry.trim();
+        }
+        const cfgComp = asArray(config.competitors).filter((x): x is string => typeof x === "string");
+        const cfgKw = asArray(config.market_news_keywords).filter((x): x is string => typeof x === "string");
+        safeCompetitors = [...new Set([...safeCompetitors, ...cfgComp])];
+        safeKeywords = [...new Set([...safeKeywords, ...cfgKw])];
+      }
+    }
+
     runSupabase = supabase;
     runStartedAt = Date.now();
     runId = await startIntegrationRun(supabase, {
@@ -130,6 +160,39 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!cacheError && cachedData?.expires_at && new Date(cachedData.expires_at) > new Date()) {
+      // Cache hit — but if veille_items is empty for this client, backfill from cache
+      if (clientId) {
+        const { count } = await supabase
+          .from("veille_items")
+          .select("id", { count: "exact", head: true })
+          .eq("client_id", clientId);
+
+        if (!count || count === 0) {
+          const cachedArticles = normalizeArticles(
+            Array.isArray(cachedData.articles) ? cachedData.articles : [],
+            safeCategory,
+          );
+          if (cachedArticles.length > 0) {
+            const rows = cachedArticles.map((a) => ({
+              client_id: clientId,
+              title: a.title,
+              summary: a.summary,
+              skill: a.skill,
+              source: a.source || null,
+              source_url: a.url || null,
+              severity: a.severity,
+              is_actionable: a.is_actionable,
+              details: {
+                source_function: "market-news",
+                category: a.category,
+                citations: a.citations || [],
+              },
+            }));
+            await supabase.from("veille_items").insert(rows);
+          }
+        }
+      }
+
       await finishIntegrationRun(supabase, runId, {
         status: "success",
         metrics: {
@@ -159,12 +222,16 @@ Return STRICT JSON object with this exact schema:
       "summary": "2-3 concise sentences with actionable signal",
       "source": "publisher or platform name",
       "category": "marketing|technology|finance|industry|competitor",
+      "skill": "veille|market_intelligence|seo|ads|social|concurrence|reputation|compliance",
+      "severity": "alert|warning|opportunity|info",
+      "is_actionable": true or false,
       "citations": ["url1","url2"],
-      "url": "primary url or empty string",
-      "imageUrl": "optional image url or empty string"
+      "url": "primary url or empty string"
     }
   ]
 }
+Skill: veille=general watch, market_intelligence=market signals, seo=SEO signals, ads=paid media, social=social media, concurrence=competitor moves, reputation=brand reputation, compliance=legal/regulatory.
+Severity: alert=urgent threat, warning=needs attention, opportunity=growth potential, info=general awareness.
 No markdown. No extra keys.
 `;
 
@@ -188,6 +255,9 @@ No markdown. No extra keys.
               citations: [],
               imageUrl: undefined,
               url: undefined,
+              skill: "veille",
+              severity: "info",
+              is_actionable: false,
             },
           ];
 
@@ -201,6 +271,34 @@ No markdown. No extra keys.
       },
       { onConflict: "cache_key" },
     );
+
+    // Persist veille items into the veille_items table so the Veille page can display them
+    if (clientId && finalArticles.length > 0) {
+      const veilleRows = finalArticles.map((a) => ({
+        client_id: clientId,
+        title: a.title,
+        summary: a.summary,
+        skill: a.skill,
+        source: a.source || null,
+        source_url: a.url || null,
+        severity: a.severity,
+        is_actionable: a.is_actionable,
+        details: {
+          source_function: "market-news",
+          category: a.category,
+          citations: a.citations || [],
+        },
+      }));
+
+      const { error: insertError } = await supabase
+        .from("veille_items")
+        .insert(veilleRows);
+
+      if (insertError) {
+        console.error("Failed to insert veille_items:", insertError);
+      }
+    }
+
     await finishIntegrationRun(supabase, runId, {
       status: "success",
       metrics: {

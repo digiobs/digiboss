@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -77,6 +78,7 @@ function getSeverityConfig(severity: string) {
 export default function Veille() {
   const { clients, currentClient, setCurrentClient, isAllClientsSelected } = useClient();
   const { isAdmin } = useVisibilityMode();
+  const queryClient = useQueryClient();
   const selectedClientId = currentClient?.id ?? ALL_CLIENTS_ID;
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
@@ -84,21 +86,26 @@ export default function Veille() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
-  const syncMarketNews = async () => {
+  const syncMarketNews = useCallback(async () => {
+    if (isAllClientsSelected) {
+      toast.error('Sélectionnez un client pour synchroniser la veille');
+      return;
+    }
     setSyncing(true);
     try {
-      const payload = isAllClientsSelected ? {} : { clientId: selectedClientId };
-      const { error } = await supabase.functions.invoke('market-news', { body: payload });
+      const { error } = await supabase.functions.invoke('market-news', {
+        body: { clientId: selectedClientId },
+      });
       if (error) throw error;
-      toast.success('Veille data synced');
-      window.location.reload();
+      toast.success('Veille synchronisée');
+      await queryClient.invalidateQueries({ queryKey: ['veille-items'] });
     } catch (error) {
       console.error('market-news sync failed:', error);
-      toast.error('Sync veille failed');
+      toast.error('Échec de la synchronisation veille');
     } finally {
       setSyncing(false);
     }
-  };
+  }, [isAllClientsSelected, selectedClientId, queryClient]);
 
   const clientFilter = isAllClientsSelected ? null : selectedClientId;
   const { data: items = [], isLoading } = useVeilleItems({

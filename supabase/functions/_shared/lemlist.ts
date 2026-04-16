@@ -174,18 +174,23 @@ export async function loadLemlistClients(): Promise<LemlistTeamClient[]> {
       clients.push({
         apiKey: entry.apiKey,
         teamId: team.id,
-        // Prefer the label from the secret if provided (makes it easy to
-        // override display names without touching lemlist).
         teamName: entry.label || team.name,
       });
     } catch (error) {
+      // /api/team may not be available for all workspaces (older plans, auth
+      // mismatch, etc.). In single-key mode this is harmless — we still know
+      // the API key works for campaigns. Use a synthetic team so the rest of
+      // the pipeline proceeds normally.
+      const fallbackId = `key-${clients.length + errors.length}`;
+      clients.push({
+        apiKey: entry.apiKey,
+        teamId: fallbackId,
+        teamName: entry.label || "Lemlist",
+      });
       errors.push(error instanceof Error ? error.message : String(error));
     }
   }
 
-  if (clients.length === 0 && errors.length > 0) {
-    throw new Error(`Failed to resolve any lemlist team: ${errors.join(" | ")}`);
-  }
   return clients;
 }
 

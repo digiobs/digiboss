@@ -37,6 +37,9 @@ export interface PlanTaskContentRow {
   content_status: string | null;
   funnel_stage: string | null;
   period: string | null;
+  wrike_custom_status: string | null;
+  wrike_permalink: string | null;
+  importance: string | null;
   created_at: string;
   updated_at: string;
 }

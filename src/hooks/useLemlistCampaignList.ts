@@ -24,7 +24,15 @@ export function useLemlistCampaignList(enabled: boolean) {
       const { data, error } = await supabase.functions.invoke('lemlist-list-campaigns', {
         body: {},
       });
-      if (error) throw new Error(error.message || 'Failed to list lemlist campaigns.');
+      // When the edge function returns a non-2xx status, `error` carries a
+      // generic message but the real reason is in the response body (`data`).
+      if (error) {
+        const detail =
+          (data as { error?: string } | null)?.error ||
+          error.message ||
+          'Failed to list lemlist campaigns.';
+        throw new Error(detail);
+      }
       const raw = (data as { campaigns?: RawCampaign[] } | null)?.campaigns ?? [];
       return raw
         .map((c): LemlistCampaign | null => {

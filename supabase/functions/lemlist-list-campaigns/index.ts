@@ -42,14 +42,37 @@ serve(async (req) => {
       requestPayload: { source: "lemlist-list-campaigns" },
     });
 
-    const clients = await loadLemlistClients();
-    if (clients.length === 0) {
+    // Detect which secrets are present so the error message can say exactly
+    // what's missing when the API call inevitably fails.
+    const hasMultiKey = Boolean(Deno.env.get("LEMLIST_API_KEYS"));
+    const hasLegacyKey = Boolean(Deno.env.get("LEMLIST_API_KEY"));
+
+    let clients: Awaited<ReturnType<typeof loadLemlistClients>>;
+    try {
+      clients = await loadLemlistClients();
+    } catch (loadError) {
+      const detail = loadError instanceof Error ? loadError.message : String(loadError);
       throw new Error(
-        "No lemlist API key configured (set LEMLIST_API_KEYS or LEMLIST_API_KEY).",
+        `loadLemlistClients failed (LEMLIST_API_KEYS=${hasMultiKey}, LEMLIST_API_KEY=${hasLegacyKey}): ${detail}`,
       );
     }
 
-    const campaigns = await fetchCampaignsAcrossTeams(clients);
+    if (clients.length === 0) {
+      throw new Error(
+        `No lemlist API key configured (LEMLIST_API_KEYS=${hasMultiKey}, LEMLIST_API_KEY=${hasLegacyKey}). ` +
+          "Set at least one in Supabase Edge Function secrets.",
+      );
+    }
+
+    let campaigns: Awaited<ReturnType<typeof fetchCampaignsAcrossTeams>>;
+    try {
+      campaigns = await fetchCampaignsAcrossTeams(clients);
+    } catch (fetchError) {
+      const detail = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      throw new Error(
+        `fetchCampaigns failed for ${clients.length} team(s): ${detail}`,
+      );
+    }
 
     // Frontend picker expects a flat list of `{id, name, team_id, team_name}`.
     // Sort teams first so campaigns group naturally in the dropdown.
@@ -87,12 +110,13 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[lemlist-list-campaigns]", message);
     await finishIntegrationRun(supabase, runId, {
       status: "failed",
       metrics: { durationMs: Date.now() - startedAt },
-      errorMessage: error instanceof Error ? error.message : "Unknown error",
+      errorMessage: message,
     });
-    const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

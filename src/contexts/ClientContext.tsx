@@ -22,6 +22,15 @@ export interface ClientConfig {
   linkedin_organization_id: string | null;
   hubspot_portal_id: string | null;
   google_analytics_property_id: string | null;
+  ga4_property_id: string | null;
+  google_ads_id: string | null;
+  gsc_site_id: string | null;
+  hubspot_analytics_id: string | null;
+  meteoria_project_id: string | null;
+  notion_page_id: string | null;
+  onedrive_claude_path: string | null;
+  semrush_campaign_id: string | null;
+  semrush_project_id: string | null;
   industry: string;
   market_news_keywords: string[];
 }

@@ -18,6 +18,15 @@ interface ClientConfig {
   linkedin_organization_id: string | null;
   hubspot_portal_id: string | null;
   google_analytics_property_id: string | null;
+  ga4_property_id: string | null;
+  google_ads_id: string | null;
+  gsc_site_id: string | null;
+  hubspot_analytics_id: string | null;
+  meteoria_project_id: string | null;
+  notion_page_id: string | null;
+  onedrive_claude_path: string | null;
+  semrush_campaign_id: string | null;
+  semrush_project_id: string | null;
   industry: string;
   market_news_keywords: string[];
 }
@@ -58,6 +67,15 @@ export function ClientConfigDialog({
     linkedin_organization_id: '',
     hubspot_portal_id: '',
     google_analytics_property_id: '',
+    ga4_property_id: '',
+    google_ads_id: '',
+    gsc_site_id: '',
+    hubspot_analytics_id: '',
+    meteoria_project_id: '',
+    notion_page_id: '',
+    onedrive_claude_path: '',
+    semrush_campaign_id: '',
+    semrush_project_id: '',
     industry: 'technology',
     market_news_keywords: [],
   });
@@ -92,6 +110,15 @@ export function ClientConfigDialog({
         linkedin_organization_id: '',
         hubspot_portal_id: '',
         google_analytics_property_id: '',
+        ga4_property_id: '',
+        google_ads_id: '',
+        gsc_site_id: '',
+        hubspot_analytics_id: '',
+        meteoria_project_id: '',
+        notion_page_id: '',
+        onedrive_claude_path: '',
+        semrush_campaign_id: '',
+        semrush_project_id: '',
         industry: 'technology',
         market_news_keywords: [],
       });
@@ -109,6 +136,15 @@ export function ClientConfigDialog({
       linkedin_organization_id: config.linkedin_organization_id || null,
       hubspot_portal_id: config.hubspot_portal_id || null,
       google_analytics_property_id: config.google_analytics_property_id || null,
+      ga4_property_id: config.ga4_property_id || null,
+      google_ads_id: config.google_ads_id || null,
+      gsc_site_id: config.gsc_site_id || null,
+      hubspot_analytics_id: config.hubspot_analytics_id || null,
+      meteoria_project_id: config.meteoria_project_id || null,
+      notion_page_id: config.notion_page_id || null,
+      onedrive_claude_path: config.onedrive_claude_path || null,
+      semrush_campaign_id: config.semrush_campaign_id || null,
+      semrush_project_id: config.semrush_project_id || null,
       industry: config.industry,
       market_news_keywords: config.market_news_keywords,
     };
@@ -281,6 +317,54 @@ export function ClientConfigDialog({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  <Label htmlFor="ga4_id">GA4 Property ID</Label>
+                  <Input
+                    id="ga4_id"
+                    value={config.ga4_property_id || ''}
+                    onChange={(e) =>
+                      setConfig({ ...config, ga4_property_id: e.target.value })
+                    }
+                    placeholder="e.g., 123456789"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ga_id">Google Analytics Property ID (legacy)</Label>
+                  <Input
+                    id="ga_id"
+                    value={config.google_analytics_property_id || ''}
+                    onChange={(e) =>
+                      setConfig({ ...config, google_analytics_property_id: e.target.value })
+                    }
+                    placeholder="e.g., G-XXXXXXXXXX"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gsc_id">Google Search Console Site</Label>
+                  <Input
+                    id="gsc_id"
+                    value={config.gsc_site_id || ''}
+                    onChange={(e) =>
+                      setConfig({ ...config, gsc_site_id: e.target.value })
+                    }
+                    placeholder="e.g., sc-domain:example.com"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="google_ads_id">Google Ads ID</Label>
+                  <Input
+                    id="google_ads_id"
+                    value={config.google_ads_id || ''}
+                    onChange={(e) =>
+                      setConfig({ ...config, google_ads_id: e.target.value })
+                    }
+                    placeholder="e.g., 123-456-7890"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="linkedin_id">LinkedIn Organization ID</Label>
                   <Input
                     id="linkedin_id"
@@ -303,14 +387,62 @@ export function ClientConfigDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="ga_id">Google Analytics Property ID</Label>
+                  <Label htmlFor="hubspot_analytics_id">HubSpot Analytics ID</Label>
                   <Input
-                    id="ga_id"
-                    value={config.google_analytics_property_id || ''}
-                    onChange={(e) =>
-                      setConfig({ ...config, google_analytics_property_id: e.target.value })
-                    }
-                    placeholder="e.g., G-XXXXXXXXXX"
+                    id="hubspot_analytics_id"
+                    value={config.hubspot_analytics_id || ''}
+                    onChange={(e) => setConfig({ ...config, hubspot_analytics_id: e.target.value })}
+                    placeholder="e.g., 12345678"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="semrush_project_id">SEMrush Project ID</Label>
+                  <Input
+                    id="semrush_project_id"
+                    value={config.semrush_project_id || ''}
+                    onChange={(e) => setConfig({ ...config, semrush_project_id: e.target.value })}
+                    placeholder="e.g., 12345678"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="semrush_campaign_id">SEMrush Campaign ID</Label>
+                  <Input
+                    id="semrush_campaign_id"
+                    value={config.semrush_campaign_id || ''}
+                    onChange={(e) => setConfig({ ...config, semrush_campaign_id: e.target.value })}
+                    placeholder="e.g., 12345678"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="meteoria_id">Meteoria Project ID</Label>
+                  <Input
+                    id="meteoria_id"
+                    value={config.meteoria_project_id || ''}
+                    onChange={(e) => setConfig({ ...config, meteoria_project_id: e.target.value })}
+                    placeholder="e.g., proj_abc123"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notion_id">Notion Page ID</Label>
+                  <Input
+                    id="notion_id"
+                    value={config.notion_page_id || ''}
+                    onChange={(e) => setConfig({ ...config, notion_page_id: e.target.value })}
+                    placeholder="e.g., abc12345-..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="onedrive_path">OneDrive Claude Path</Label>
+                  <Input
+                    id="onedrive_path"
+                    value={config.onedrive_claude_path || ''}
+                    onChange={(e) => setConfig({ ...config, onedrive_claude_path: e.target.value })}
+                    placeholder="e.g., /clients/acme"
                   />
                 </div>
               </div>

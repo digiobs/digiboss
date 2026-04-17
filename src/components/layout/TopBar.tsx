@@ -20,9 +20,11 @@ import {
 } from '@/components/ui/select';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { NotificationPreferencesPanel } from '@/components/notifications/NotificationPreferencesPanel';
+import { VisibilityToggle } from '@/components/plan/VisibilityToggle';
 import { useDateRange } from '@/contexts/DateRangeContext';
 import { usePreAuth } from '@/contexts/PreAuthContext';
 import { useTeamAuth } from '@/contexts/TeamAuthContext';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 import { toast } from 'sonner';
 
 export function TopBar() {
@@ -31,6 +33,7 @@ export function TopBar() {
   const { dateRange, setDateRange } = useDateRange();
   const { user, signOut } = useTeamAuth();
   const { preLogout } = usePreAuth();
+  const { mode, toggle } = useVisibilityMode();
 
   const handleSignOut = async () => {
     // Clear both auth layers — PreAuthGuard grants access when *either*
@@ -59,6 +62,9 @@ export function TopBar() {
 
         {/* Right side - Date, Notifications, Profile */}
         <div className="flex items-center gap-3">
+          {/* Visibility Toggle */}
+          <VisibilityToggle mode={mode} onToggle={toggle} />
+
           {/* Date Range Selector */}
           <Select value={dateRange} onValueChange={setDateRange}>
             <SelectTrigger className="w-40 h-9">

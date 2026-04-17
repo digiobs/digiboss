@@ -2036,6 +2036,45 @@ export type Database = {
         }
         Relationships: []
       }
+      windsor_linkedin_metrics: {
+        Row: {
+          id: string
+          client_id: string | null
+          date: string
+          organization_follower_count: number
+          followers_gain_organic: number
+          followers_gain_paid: number
+          raw: Json
+          synced_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          client_id?: string | null
+          date: string
+          organization_follower_count?: number
+          followers_gain_organic?: number
+          followers_gain_paid?: number
+          raw?: Json
+          synced_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string | null
+          date?: string
+          organization_follower_count?: number
+          followers_gain_organic?: number
+          followers_gain_paid?: number
+          raw?: Json
+          synced_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tldv_meetings: {
         Row: {
           ai_summary_json: Json

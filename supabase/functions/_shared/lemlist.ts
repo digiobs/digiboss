@@ -248,9 +248,8 @@ export async function fetchLeadsForCampaign(
   limit: number,
 ): Promise<LemlistLead[]> {
   const cappedLimit = Math.min(Math.max(limit, 1), 500);
+  // /export/leads returns CSV — try JSON endpoints first.
   const urls = [
-    `https://api.lemlist.com/api/campaigns/${campaignId}/export/leads?state=all&limit=${cappedLimit}`,
-    `https://api.lemlist.com/api/campaigns/${campaignId}/export/leads?limit=${cappedLimit}`,
     `https://api.lemlist.com/api/campaigns/${campaignId}/leads?limit=${cappedLimit}`,
     `https://api.lemlist.com/api/leads?campaignId=${campaignId}&limit=${cappedLimit}`,
   ];

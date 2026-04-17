@@ -48,20 +48,19 @@ const colorClasses: Record<string, string> = {
 
 const navItems = [
   { path: '/home', icon: LayoutDashboard, label: 'Home' },
+  { path: '/actions', icon: CheckSquare, label: 'Contenus' },
+  { path: '/prospects', icon: Users, label: 'Prospects' },
+  { path: '/reporting', icon: BarChart3, label: 'Reporting' },
   { path: '/meetings', icon: Lightbulb, label: 'Meetings' },
   { path: '/veille', icon: Newspaper, label: 'Veille' },
-  { path: '/prospects', icon: Users, label: 'Prospects' },
   { path: '/assets', icon: FolderOpen, label: 'Assets' },
-  { path: '/actions', icon: CheckSquare, label: 'Contenus' },
   { path: '/seo-geo', icon: Search, label: 'SEO / GEO' },
-  { path: '/kpis', icon: Activity, label: 'KPIs' },
-  { path: '/reporting', icon: BarChart3, label: 'Reporting' },
-  { path: '/journal', icon: ScrollText, label: 'Journal' },
   { path: '/chat', icon: MessageSquare, label: 'Talk to DigiObs' },
 ];
 
 const bottomNavItems = [
   { path: '/admin/my-work', icon: Briefcase, label: 'Mon travail' },
+  { path: '/journal', icon: ScrollText, label: 'Journal' },
   { path: '/settings/profile', icon: UserCog, label: 'Mon profil' },
   { path: '/settings/integrations', icon: Plug, label: 'Intégrations' },
   { path: '/admin', icon: Settings, label: 'Admin' },

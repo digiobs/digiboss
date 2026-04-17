@@ -5,8 +5,9 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '';
 
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  console.error('[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY — check your .env file');
+const isMissingConfig = !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY;
+if (isMissingConfig) {
+  console.error('[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY — check your .env file or Vercel environment variables');
 }
 
 // Import the supabase client like this:
@@ -100,11 +101,18 @@ async function silentInMemoryLock<R>(
   return await operation;
 }
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-    lock: silentInMemoryLock,
+const FALLBACK_URL = 'https://placeholder.supabase.co';
+const FALLBACK_KEY = 'placeholder';
+
+export const supabase = createClient<Database>(
+  SUPABASE_URL || FALLBACK_URL,
+  SUPABASE_PUBLISHABLE_KEY || FALLBACK_KEY,
+  {
+    auth: {
+      storage: localStorage,
+      persistSession: !isMissingConfig,
+      autoRefreshToken: !isMissingConfig,
+      lock: silentInMemoryLock,
+    },
   },
-});
+);

@@ -84,24 +84,8 @@ export default function Veille() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
-  const syncMarketNews = async () => {
-    setSyncing(true);
-    try {
-      const payload = isAllClientsSelected ? {} : { clientId: selectedClientId };
-      const { error } = await supabase.functions.invoke('market-news', { body: payload });
-      if (error) throw error;
-      toast.success('Veille data synced');
-      window.location.reload();
-    } catch (error) {
-      console.error('market-news sync failed:', error);
-      toast.error('Sync veille failed');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const clientFilter = isAllClientsSelected ? null : selectedClientId;
-  const { data: items = [], isLoading } = useVeilleItems({
+  const { data: items = [], isLoading, refetch } = useVeilleItems({
     clientId: clientFilter,
     skill: selectedSkill,
     severity: selectedSeverity,
@@ -119,6 +103,23 @@ export default function Veille() {
         item.clients?.name?.toLowerCase().includes(q)
     );
   }, [items, search]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    const body = isAllClientsSelected ? {} : { clientId: currentClient?.id };
+    const { data, error } = await supabase.functions.invoke('market-news', { body });
+    if (error) {
+      toast.error(error.message || 'Échec de la synchronisation veille');
+      setSyncing(false);
+      return;
+    }
+    const result = data as { fetched?: number; upserted?: number; clientsSynced?: number } | null;
+    toast.success(
+      `Veille synchronisée. ${result?.upserted ?? 0} signaux, ${result?.clientsSynced ?? 0} client(s).`,
+    );
+    refetch();
+    setSyncing(false);
+  };
 
   // Stats
   const stats = useMemo(() => {
@@ -142,7 +143,7 @@ export default function Veille() {
           </p>
         </div>
         {isAdmin && (
-          <Button variant="outline" className="gap-2" onClick={syncMarketNews} disabled={syncing}>
+          <Button variant="outline" className="gap-2" onClick={handleSync} disabled={syncing}>
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Syncing...' : 'Sync Veille'}
           </Button>

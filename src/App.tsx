@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { ClientProvider } from "@/contexts/ClientContext";
 import { PreAuthProvider, usePreAuth } from "@/contexts/PreAuthContext";
@@ -24,7 +25,8 @@ import Admin from "@/pages/Admin";
 import Journal from "@/pages/Journal";
 import Actions from "@/pages/Actions";
 import Veille from "@/pages/Veille";
-import EditorialCalendar from "@/pages/EditorialCalendar";
+// EditorialCalendar is now embedded as a tab in the Actions page.
+// The /calendar route redirects to /actions for backwards compatibility.
 import KpiDashboard from "@/pages/KpiDashboard";
 import SeoGeo from "@/pages/SeoGeo";
 import SettingsIntegrations from "@/pages/SettingsIntegrations";
@@ -96,7 +98,9 @@ const AppRoutes = () => {
             compatibility so old links and bookmarks still land on the right
             page. */}
         <Route path="/proposals" element={<Navigate to="/actions" replace />} />
-        <Route path="/calendar" element={<EditorialCalendar />} />
+        {/* /calendar was merged into /actions as a tab — keep the path
+            for backwards compatibility so old links still work. */}
+        <Route path="/calendar" element={<Navigate to="/actions" replace />} />
         <Route path="/kpis" element={<KpiDashboard />} />
         <Route path="/seo-geo" element={<SeoGeo />} />
         <Route path="/chat" element={<Chat />} />
@@ -117,23 +121,25 @@ const AppRoutes = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <DateRangeProvider>
-        <ClientProvider>
-          <PreAuthProvider>
-            <TeamAuthProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
-            </TeamAuthProvider>
-          </PreAuthProvider>
-        </ClientProvider>
-      </DateRangeProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <DateRangeProvider>
+          <ClientProvider>
+            <PreAuthProvider>
+              <TeamAuthProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <AppRoutes />
+                </BrowserRouter>
+              </TeamAuthProvider>
+            </PreAuthProvider>
+          </ClientProvider>
+        </DateRangeProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

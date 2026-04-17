@@ -1,8 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { WRIKE_CLIENTS } from '@/types/wrike';
 import {
-  addDays,
   startOfWeek,
   endOfWeek,
   startOfMonth,
@@ -11,28 +8,26 @@ import {
   format,
   isSameMonth,
   isToday,
-  isSameDay,
-  parseISO,
   addMonths,
   subMonths,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
-  RefreshCw,
   GripVertical,
   Linkedin,
   FileText,
   Mail,
   Globe,
   BookOpen,
+  RefreshCw,
   Download,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -46,11 +41,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useClient } from '@/contexts/ClientContext';
-import { useVisibilityMode } from '@/hooks/useVisibilityMode';
-import { useEditorialCalendar, type CalendarEntry } from '@/hooks/useEditorialCalendar';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { WRIKE_CLIENTS } from '@/types/wrike';
+import { useEditorialCalendar, type CalendarEntry } from '@/hooks/useEditorialCalendar';
+import { useClient } from '@/contexts/ClientContext';
+import type { PlanTaskContentRow } from '@/hooks/useContentTasks';
+
+// ---------------------------------------------------------------------------
+// Shared config
+// ---------------------------------------------------------------------------
 
 const canalIcons: Record<string, typeof Linkedin> = {
   linkedin: Linkedin,
@@ -75,6 +76,18 @@ const priorityColors: Record<string, string> = {
   normal: 'border-l-slate-300',
 };
 
+// Task chip colors (different from editorial to visually distinguish)
+const taskStatusColors: Record<string, string> = {
+  backlog: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+  in_progress: 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200',
+  review: 'bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-200',
+  done: 'bg-emerald-200 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-200',
+};
+
+// ---------------------------------------------------------------------------
+// Entry chip (editorial)
+// ---------------------------------------------------------------------------
+
 function EntryChip({
   entry,
   onClick,
@@ -93,7 +106,7 @@ function EntryChip({
     <div
       className={cn(
         'group flex items-center gap-1.5 px-2 py-1 rounded text-xs cursor-pointer border-l-2 bg-card hover:bg-accent/50 transition-colors mb-1',
-        priorityColors[entry.priority] || priorityColors.normal
+        priorityColors[entry.priority] || priorityColors.normal,
       )}
       onClick={onClick}
       draggable={draggable}
@@ -108,6 +121,28 @@ function EntryChip({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Task chip (plan_tasks with due_date)
+// ---------------------------------------------------------------------------
+
+function TaskChip({ task, onClick }: { task: PlanTaskContentRow; onClick: () => void }) {
+  const color = taskStatusColors[task.status] || taskStatusColors.backlog;
+  return (
+    <div
+      className="flex items-center gap-1.5 px-2 py-1 rounded text-xs cursor-pointer border-l-2 border-l-blue-400 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100/60 dark:hover:bg-blue-950/40 transition-colors mb-1"
+      onClick={onClick}
+    >
+      <CalendarIcon className="w-3 h-3 shrink-0 text-blue-500" />
+      <span className="truncate flex-1 font-medium">{task.title}</span>
+      <Badge className={cn('text-[10px] px-1 py-0', color)}>{task.status}</Badge>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Entry detail dialog
+// ---------------------------------------------------------------------------
 
 function EntryDetailDialog({
   entry,
@@ -138,7 +173,9 @@ function EntryDetailDialog({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <p className="text-muted-foreground text-xs">Date</p>
-              <p className="font-medium">{format(parseISO(entry.date), 'EEEE d MMMM yyyy', { locale: fr })}</p>
+              <p className="font-medium">
+                {format(new Date(entry.date + 'T00:00:00'), 'EEEE d MMMM yyyy', { locale: fr })}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Canal</p>
@@ -149,7 +186,7 @@ function EntryDetailDialog({
               <p className="font-medium">{entry.content_type}</p>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs">Priorité</p>
+              <p className="text-muted-foreground text-xs">Priorite</p>
               <p className="font-medium capitalize">{entry.priority}</p>
             </div>
           </div>
@@ -157,12 +194,6 @@ function EntryDetailDialog({
             <div>
               <p className="text-muted-foreground text-xs">Pilier</p>
               <p>{entry.pilier}</p>
-            </div>
-          )}
-          {entry.serie_id && (
-            <div>
-              <p className="text-muted-foreground text-xs">Série</p>
-              <p>{entry.serie_id} · Épisode {entry.serie_episode}/{entry.serie_total}</p>
             </div>
           )}
           {entry.draft_content && (
@@ -182,7 +213,9 @@ function EntryDetailDialog({
           {entry.tags.length > 0 && (
             <div className="flex gap-1 flex-wrap">
               {entry.tags.map((tag, i) => (
-                <Badge key={i} variant="outline" className="text-xs">{String(tag)}</Badge>
+                <Badge key={i} variant="outline" className="text-xs">
+                  {String(tag)}
+                </Badge>
               ))}
             </div>
           )}
@@ -210,10 +243,27 @@ function EntryDetailDialog({
   );
 }
 
-export default function EditorialCalendar() {
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+export interface ActionsCalendarViewProps {
+  /** Plan tasks to overlay on the calendar (those with due_date). */
+  planTasks: PlanTaskContentRow[];
+  isAdmin: boolean;
+}
+
+export function ActionsCalendarView({ planTasks, isAdmin }: ActionsCalendarViewProps) {
   const { currentClient, isAllClientsSelected } = useClient();
-  const { isAdmin } = useVisibilityMode();
-  const { entries, entriesByDate, stats, isLoading, moveEntry, updateEntryStatus, refetch } = useEditorialCalendar();
+  const {
+    entries,
+    entriesByDate,
+    stats,
+    isLoading,
+    moveEntry,
+    updateEntryStatus,
+    refetch,
+  } = useEditorialCalendar();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedEntry, setSelectedEntry] = useState<CalendarEntry | null>(null);
@@ -231,7 +281,7 @@ export default function EditorialCalendar() {
   const handleWrikeImport = useCallback(async () => {
     if (!currentClient?.id) return;
     if (!wrikeFolderId) {
-      toast.error('Aucun projet Wrike associé à ce client');
+      toast.error('Aucun projet Wrike associe a ce client');
       return;
     }
     setIsImporting(true);
@@ -241,22 +291,24 @@ export default function EditorialCalendar() {
       });
       if (error) throw error;
       const imported = (data as { imported?: number } | null)?.imported ?? 0;
-      toast.success(`${imported} publication${imported > 1 ? 's' : ''} importée${imported > 1 ? 's' : ''} depuis Wrike`);
+      toast.success(`${imported} publication${imported > 1 ? 's' : ''} importee${imported > 1 ? 's' : ''} depuis Wrike`);
       await refetch();
     } catch (err) {
       console.error('wrike-editorial-import failed:', err);
-      toast.error("Échec de l'import Wrike");
+      toast.error("Echec de l'import Wrike");
     } finally {
       setIsImporting(false);
     }
   }, [currentClient?.id, wrikeFolderId, refetch]);
 
+  // Calendar grid setup
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
+  // Filtered editorial entries by date
   const filteredEntriesByDate = useMemo(() => {
     if (filterCanal === 'all') return entriesByDate;
     const result: Record<string, CalendarEntry[]> = {};
@@ -266,6 +318,18 @@ export default function EditorialCalendar() {
     }
     return result;
   }, [entriesByDate, filterCanal]);
+
+  // Plan tasks indexed by due_date
+  const tasksByDate = useMemo(() => {
+    const map: Record<string, PlanTaskContentRow[]> = {};
+    for (const t of planTasks) {
+      if (!t.due_date) continue;
+      const key = t.due_date.substring(0, 10); // YYYY-MM-DD
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    }
+    return map;
+  }, [planTasks]);
 
   const canals = useMemo(() => {
     const set = new Set(entries.map((e) => e.canal));
@@ -278,19 +342,22 @@ export default function EditorialCalendar() {
     e.dataTransfer.setData('text/plain', entryId);
   }, []);
 
-  const handleDrop = useCallback(async (e: React.DragEvent, targetDate: Date) => {
-    e.preventDefault();
-    const entryId = e.dataTransfer.getData('text/plain');
-    if (!entryId) return;
-    const newDate = format(targetDate, 'yyyy-MM-dd');
-    try {
-      await moveEntry(entryId, newDate);
-      toast.success('Publication déplacée');
-    } catch {
-      toast.error('Erreur lors du déplacement');
-    }
-    setDraggedEntryId(null);
-  }, [moveEntry]);
+  const handleDrop = useCallback(
+    async (e: React.DragEvent, targetDate: Date) => {
+      e.preventDefault();
+      const entryId = e.dataTransfer.getData('text/plain');
+      if (!entryId) return;
+      const newDate = format(targetDate, 'yyyy-MM-dd');
+      try {
+        await moveEntry(entryId, newDate);
+        toast.success('Publication deplacee');
+      } catch {
+        toast.error('Erreur lors du deplacement');
+      }
+      setDraggedEntryId(null);
+    },
+    [moveEntry],
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -300,48 +367,17 @@ export default function EditorialCalendar() {
   const handleStatusChange = async (id: string, status: string) => {
     try {
       await updateEntryStatus(id, status);
-      toast.success(`Statut mis à jour: ${status}`);
+      toast.success(`Statut mis a jour: ${status}`);
       setDetailOpen(false);
     } catch {
-      toast.error('Erreur lors de la mise à jour');
+      toast.error('Erreur lors de la mise a jour');
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <CalendarDays className="w-6 h-6 text-blue-500" />
-            Calendrier Éditorial
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {isAllClientsSelected ? 'Tous les clients' : currentClient?.name} · {stats.total} publications
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isAdmin && !isAllClientsSelected && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleWrikeImport}
-              disabled={isImporting || !wrikeFolderId}
-              title={wrikeFolderId ? 'Importer les tâches Wrike (articles, posts, newsletters)' : 'Aucun projet Wrike associé'}
-            >
-              <Download className={cn('w-4 h-4 mr-2', isImporting && 'animate-pulse')} />
-              {isImporting ? 'Import en cours…' : 'Importer Wrike'}
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Actualiser
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {Object.entries(stats.byStatus).map(([status, count]) => (
           <Card key={status}>
             <CardContent className="p-3 flex items-center gap-2">
@@ -353,30 +389,60 @@ export default function EditorialCalendar() {
       </div>
 
       {/* Month nav + filters */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => setCurrentMonth((m) => subMonths(m, 1))}>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setCurrentMonth((m) => subMonths(m, 1))}
+          >
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <h2 className="text-lg font-semibold min-w-[180px] text-center capitalize">
             {format(currentMonth, 'MMMM yyyy', { locale: fr })}
           </h2>
-          <Button variant="outline" size="icon" onClick={() => setCurrentMonth((m) => addMonths(m, 1))}>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setCurrentMonth((m) => addMonths(m, 1))}
+          >
             <ChevronRight className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(new Date())}>Aujourd'hui</Button>
+          <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(new Date())}>
+            Aujourd'hui
+          </Button>
         </div>
-        <Select value={filterCanal} onValueChange={setFilterCanal}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Canal" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous les canaux</SelectItem>
-            {canals.map((c) => (
-              <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={filterCanal} onValueChange={setFilterCanal}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Canal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les canaux</SelectItem>
+              {canals.map((c) => (
+                <SelectItem key={c} value={c} className="capitalize">
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {isAdmin && !isAllClientsSelected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleWrikeImport}
+              disabled={isImporting || !wrikeFolderId}
+              title={
+                wrikeFolderId
+                  ? 'Importer les taches Wrike'
+                  : 'Aucun projet Wrike associe'
+              }
+            >
+              <Download className={cn('w-4 h-4 mr-2', isImporting && 'animate-pulse')} />
+              {isImporting ? 'Import...' : 'Import Wrike'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Calendar grid */}
@@ -389,7 +455,10 @@ export default function EditorialCalendar() {
           {/* Day headers */}
           <div className="grid grid-cols-7 bg-muted/50">
             {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((day) => (
-              <div key={day} className="p-2 text-center text-xs font-medium text-muted-foreground border-b">
+              <div
+                key={day}
+                className="p-2 text-center text-xs font-medium text-muted-foreground border-b"
+              >
                 {day}
               </div>
             ))}
@@ -399,6 +468,7 @@ export default function EditorialCalendar() {
             {days.map((day) => {
               const dateKey = format(day, 'yyyy-MM-dd');
               const dayEntries = filteredEntriesByDate[dateKey] || [];
+              const dayTasks = tasksByDate[dateKey] || [];
               const inMonth = isSameMonth(day, currentMonth);
               const today = isToday(day);
 
@@ -409,16 +479,20 @@ export default function EditorialCalendar() {
                     'min-h-[100px] p-1 border-b border-r last:border-r-0 transition-colors',
                     !inMonth && 'bg-muted/30',
                     today && 'bg-blue-50/50 dark:bg-blue-950/20',
-                    draggedEntryId && 'hover:bg-accent/30'
+                    draggedEntryId && 'hover:bg-accent/30',
                   )}
                   onDrop={(e) => handleDrop(e, day)}
                   onDragOver={handleDragOver}
                 >
-                  <div className={cn(
-                    'text-xs mb-1 px-1',
-                    today ? 'font-bold text-blue-600 dark:text-blue-400' : 'text-muted-foreground',
-                    !inMonth && 'opacity-40'
-                  )}>
+                  <div
+                    className={cn(
+                      'text-xs mb-1 px-1',
+                      today
+                        ? 'font-bold text-blue-600 dark:text-blue-400'
+                        : 'text-muted-foreground',
+                      !inMonth && 'opacity-40',
+                    )}
+                  >
                     {format(day, 'd')}
                   </div>
                   <div className="space-y-0">
@@ -426,9 +500,21 @@ export default function EditorialCalendar() {
                       <EntryChip
                         key={entry.id}
                         entry={entry}
-                        onClick={() => { setSelectedEntry(entry); setDetailOpen(true); }}
+                        onClick={() => {
+                          setSelectedEntry(entry);
+                          setDetailOpen(true);
+                        }}
                         draggable={isAdmin}
                         onDragStart={(e) => handleDragStart(e, entry.id)}
+                      />
+                    ))}
+                    {dayTasks.map((task) => (
+                      <TaskChip
+                        key={task.id}
+                        task={task}
+                        onClick={() => {
+                          /* tasks don't open a detail dialog for now */
+                        }}
                       />
                     ))}
                   </div>

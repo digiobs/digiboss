@@ -24,16 +24,18 @@ export function useLemlistCampaignList(enabled: boolean) {
       const { data, error } = await supabase.functions.invoke('lemlist-list-campaigns', {
         body: {},
       });
-      // When the edge function returns a non-2xx status, `error` carries a
-      // generic message but the real reason is in the response body (`data`).
-      if (error) {
+      // Edge function returns 200 even on error (with `{error: "..."}` in
+      // the body) so supabase.functions.invoke() surfaces the real message
+      // instead of a generic "non-2xx" wrapper.
+      const body = data as { campaigns?: RawCampaign[]; error?: string } | null;
+      if (error || body?.error) {
         const detail =
-          (data as { error?: string } | null)?.error ||
-          error.message ||
+          body?.error ||
+          (error instanceof Error ? error.message : null) ||
           'Failed to list lemlist campaigns.';
         throw new Error(detail);
       }
-      const raw = (data as { campaigns?: RawCampaign[] } | null)?.campaigns ?? [];
+      const raw = body?.campaigns ?? [];
       return raw
         .map((c): LemlistCampaign | null => {
           const id = typeof c?.id === 'string' ? c.id : null;

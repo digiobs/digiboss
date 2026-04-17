@@ -8,15 +8,6 @@ import { asArray, asObject, safeString } from "./ingestion.ts";
 export type LemlistCampaign = {
   id: string;
   name: string;
-  teamId: string | null;
-  teamName: string | null;
-};
-
-/** One lemlist workspace we know how to call (its API key and team metadata). */
-export type LemlistTeamClient = {
-  apiKey: string;
-  teamId: string;
-  teamName: string;
 };
 
 export type LemlistLead = {
@@ -72,169 +63,14 @@ async function fetchWithFallbacks(
   throw new Error(`Lemlist API failed: ${lastError}`);
 }
 
-/**
- * Parse the raw `LEMLIST_API_KEYS` secret. Accepts either:
- *   - a JSON array of strings:          `["key1", "key2"]`
- *   - a JSON array of `{apiKey,label?}`: `[{"apiKey":"key1","label":"Team A"}]`
- *   - a single bare string (treated as one key)
- *   - a comma-separated list of bare keys
- *
- * The returned objects only carry the raw key; team metadata is resolved later
- * via `/api/team`. Returns an empty array when the secret is absent or empty.
- */
-function parseApiKeysSecret(raw: string | undefined): Array<{ apiKey: string; label: string | null }> {
-  if (!raw) return [];
-  const trimmed = raw.trim();
-  if (!trimmed) return [];
-
-  // Try JSON first.
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) {
-      return parsed
-        .map((item) => {
-          if (typeof item === "string") {
-            const key = item.trim();
-            return key ? { apiKey: key, label: null } : null;
-          }
-          const obj = asObject(item);
-          if (!obj) return null;
-          const apiKey = safeString(obj.apiKey ?? obj.api_key ?? obj.key);
-          const label = safeString(obj.label ?? obj.name ?? obj.teamName ?? obj.team_name);
-          return apiKey ? { apiKey, label } : null;
-        })
-        .filter((entry): entry is { apiKey: string; label: string | null } => Boolean(entry));
-    }
-    if (typeof parsed === "string") {
-      const key = parsed.trim();
-      return key ? [{ apiKey: key, label: null }] : [];
-    }
-  } catch {
-    // Fall through to comma-separated parsing.
-  }
-
-  // Comma-separated fallback.
-  return trimmed
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0)
-    .map((apiKey) => ({ apiKey, label: null }));
-}
-
-/**
- * Fetch the lemlist team (workspace) tied to a given API key. Lemlist returns
- * a single object on `/api/team`, but older accounts occasionally return an
- * array — we normalize both shapes.
- */
-export async function fetchTeam(apiKey: string): Promise<{ id: string; name: string }> {
-  const { text, url } = await fetchWithFallbacks(["https://api.lemlist.com/api/team"], apiKey);
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Error(`Invalid JSON from ${url}: ${text.slice(0, 240)}`);
-  }
-  const candidate = Array.isArray(json) ? json[0] : json;
-  const obj = asObject(candidate);
-  if (!obj) {
-    throw new Error(`Unexpected /api/team payload: ${text.slice(0, 240)}`);
-  }
-  const id = safeString(obj._id ?? obj.id ?? obj.teamId ?? obj.team_id);
-  const name = safeString(obj.name ?? obj.teamName ?? obj.team_name ?? obj.companyName);
-  if (!id) {
-    throw new Error(`/api/team did not include a team id: ${text.slice(0, 240)}`);
-  }
-  return { id, name: name || id };
-}
-
-/**
- * Resolve the full list of lemlist workspaces we can talk to. Reads the new
- * multi-team secret `LEMLIST_API_KEYS` first, then falls back to the legacy
- * single-key secret `LEMLIST_API_KEY`. For each API key, we call `/api/team`
- * to fetch the team id/name so downstream callers can aggregate campaigns and
- * route sync calls to the right key.
- *
- * Failures are collected per-key so one broken key doesn't take the whole
- * feature down. If every key fails, we throw with the aggregated errors.
- */
-export async function loadLemlistClients(): Promise<LemlistTeamClient[]> {
-  const multi = parseApiKeysSecret(Deno.env.get("LEMLIST_API_KEYS"));
-  const legacy = safeString(Deno.env.get("LEMLIST_API_KEY"));
-  const entries: Array<{ apiKey: string; label: string | null }> = [...multi];
-  if (legacy && !entries.some((e) => e.apiKey === legacy)) {
-    entries.push({ apiKey: legacy, label: null });
-  }
-  if (entries.length === 0) return [];
-
-  const clients: LemlistTeamClient[] = [];
-  const errors: string[] = [];
-  for (const entry of entries) {
-    try {
-      const team = await fetchTeam(entry.apiKey);
-      clients.push({
-        apiKey: entry.apiKey,
-        teamId: team.id,
-        teamName: entry.label || team.name,
-      });
-    } catch (error) {
-      // /api/team may not be available for all workspaces (older plans, auth
-      // mismatch, etc.). In single-key mode this is harmless — we still know
-      // the API key works for campaigns. Use a synthetic team so the rest of
-      // the pipeline proceeds normally.
-      const fallbackId = `key-${clients.length + errors.length}`;
-      clients.push({
-        apiKey: entry.apiKey,
-        teamId: fallbackId,
-        teamName: entry.label || "Lemlist",
-      });
-      errors.push(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  return clients;
-}
-
-/**
- * Fetch campaigns for every configured lemlist team and tag each campaign with
- * its team id/name. Campaign ids are globally unique in lemlist, so we don't
- * need to dedupe across teams.
- */
-export async function fetchCampaignsAcrossTeams(
-  clients: LemlistTeamClient[],
-): Promise<LemlistCampaign[]> {
-  const all: LemlistCampaign[] = [];
-  for (const client of clients) {
-    const perTeam = await fetchCampaignsForKey(client.apiKey);
-    for (const campaign of perTeam) {
-      all.push({
-        id: campaign.id,
-        name: campaign.name,
-        teamId: client.teamId,
-        teamName: client.teamName,
-      });
-    }
-  }
-  return all;
-}
-
-/**
- * Legacy single-key wrapper: returns campaigns for one lemlist key without any
- * team metadata attached. Kept for backwards compatibility; new callers should
- * prefer `fetchCampaignsAcrossTeams`.
- */
 export async function fetchCampaigns(apiKey: string): Promise<LemlistCampaign[]> {
-  const rows = await fetchCampaignsForKey(apiKey);
-  return rows.map((c) => ({ ...c, teamId: null, teamName: null }));
-}
-
-async function fetchCampaignsForKey(apiKey: string): Promise<Array<{ id: string; name: string }>> {
   // Lemlist historically caps `/api/campaigns` at 100 rows per call regardless
   // of the `limit` we pass, so we always paginate. Stop when a page is empty,
   // shorter than the page size, or repeats IDs we already saw (which means the
   // workspace doesn't actually honor `offset` and we're looping on page 0).
   const pageSize = 100;
   const maxPages = 20;
-  const seen = new Map<string, { id: string; name: string }>();
+  const seen = new Map<string, LemlistCampaign>();
 
   for (let page = 0; page < maxPages; page += 1) {
     const offset = page * pageSize;
@@ -271,7 +107,7 @@ async function fetchCampaignsForKey(apiKey: string): Promise<Array<{ id: string;
         if (!id || !name) return null;
         return { id, name };
       })
-      .filter((c): c is { id: string; name: string } => Boolean(c));
+      .filter((c): c is LemlistCampaign => Boolean(c));
 
     if (pageCampaigns.length === 0) break;
     const hasNew = pageCampaigns.some((c) => !seen.has(c.id));
@@ -412,9 +248,8 @@ export async function fetchLeadsForCampaign(
   limit: number,
 ): Promise<LemlistLead[]> {
   const cappedLimit = Math.min(Math.max(limit, 1), 500);
+  // /export/leads returns CSV — try JSON endpoints first.
   const urls = [
-    `https://api.lemlist.com/api/campaigns/${campaignId}/export/leads?state=all&limit=${cappedLimit}`,
-    `https://api.lemlist.com/api/campaigns/${campaignId}/export/leads?limit=${cappedLimit}`,
     `https://api.lemlist.com/api/campaigns/${campaignId}/leads?limit=${cappedLimit}`,
     `https://api.lemlist.com/api/leads?campaignId=${campaignId}&limit=${cappedLimit}`,
   ];

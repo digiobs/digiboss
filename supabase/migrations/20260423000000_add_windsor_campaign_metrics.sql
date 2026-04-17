@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.windsor_campaign_metrics (
   synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (datasource, date, campaign, post_id)
+  UNIQUE (date, datasource, campaign)
 );
 
 ALTER TABLE public.windsor_campaign_metrics ENABLE ROW LEVEL SECURITY;

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { ClientProvider } from "@/contexts/ClientContext";
 import { PreAuthProvider, usePreAuth } from "@/contexts/PreAuthContext";
@@ -120,23 +121,25 @@ const AppRoutes = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <DateRangeProvider>
-        <ClientProvider>
-          <PreAuthProvider>
-            <TeamAuthProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
-            </TeamAuthProvider>
-          </PreAuthProvider>
-        </ClientProvider>
-      </DateRangeProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <DateRangeProvider>
+          <ClientProvider>
+            <PreAuthProvider>
+              <TeamAuthProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <AppRoutes />
+                </BrowserRouter>
+              </TeamAuthProvider>
+            </PreAuthProvider>
+          </ClientProvider>
+        </DateRangeProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

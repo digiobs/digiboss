@@ -236,11 +236,45 @@ export function normalizeLemlistLead(payload: Record<string, unknown>): LemlistL
   };
 }
 
+function parseCsvToObjects(csv: string): Record<string, unknown>[] {
+  const lines = csv.split("\n").filter((l) => l.trim());
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(",").map((h) => h.trim());
+  const results: Record<string, unknown>[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (const ch of lines[i]) {
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+      } else if (ch === "," && !inQuotes) {
+        values.push(current.trim());
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+    values.push(current.trim());
+
+    const obj: Record<string, unknown> = {};
+    for (let j = 0; j < headers.length; j++) {
+      const v = values[j] ?? "";
+      obj[headers[j]] = v === "" ? null : v;
+    }
+    results.push(obj);
+  }
+  return results;
+}
+
 /**
- * Fetch leads for a single lemlist campaign with funnel counters. The public
- * lemlist endpoint changed shape a few times — we try the per-campaign export
- * first (returns counters), then fall back to the flat `/api/leads` list which
- * at least carries the status and a few basic fields.
+ * Fetch leads for a single lemlist campaign. The `/export/leads` endpoint
+ * returns CSV with full contact details (name, email, company). The JSON
+ * `/leads` endpoint only returns minimal data (_id, state, contactId), so we
+ * prefer the CSV export and fall back to JSON only when CSV fails.
  */
 export async function fetchLeadsForCampaign(
   apiKey: string,
@@ -248,14 +282,33 @@ export async function fetchLeadsForCampaign(
   limit: number,
 ): Promise<LemlistLead[]> {
   const cappedLimit = Math.min(Math.max(limit, 1), 500);
-  const urls = [
+
+  // Try CSV export first — it has full contact data.
+  const csvUrls = [
     `https://api.lemlist.com/api/campaigns/${campaignId}/export/leads?state=all&limit=${cappedLimit}`,
     `https://api.lemlist.com/api/campaigns/${campaignId}/export/leads?limit=${cappedLimit}`,
+  ];
+
+  try {
+    const csvResult = await fetchWithFallbacks(csvUrls, apiKey);
+    const rows = parseCsvToObjects(csvResult.text);
+    if (rows.length > 0) {
+      const leads = rows
+        .map((row) => normalizeLemlistLead(row))
+        .filter((lead): lead is LemlistLead => Boolean(lead));
+      if (leads.length > 0) return leads;
+    }
+  } catch {
+    // CSV export failed — fall through to JSON endpoints.
+  }
+
+  // Fallback: JSON endpoints (minimal data but at least returns IDs/status).
+  const jsonUrls = [
     `https://api.lemlist.com/api/campaigns/${campaignId}/leads?limit=${cappedLimit}`,
     `https://api.lemlist.com/api/leads?campaignId=${campaignId}&limit=${cappedLimit}`,
   ];
 
-  const { text, url } = await fetchWithFallbacks(urls, apiKey);
+  const { text, url } = await fetchWithFallbacks(jsonUrls, apiKey);
 
   let json: unknown;
   try {
@@ -265,10 +318,10 @@ export async function fetchLeadsForCampaign(
   }
 
   const container = asObject(json);
-  const rows = asArray(
+  const jsonRows = asArray(
     container?.["leads"] ?? container?.["data"] ?? container?.["results"] ?? json,
   );
-  return rows
+  return jsonRows
     .map((item) => asObject(item))
     .filter((item): item is Record<string, unknown> => Boolean(item))
     .map((item) => normalizeLemlistLead(item))

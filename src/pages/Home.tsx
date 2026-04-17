@@ -9,6 +9,9 @@ import { HomeRecentMeetings } from "@/components/home/HomeRecentMeetings";
 import { HomeCalendarWeek } from "@/components/home/HomeCalendarWeek";
 import { HomeClientProposals } from "@/components/home/HomeClientProposals";
 import { HomeRecentDeliverables } from "@/components/home/HomeRecentDeliverables";
+import { HomeClientDecisions } from "@/components/home/HomeClientDecisions";
+import { HomeClientInsights } from "@/components/home/HomeClientInsights";
+import { HomeClientCalendar } from "@/components/home/HomeClientCalendar";
 import { type NextBestAction, dashboardKPIs } from "@/data/dashboardData";
 import { useHomeReportingKpis } from "@/hooks/useHomeData";
 import { TabDataStatusBanner } from "@/components/data/TabDataStatusBanner";
@@ -18,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpRight, CalendarDays, LayoutDashboard, RefreshCw, Sparkles, Zap } from "lucide-react";
+import { ArrowUpRight, CalendarDays, LayoutDashboard, Lightbulb, RefreshCw, Sparkles, Target, TrendingUp, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -58,26 +61,32 @@ export default function Home() {
   const aiScopeLabel = isAllClientsSelected ? "global" : selectedClient?.name ?? "client";
   const aiContext = `Home dashboard generation scope: ${aiScopeLabel}. Prioritize high-impact opportunities for this scope.`;
 
-  // Client-focused homepage — shown when visibility mode is "client".
-  // Leads with calendar, last veille, and propositions awaiting decision,
-  // followed by a 2x2 grid of delivery / livrables / SEO / meetings.
+  // Client-focused homepage — decision-oriented dashboard.
+  // Leads with decisions to make, then calendar + veille side by side,
+  // followed by aggregated insights and a performance snapshot.
   if (!isAdmin) {
     const clientLabel = isAllClientsSelected ? "Vue globale" : selectedClient?.name ?? "Client";
+    const todayStr = new Date().toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+
     return (
       <div className="space-y-6 animate-fade-in pb-6">
-        {/* Compact client hero */}
+        {/* Hero — greeting + KPIs */}
         <div className="rounded-2xl border border-border bg-gradient-to-br from-background via-background to-primary/5 p-5 md:p-6">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
               <Sparkles className="h-3.5 w-3.5" />
-              Vue client
+              Tableau de bord
             </div>
             <div className="space-y-1">
               <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
                 Bonjour {clientLabel}
               </h1>
               <p className="max-w-2xl text-sm text-muted-foreground">
-                Votre semaine, vos dernières alertes et les décisions à valider.
+                {todayStr} — Vos decisions, votre calendrier et les signaux importants.
               </p>
             </div>
           </div>
@@ -116,73 +125,101 @@ export default function Home() {
 
         <TabDataStatusBanner tab="home" />
 
-        {/* Row 1 — striking client info */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Section 1 — Decisions: proposals + convergences */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Target className="h-4 w-4 text-primary" />
+              A decider
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Propositions et convergences en attente de votre validation.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <HomeClientDecisions />
+          </CardContent>
+        </Card>
+
+        {/* Section 2 — Calendar + Veille side by side */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card className="border-border/60">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Cette semaine</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                Votre semaine
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Contenus, meetings et echeances a venir.
+              </p>
             </CardHeader>
             <CardContent>
-              <HomeCalendarWeek />
+              <HomeClientCalendar />
             </CardContent>
           </Card>
 
           <Card className="border-border/60">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Dernière veille</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                Veille & Alertes
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Signaux marche, concurrence et opportunites detectees.
+              </p>
             </CardHeader>
             <CardContent>
               <HomeVeilleAlerts />
             </CardContent>
           </Card>
-
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Propositions à valider</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HomeClientProposals />
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Row 2 — secondary 2x2 grid */}
+        {/* Section 3 — Insights for decision-making */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Lightbulb className="h-4 w-4 text-primary" />
+              Insights pour decider
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Opportunites, decisions de meetings et alertes cles pour orienter vos choix.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <HomeClientInsights />
+          </CardContent>
+        </Card>
+
+        {/* Section 4 — Operational snapshot */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card className="border-border/60">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Avancement des tâches</CardTitle>
+              <CardTitle className="text-base">Avancement des taches</CardTitle>
             </CardHeader>
             <CardContent>
               <HomeTasksAvancement />
             </CardContent>
           </Card>
 
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Livrables récents</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HomeRecentDeliverables />
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card className="border-border/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Pipeline editorial</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <HomeEditorialPipeline />
+              </CardContent>
+            </Card>
 
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Aperçu SEO</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HomeSeoSnapshot />
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Réunions récentes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HomeRecentMeetings />
-            </CardContent>
-          </Card>
+            <Card className="border-border/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Apercu SEO</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <HomeSeoSnapshot />
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Footer CTA */}

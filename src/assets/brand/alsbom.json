@@ -1,0 +1,28 @@
+{
+  "client_id": "alsbom",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#008FA1", "name": "Bleu principale", "usage": "Headers, CTA, titres" },
+    { "hex": "#FFAA06", "name": "Orange", "usage": "Badges, highlights, CTA secondaires" },
+    { "hex": "#1E1E1E", "name": "Noir", "usage": "Textes" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds" },
+    { "hex": "#F3F3F0", "name": "Gris", "usage": "Sections alternées" }
+  ],
+  "typographies": [
+    { "name": "Inter Bold 56px", "description": "Inter Bold 56px — H1" },
+    { "name": "Inter Bold 40px", "description": "Inter Bold 40px — H2" },
+    { "name": "Inter Semi Bold 32px", "description": "Inter Semi Bold 32px — H3" },
+    { "name": "Inter Regular 18px", "description": "Inter Regular 18px — texte courant" }
+  ],
+  "figma_urls": [
+    {
+      "name": "Maquette site web",
+      "url": "https://www.figma.com/design/wMQf7SWizz76fwohK6zSMX/Alsbom---Maquette?node-id=1832-3311"
+    }
+  ],
+  "style_visuel": {
+    "logo": "ALSBOM bleu pétrole #008FA1",
+    "visuels": "photos chantiers, équipes, avant/après",
+    "ambiance": "terrain, professionnelle, accessible"
+  }
+}

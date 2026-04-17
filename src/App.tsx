@@ -7,56 +7,72 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { ClientProvider } from "@/contexts/ClientContext";
 import { PreAuthProvider, usePreAuth } from "@/contexts/PreAuthContext";
+import { TeamAuthProvider, useTeamAuth } from "@/contexts/TeamAuthContext";
+import { TeamAuthGate } from "@/components/auth/TeamAuthGate";
 import Landing from "@/pages/Landing";
 import Auth from "@/pages/Auth";
+import ResetPassword from "@/pages/ResetPassword";
 import PreLogin from "@/pages/PreLogin";
+import MyWork from "@/pages/MyWork";
 import Home from "@/pages/Home";
 import Insights from "@/pages/Insights";
 import Prospects from "@/pages/Prospects";
-import Plan from "@/pages/Plan";
-import ContentCreator from "@/pages/ContentCreator";
-import Contenus from "@/pages/Contenus";
 import Assets from "@/pages/Assets";
 import Reporting from "@/pages/Reporting";
 import Chat from "@/pages/Chat";
 import Admin from "@/pages/Admin";
-import Deliverables from "@/pages/Deliverables";
+import Journal from "@/pages/Journal";
+import Actions from "@/pages/Actions";
 import Veille from "@/pages/Veille";
+// EditorialCalendar is now embedded as a tab in the Actions page.
+// The /calendar route redirects to /actions for backwards compatibility.
+import KpiDashboard from "@/pages/KpiDashboard";
+import SeoGeo from "@/pages/SeoGeo";
+import SettingsIntegrations from "@/pages/SettingsIntegrations";
+import ProfileSettings from "@/pages/ProfileSettings";
+import WrikeCallback from "@/pages/oauth/WrikeCallback";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Protected route wrapper that checks pre-authentication
+// Protected route wrapper: allow access if pre-authenticated OR logged in via Supabase
 function PreAuthGuard({ children }: { children: React.ReactNode }) {
   const { isPreAuthenticated } = usePreAuth();
-  
-  if (!isPreAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
+  const { isTeamMember, isLoading } = useTeamAuth();
+
+  // Pre-auth (user/user22) grants immediate access — no need to wait for Supabase
+  if (isPreAuthenticated) return <>{children}</>;
+
+  // Supabase auth: wait for session check to complete
+  if (isLoading) return null;
+
+  if (isTeamMember) return <>{children}</>;
+
+  return <Navigate to="/login" replace />;
 }
 
 const AppRoutes = () => {
   const { isPreAuthenticated } = usePreAuth();
+  const { isTeamMember } = useTeamAuth();
+  const isAuthenticated = isPreAuthenticated || isTeamMember;
 
   return (
     <Routes>
       {/* Public landing page */}
-      <Route path="/" element={isPreAuthenticated ? <Navigate to="/home" replace /> : <Landing />} />
-      
+      <Route path="/" element={isAuthenticated ? <Navigate to="/home" replace /> : <Landing />} />
+
       {/* Pre-auth login route - redirects to dashboard if already authenticated */}
-      <Route 
-        path="/login" 
-        element={isPreAuthenticated ? <Navigate to="/home" replace /> : <PreLogin />} 
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/home" replace /> : <PreLogin />}
       />
       
-      {/* Auth route requires pre-authentication */}
-      <Route path="/auth" element={
-        <PreAuthGuard>
-          <Auth />
-        </PreAuthGuard>
-      } />
+      {/* Auth route — accessible without pre-auth so team members can
+          sign in directly (e.g. from /admin/my-work redirect). */}
+      <Route path="/auth" element={<Auth />} />
+
+      {/* Password reset landing for Supabase recovery & invite links */}
+      <Route path="/reset-password" element={<ResetPassword />} />
       
       {/* Redirect old dashboard route to home */}
       <Route path="/dashboard" element={<Navigate to="/home" replace />} />
@@ -71,17 +87,33 @@ const AppRoutes = () => {
         <Route path="/meetings" element={<Insights />} />
         <Route path="/insights" element={<Navigate to="/meetings" replace />} />
         <Route path="/prospects" element={<Prospects />} />
-        <Route path="/plan" element={<Plan />} />
-        <Route path="/content" element={<ContentCreator />} />
-        <Route path="/contenus" element={<Contenus />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/reporting" element={<Reporting />} />
-        <Route path="/deliverables" element={<Deliverables />} />
+        <Route path="/journal" element={<Journal />} />
+        <Route path="/actions" element={<Actions />} />
+        <Route path="/deliverables" element={<Navigate to="/journal" replace />} />
         <Route path="/veille" element={<Veille />} />
+        {/* /proposals was merged into /actions — keep the path for backwards
+            compatibility so old links and bookmarks still land on the right
+            page. */}
+        <Route path="/proposals" element={<Navigate to="/actions" replace />} />
+        {/* /calendar was merged into /actions as a tab — keep the path
+            for backwards compatibility so old links still work. */}
+        <Route path="/calendar" element={<Navigate to="/actions" replace />} />
+        <Route path="/kpis" element={<KpiDashboard />} />
+        <Route path="/seo-geo" element={<SeoGeo />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/my-work" element={
+          <TeamAuthGate><MyWork /></TeamAuthGate>
+        } />
+        <Route path="/settings/profile" element={
+          <TeamAuthGate><ProfileSettings /></TeamAuthGate>
+        } />
+        <Route path="/settings/integrations" element={<SettingsIntegrations />} />
+        <Route path="/oauth/wrike/callback" element={<WrikeCallback />} />
       </Route>
-      
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -93,11 +125,13 @@ const App = () => (
       <DateRangeProvider>
         <ClientProvider>
           <PreAuthProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
+            <TeamAuthProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </TeamAuthProvider>
           </PreAuthProvider>
         </ClientProvider>
       </DateRangeProvider>

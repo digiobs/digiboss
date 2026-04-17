@@ -20,6 +20,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   useEffect(() => {
@@ -101,9 +102,36 @@ export default function Auth() {
         setIsLogin(true);
       }
     } catch (err) {
+      console.error('[Auth] unexpected error:', err);
       toast.error('An unexpected error occurred');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const target = email.trim();
+    if (!target) {
+      toast.error('Entrez votre email pour réinitialiser le mot de passe');
+      return;
+    }
+    const result = z.string().email().safeParse(target);
+    if (!result.success) {
+      toast.error('Email invalide');
+      return;
+    }
+    setIsSendingReset(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(target, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success('Email de réinitialisation envoyé');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      toast.error(`Envoi impossible : ${message}`);
+    } finally {
+      setIsSendingReset(false);
     }
   };
 
@@ -185,6 +213,19 @@ export default function Auth() {
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {isLogin ? 'Sign In' : 'Sign Up'}
             </Button>
+
+            {isLogin && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isSendingReset}
+                  className="text-xs text-muted-foreground hover:text-primary hover:underline disabled:opacity-50"
+                >
+                  {isSendingReset ? 'Envoi...' : 'Mot de passe oublié ?'}
+                </button>
+              </div>
+            )}
           </form>
 
           <div className="mt-6 text-center">

@@ -21,19 +21,25 @@ import {
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { NotificationPreferencesPanel } from '@/components/notifications/NotificationPreferencesPanel';
 import { useDateRange } from '@/contexts/DateRangeContext';
-import { useAuth } from '@/hooks/useAuth';
+import { usePreAuth } from '@/contexts/PreAuthContext';
+import { useTeamAuth } from '@/contexts/TeamAuthContext';
 import { toast } from 'sonner';
 
 export function TopBar() {
   const navigate = useNavigate();
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const { dateRange, setDateRange } = useDateRange();
-  const { user, signOut } = useAuth();
+  const { user, signOut } = useTeamAuth();
+  const { preLogout } = usePreAuth();
 
   const handleSignOut = async () => {
+    // Clear both auth layers — PreAuthGuard grants access when *either*
+    // is set, so leaving the pre-auth flag behind would silently keep the
+    // user logged in.
+    preLogout();
     await signOut();
     toast.success('Signed out successfully');
-    navigate('/auth');
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -88,7 +94,9 @@ export function TopBar() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile Settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings/profile')}>
+                Profile Settings
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setPreferencesOpen(true)}>
                 Notification Preferences
               </DropdownMenuItem>

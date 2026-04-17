@@ -1,0 +1,136 @@
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+
+export type TeamProfile = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'team_member' | 'admin';
+  avatar_url: string | null;
+};
+
+interface TeamAuthContextType {
+  /** Supabase auth user (null when not logged in) */
+  user: User | null;
+  /** Profile row from public.profiles (null when not logged in or not a team member) */
+  profile: TeamProfile | null;
+  isLoading: boolean;
+  isTeamMember: boolean;
+  isAdmin: boolean;
+  signOut: () => Promise<void>;
+}
+
+const TeamAuthContext = createContext<TeamAuthContextType | undefined>(undefined);
+
+export function TeamAuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<TeamProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch the profile row for the given user id.
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, role, avatar_url')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[TeamAuth] profile fetch failed:', error.message);
+      return null;
+    }
+    return data as TeamProfile | null;
+  };
+
+  /**
+   * Resolve a session: fetch the profile, and if it doesn't exist
+   * (deleted user / stale JWT) automatically sign out so the dead
+   * token is cleared from localStorage.
+   */
+  const resolveSession = async (authUser: User | null) => {
+    setUser(authUser);
+
+    if (authUser) {
+      const p = await fetchProfile(authUser.id);
+      if (!p) {
+        // Stale session for a deleted user → auto-invalidate
+        console.warn('[TeamAuth] No profile for session user — signing out stale session');
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        return;
+      }
+      setProfile(p);
+    } else {
+      setProfile(null);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const handleSession = async (authUser: User | null) => {
+      if (cancelled) return;
+      await resolveSession(authUser);
+      if (!cancelled) setIsLoading(false);
+    };
+
+    // Listen for auth state changes. IMPORTANT: the Supabase SDK holds a
+    // NavigatorLock while firing subscribers, so any `supabase.from(...)`
+    // or `supabase.auth.signOut()` call awaited synchronously here will
+    // deadlock and abort with `AbortError: signal is aborted without reason`.
+    // We must defer all async work out of the callback with setTimeout(0).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        // When a new sign-in fires, set loading=true so PreAuthGuard
+        // waits for the profile check instead of redirecting to /login.
+        if (event === 'SIGNED_IN') {
+          setIsLoading(true);
+        }
+        setTimeout(() => {
+          handleSession(session?.user ?? null);
+        }, 0);
+      },
+    );
+
+    // Check existing session on mount.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session?.user ?? null);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+  };
+
+  return (
+    <TeamAuthContext.Provider
+      value={{
+        user,
+        profile,
+        isLoading,
+        isTeamMember: !!profile,
+        isAdmin: profile?.role === 'admin',
+        signOut,
+      }}
+    >
+      {children}
+    </TeamAuthContext.Provider>
+  );
+}
+
+export function useTeamAuth() {
+  const context = useContext(TeamAuthContext);
+  if (context === undefined) {
+    throw new Error('useTeamAuth must be used within a TeamAuthProvider');
+  }
+  return context;
+}

@@ -1,0 +1,15 @@
+{
+  "client_id": "mabsilico",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#1E3A5F", "name": "Bleu", "usage": "Fond principal" },
+    { "hex": "#00C9A7", "name": "Vert biotech", "usage": "Accents, CTA" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds" }
+  ],
+  "typographies": [],
+  "figma_urls": [],
+  "style_visuel": {
+    "visuels": "modélisation 3D anticorps, structures protéiques",
+    "ambiance": "biotech IA, scientifique moderne"
+  }
+}

@@ -38,9 +38,11 @@ export function HomeClientHealth() {
   const { data: taskHealth, isLoading: taskLoading } = useClientTaskHealth();
   const isLoading = healthLoading || taskLoading;
 
+  type TaskHealthItem = { client_id: string; completion_rate: number };
+  type HealthScore = { id: string; client_id: string; overall_score: number; trend: string | null; score_breakdown: unknown; clients?: { name: string } };
   // Merge health scores with task health data
-  const mergedData = ((scores || []) as any[]).map((score: any) => {
-    const taskData = (taskHealth as any[])?.find((th: any) => th.client_id === score.client_id);
+  const mergedData = ((scores || []) as HealthScore[]).map((score: HealthScore) => {
+    const taskData = (taskHealth as TaskHealthItem[])?.find((th: TaskHealthItem) => th.client_id === score.client_id);
     return {
       ...score,
       taskHealth,
@@ -81,7 +83,7 @@ export function HomeClientHealth() {
         </p>
       ) : (
         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-          {mergedData.map((s: any) => {
+          {mergedData.map((s) => {
             const breakdown = (s.score_breakdown as Record<string, number>) || {};
 
             return (

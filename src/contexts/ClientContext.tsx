@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Client {
@@ -22,6 +22,15 @@ export interface ClientConfig {
   linkedin_organization_id: string | null;
   hubspot_portal_id: string | null;
   google_analytics_property_id: string | null;
+  ga4_property_id: string | null;
+  google_ads_id: string | null;
+  gsc_site_id: string | null;
+  hubspot_analytics_id: string | null;
+  meteoria_project_id: string | null;
+  notion_page_id: string | null;
+  onedrive_claude_path: string | null;
+  semrush_campaign_id: string | null;
+  semrush_project_id: string | null;
   industry: string;
   market_news_keywords: string[];
 }
@@ -33,6 +42,8 @@ interface ClientContextType {
   isAllClientsSelected: boolean;
   clientConfig: ClientConfig | null;
   isLoading: boolean;
+  /** Whether the current Supabase user is a DigiObs admin (sees all clients) */
+  isAdminUser: boolean;
   refetchClients: () => Promise<void>;
   refetchConfig: () => Promise<void>;
 }
@@ -44,6 +55,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [currentClientId, setCurrentClientId] = useState<string | null>(null);
   const [clientConfig, setClientConfig] = useState<ClientConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  /** IDs the authenticated user is granted access to (null = no restriction / pre-auth) */
+  const allowedClientIds = useRef<Set<string> | null>(null);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   const isAllClientsSelected = currentClientId === ALL_CLIENTS_ID;
 
   const currentClient = useMemo(
@@ -58,28 +72,92 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     setCurrentClientId(client?.id ?? null);
   };
 
+  /**
+   * Fetch the authenticated user's role and allowed client IDs.
+   * Pre-auth users (no Supabase session) get unrestricted access.
+   * Admins get unrestricted access.
+   * Team members only see clients listed in user_clients.
+   */
+  const fetchAccessScope = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      // Pre-auth or anon — no filter
+      allowedClientIds.current = null;
+      setIsAdminUser(false);
+      return;
+    }
+
+    const userId = session.user.id;
+
+    // Check role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (!profile) {
+      // Session exists but no profile row (stale/deleted user) — no filter
+      allowedClientIds.current = null;
+      setIsAdminUser(false);
+      return;
+    }
+
+    if (profile.role === 'admin') {
+      allowedClientIds.current = null; // admin sees all
+      setIsAdminUser(true);
+      return;
+    }
+
+    setIsAdminUser(false);
+
+    // Non-admin: load their client assignments
+    const { data: ucRows } = await supabase
+      .from('user_clients')
+      .select('client_id')
+      .eq('user_id', userId);
+
+    if (ucRows && ucRows.length > 0) {
+      allowedClientIds.current = new Set(ucRows.map((r) => r.client_id));
+    } else {
+      // No assignments → empty set (sees nothing)
+      allowedClientIds.current = new Set();
+    }
+  };
+
   const fetchClients = async () => {
+    // First resolve access scope so we can filter properly
+    await fetchAccessScope();
+
     const colorMissing = (message: string) => message.toLowerCase().includes('column clients.color does not exist');
     let { data, error } = await supabase
       .from('clients')
       .select('id, name')
+      .eq('status', 'active')
       .order('name');
 
     if (error && colorMissing(error.message)) {
       const fallback = await supabase
         .from('clients')
         .select('id, name')
+        .eq('status', 'active')
         .order('name');
       data = fallback.data as Array<{ id: string; name: string; color?: string }> | null;
       error = fallback.error;
     }
 
     if (!error && data) {
-      const normalized: Client[] = (data as Array<{ id: string; name: string; color?: string }>).map((c) => ({
+      let normalized: Client[] = (data as Array<{ id: string; name: string; color?: string }>).map((c) => ({
         id: c.id,
         name: c.name,
         color: c.color ?? 'blue',
       }));
+
+      // Apply client access filter for non-admin authenticated users
+      if (allowedClientIds.current != null) {
+        normalized = normalized.filter((c) => allowedClientIds.current!.has(c.id));
+      }
+
       setClients(normalized);
       setCurrentClientId((prev) => {
         if (prev === ALL_CLIENTS_ID) return prev;
@@ -123,8 +201,14 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchClients();
-    
-    // Subscribe to realtime changes
+
+    // Refetch when auth state changes (e.g. after login, the session
+    // switches from anon → authenticated which may affect RLS).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      fetchClients();
+    });
+
+    // Subscribe to realtime changes on clients and user_clients
     const channel = supabase
       .channel('clients-context-changes')
       .on(
@@ -134,9 +218,17 @@ export function ClientProvider({ children }: { children: ReactNode }) {
           fetchClients();
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_clients' },
+        () => {
+          fetchClients();
+        }
+      )
       .subscribe();
 
     return () => {
+      subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, []);
@@ -154,6 +246,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         isAllClientsSelected,
         clientConfig,
         isLoading,
+        isAdminUser,
         refetchClients: fetchClients,
         refetchConfig: fetchClientConfig,
       }}

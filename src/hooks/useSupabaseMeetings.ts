@@ -5,8 +5,10 @@ import type {
   MeetingAISummary,
   MeetingHighlight,
   MeetingParticipant,
+  NBA,
   TranscriptSegment,
   Verbatim,
+  VerbatimTag,
 } from "@/types/insights";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -40,6 +42,8 @@ type TldvRow = {
   ai_summary_json?: Record<string, unknown> | null;
   highlights_json?: unknown[] | null;
   thumbnail_url?: string | null;
+  verbatims_json?: unknown[] | null;
+  nbas_json?: unknown[] | null;
 };
 
 function toNumber(value: number | string | null | undefined): number {
@@ -189,6 +193,69 @@ function normalizeStoredAiSummary(row: TldvRow): MeetingAISummary | null {
   };
 }
 
+function normalizeStoredVerbatims(row: TldvRow): Verbatim[] {
+  if (!Array.isArray(row.verbatims_json)) return [];
+  const allowedTags: VerbatimTag["type"][] = ["pain", "objection", "benefit", "proof", "feature"];
+  return row.verbatims_json
+    .map((item, idx) => {
+      if (!item || typeof item !== "object") return null;
+      const v = item as Record<string, unknown>;
+      const text = typeof v.text === "string" ? v.text : "";
+      if (!text.trim()) return null;
+      const tags = Array.isArray(v.tags)
+        ? v.tags.filter((t): t is VerbatimTag["type"] => typeof t === "string" && allowedTags.includes(t as VerbatimTag["type"]))
+        : [];
+      return {
+        id: typeof v.id === "string" ? v.id : `${row.id}-verbatim-${idx + 1}`,
+        text,
+        speakerName: typeof v.speakerName === "string" ? v.speakerName : "Speaker",
+        speakerId: typeof v.speakerId === "string" ? v.speakerId : `${row.id}-vsp-${idx + 1}`,
+        timestamp: typeof v.timestamp === "number" ? v.timestamp : 0,
+        meetingId: typeof v.meetingId === "string" ? v.meetingId : row.id,
+        tags,
+      } satisfies Verbatim;
+    })
+    .filter((v): v is Verbatim => Boolean(v));
+}
+
+function normalizeStoredNBAs(row: TldvRow): NBA[] {
+  if (!Array.isArray(row.nbas_json)) return [];
+  return row.nbas_json
+    .map((item, idx) => {
+      if (!item || typeof item !== "object") return null;
+      const n = item as Record<string, unknown>;
+      const title = typeof n.title === "string" ? n.title : "";
+      if (!title.trim()) return null;
+      return {
+        id: typeof n.id === "string" ? n.id : `${row.id}-nba-${idx + 1}`,
+        title,
+        type: typeof n.type === "string" ? n.type : "content",
+        funnel: typeof n.funnel === "string" ? n.funnel : "awareness",
+        impact: typeof n.impact === "string" ? n.impact : "medium",
+        effort: typeof n.effort === "string" ? n.effort : "m",
+        confidence: typeof n.confidence === "number" ? n.confidence : 50,
+        whyBullets: Array.isArray(n.whyBullets) ? n.whyBullets.filter((b): b is string => typeof b === "string") : [],
+        evidence: Array.isArray(n.evidence) ? n.evidence.map((e) => {
+          if (!e || typeof e !== "object") return { type: "transcript" as const };
+          const ev = e as Record<string, unknown>;
+          return {
+            type: typeof ev.type === "string" ? ev.type : "transcript",
+            meetingId: typeof ev.meetingId === "string" ? ev.meetingId : undefined,
+            timestamp: typeof ev.timestamp === "number" ? ev.timestamp : undefined,
+            text: typeof ev.text === "string" ? ev.text : undefined,
+            source: typeof ev.source === "string" ? ev.source : undefined,
+            link: typeof ev.link === "string" ? ev.link : undefined,
+          };
+        }) : [],
+        status: typeof n.status === "string" ? n.status : "proposed",
+        createdAt: typeof n.createdAt === "string" ? n.createdAt : new Date().toISOString(),
+        meetingId: typeof n.meetingId === "string" ? n.meetingId : row.id,
+        score: typeof n.score === "number" ? n.score : 50,
+      } as NBA;
+    })
+    .filter((n): n is NBA => Boolean(n));
+}
+
 function buildParticipants(row: TldvRow): MeetingParticipant[] {
   const people: MeetingParticipant[] = [];
 
@@ -223,7 +290,8 @@ function mapTldvRowToMeeting(row: TldvRow): Meeting {
   const storedTranscript = normalizeStoredTranscriptSegments(row);
   const transcript = storedTranscript.length > 0 ? storedTranscript : fallbackTranscript(row);
   const participants = buildParticipants(row);
-  const verbatims: Verbatim[] = [];
+  const verbatims = normalizeStoredVerbatims(row);
+  const nbas = normalizeStoredNBAs(row);
   const durationSeconds = toNumber(row.duration_seconds);
   const fallbackHighlights: MeetingHighlight[] = [
     {
@@ -267,7 +335,8 @@ function mapTldvRowToMeeting(row: TldvRow): Meeting {
         opportunities: (row.raw?.invitees?.length ?? 0) > 0 ? ["Participant metadata available."] : [],
         actionItems: [],
       },
-    nbaCount: 0,
+    nbaCount: nbas.length,
+    nbas,
     tags: ["meeting", "tldv"],
     workflowTags: ["growth"],
   };
@@ -301,7 +370,7 @@ export function useSupabaseMeetings() {
         let query = supabase
           .from("tldv_meetings")
           .select(
-            "id,name,happened_at,duration_seconds,organizer_name,organizer_email,meeting_url,participants_count,raw,client_id,transcript_text,transcript_segments,transcript_status,ai_summary_json,highlights_json,thumbnail_url",
+            "id,name,happened_at,duration_seconds,organizer_name,organizer_email,meeting_url,participants_count,raw,client_id,transcript_text,transcript_segments,transcript_status,ai_summary_json,highlights_json,thumbnail_url,verbatims_json,nbas_json",
           )
           .order("happened_at", { ascending: false })
           .limit(200);

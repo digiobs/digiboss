@@ -54,7 +54,8 @@ type BrandKitRow = {
   imported_at: string;
 };
 
-const MAX_FALLBACK_TOKENS = 400;
+const MAX_FALLBACK_TOKENS = 80;
+const LOGO_PAGE_MATCH = /logo|brand|charte|style|guideline/i;
 
 function clampByte(value: number): number {
   if (!Number.isFinite(value)) return 0;
@@ -65,7 +66,10 @@ function toHex(value: number): string {
   return clampByte(value).toString(16).padStart(2, "0").toUpperCase();
 }
 
-function colorToHex(color: { r?: number; g?: number; b?: number; a?: number } | undefined, opacity?: number): string {
+function colorToHex(
+  color: { r?: number; g?: number; b?: number; a?: number } | undefined,
+  opacity?: number,
+): string {
   if (!color) return "NA";
   const r = toHex((color.r ?? 0) * 255);
   const g = toHex((color.g ?? 0) * 255);
@@ -93,88 +97,147 @@ function toStyleRows(mapping: MappingRow, fileKey: string, styles: FigmaStyle[])
   }));
 }
 
-function extractFallbackRows(mapping: MappingRow, fileKey: string, root: FigmaNode | undefined): BrandKitRow[] {
-  if (!root) return [];
+/**
+ * Walk a Figma document and extract a minimal charte graphique:
+ * - unique solid fill colors (keyed by hex),
+ * - unique text styles (keyed by family+size+weight),
+ * - logo candidates from pages whose name matches LOGO_PAGE_MATCH.
+ */
+function extractFallbackRows(
+  mapping: MappingRow,
+  fileKey: string,
+  root: FigmaNode | undefined,
+): { rows: BrandKitRow[]; logoNodeIds: string[] } {
+  if (!root) return { rows: [], logoNodeIds: [] };
   const importedAt = new Date().toISOString();
-  const dedupe = new Set<string>();
   const rows: BrandKitRow[] = [];
+  const colorSeen = new Set<string>();
+  const typoSeen = new Set<string>();
+  const logoNodeIds: string[] = [];
 
-  const pushRow = (row: BrandKitRow) => {
-    const key = `${row.token_type}|${row.token_name}|${row.token_value ?? "NA"}`;
-    if (dedupe.has(key)) return;
-    dedupe.add(key);
-    rows.push(row);
+  const pushColor = (hex: string, name: string, nodeId: string | null) => {
+    if (colorSeen.has(hex)) return;
+    if (rows.length >= MAX_FALLBACK_TOKENS) return;
+    colorSeen.add(hex);
+    rows.push({
+      client_id: mapping.client_id,
+      source: "figma-fallback",
+      figma_file_key: fileKey,
+      figma_node_id: nodeId,
+      token_type: "color",
+      token_name: name,
+      token_value: hex,
+      preview_url: null,
+      payload: { hex },
+      imported_at: importedAt,
+    });
   };
 
-  const visit = (node: FigmaNode) => {
+  const pushTypography = (
+    node: FigmaNode,
+    nodeName: string,
+    nodeId: string | null,
+  ) => {
+    const s = node.style;
+    if (!s) return;
+    const key = `${s.fontFamily ?? ""}|${s.fontSize ?? ""}|${s.fontWeight ?? ""}`;
+    if (typoSeen.has(key)) return;
+    if (rows.length >= MAX_FALLBACK_TOKENS) return;
+    typoSeen.add(key);
+    const value = [
+      s.fontFamily ? `family=${s.fontFamily}` : null,
+      typeof s.fontWeight === "number" ? `weight=${s.fontWeight}` : null,
+      typeof s.fontSize === "number" ? `size=${s.fontSize}` : null,
+      typeof s.lineHeightPx === "number" ? `lineHeight=${s.lineHeightPx}` : null,
+      typeof s.letterSpacing === "number" ? `letterSpacing=${s.letterSpacing}` : null,
+    ]
+      .filter(Boolean)
+      .join("; ");
+    if (!value) return;
+    rows.push({
+      client_id: mapping.client_id,
+      source: "figma-fallback",
+      figma_file_key: fileKey,
+      figma_node_id: nodeId,
+      token_type: "text",
+      token_name: nodeName,
+      token_value: value,
+      preview_url: null,
+      payload: { style: s },
+      imported_at: importedAt,
+    });
+  };
+
+  const visit = (node: FigmaNode, inLogoPage: boolean) => {
     if (rows.length >= MAX_FALLBACK_TOKENS) return;
     const nodeName = node.name?.trim() || "Unnamed layer";
     const nodeId = node.id ?? null;
 
+    // Mark top-level logo frames for image export.
+    if (
+      inLogoPage &&
+      nodeId &&
+      (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "COMPONENT_SET") &&
+      logoNodeIds.length < 12
+    ) {
+      logoNodeIds.push(nodeId);
+    }
+
     if (Array.isArray(node.fills)) {
       for (const fill of node.fills) {
-        if (rows.length >= MAX_FALLBACK_TOKENS) break;
         if (fill?.type !== "SOLID" || fill?.visible === false) continue;
-        const colorHex = colorToHex(fill.color, fill.opacity);
-        pushRow({
-          client_id: mapping.client_id,
-          source: "figma-fallback",
-          figma_file_key: fileKey,
-          figma_node_id: nodeId,
-          token_type: "color",
-          token_name: `${nodeName} / fill`,
-          token_value: colorHex,
-          preview_url: null,
-          payload: {
-            nodeType: node.type ?? null,
-            fill,
-          },
-          imported_at: importedAt,
-        });
+        const hex = colorToHex(fill.color, fill.opacity);
+        if (hex === "NA") continue;
+        pushColor(hex, nodeName, nodeId);
       }
     }
 
     if (node.style?.fontFamily || node.style?.fontSize) {
-      const textValue = [
-        node.style.fontFamily ? `family=${node.style.fontFamily}` : null,
-        typeof node.style.fontWeight === "number" ? `weight=${node.style.fontWeight}` : null,
-        typeof node.style.fontSize === "number" ? `size=${node.style.fontSize}` : null,
-        typeof node.style.lineHeightPx === "number" ? `lineHeight=${node.style.lineHeightPx}` : null,
-        typeof node.style.letterSpacing === "number" ? `letterSpacing=${node.style.letterSpacing}` : null,
-      ]
-        .filter(Boolean)
-        .join("; ");
-
-      if (textValue) {
-        pushRow({
-          client_id: mapping.client_id,
-          source: "figma-fallback",
-          figma_file_key: fileKey,
-          figma_node_id: nodeId,
-          token_type: "text",
-          token_name: `${nodeName} / typography`,
-          token_value: textValue,
-          preview_url: null,
-          payload: {
-            nodeType: node.type ?? null,
-            style: node.style,
-          },
-          imported_at: importedAt,
-        });
-      }
+      pushTypography(node, nodeName, nodeId);
     }
 
     if (Array.isArray(node.children)) {
       for (const child of node.children) {
         if (rows.length >= MAX_FALLBACK_TOKENS) break;
-        visit(child);
+        visit(child, inLogoPage);
       }
     }
   };
 
-  visit(root);
-  return rows;
+  // Root is the DOCUMENT node; its children are PAGEs.
+  if (Array.isArray(root.children)) {
+    for (const page of root.children) {
+      const isLogoPage = LOGO_PAGE_MATCH.test(page.name ?? "");
+      visit(page, isLogoPage);
+    }
+  } else {
+    visit(root, false);
+  }
+
+  return { rows, logoNodeIds };
 }
+
+async function fetchLogoPreviews(
+  fileKey: string,
+  nodeIds: string[],
+  token: string,
+): Promise<Record<string, string>> {
+  if (nodeIds.length === 0) return {};
+  const ids = nodeIds.join(",");
+  const url = `https://api.figma.com/v1/images/${fileKey}?ids=${encodeURIComponent(ids)}&format=png&scale=2`;
+  const response = await fetch(url, { headers: { "X-Figma-Token": token } });
+  if (!response.ok) return {};
+  const json = await response.json().catch(() => ({}));
+  const images = json?.images;
+  return images && typeof images === "object" ? images : {};
+}
+
+type ImportSummary = {
+  client_id: string;
+  status: "ok" | "error";
+  tokens: number;
+  message?: string;
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -230,62 +293,147 @@ serve(async (req) => {
 
     let importedTokens = 0;
     const touchedClients = new Set<string>();
+    const summaries: ImportSummary[] = [];
 
     for (const mapping of usableMappings) {
       const fileKey = (mapping.external_account_id ?? "").trim();
       if (!fileKey) continue;
 
-      const stylesResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}/styles`, {
-        headers: {
-          "X-Figma-Token": FIGMA_ACCESS_TOKEN,
-        },
-      });
+      try {
+        const stylesResponse = await fetch(
+          `https://api.figma.com/v1/files/${fileKey}/styles`,
+          { headers: { "X-Figma-Token": FIGMA_ACCESS_TOKEN } },
+        );
 
-      if (!stylesResponse.ok) {
-        const details = await stylesResponse.text();
-        throw new Error(`Figma API failed for file ${fileKey}: ${stylesResponse.status} ${details}`);
-      }
-
-      const stylesJson = await stylesResponse.json();
-      const styles = (stylesJson?.meta?.styles ?? []) as FigmaStyle[];
-
-      let rows: BrandKitRow[] = [];
-      if (styles.length > 0) {
-        rows = toStyleRows(mapping, fileKey, styles);
-      } else {
-        const fileResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
-          headers: {
-            "X-Figma-Token": FIGMA_ACCESS_TOKEN,
-          },
-        });
-        if (!fileResponse.ok) {
-          const details = await fileResponse.text();
-          throw new Error(`Figma file API failed for ${fileKey}: ${fileResponse.status} ${details}`);
+        if (!stylesResponse.ok) {
+          const details = await stylesResponse.text();
+          throw new Error(`styles ${stylesResponse.status}: ${details.slice(0, 200)}`);
         }
-        const fileJson = await fileResponse.json();
-        rows = extractFallbackRows(mapping, fileKey, fileJson?.document as FigmaNode | undefined);
-      }
 
-      if (rows.length === 0) continue;
+        const stylesJson = await stylesResponse.json();
+        const styles = (stylesJson?.meta?.styles ?? []) as FigmaStyle[];
 
-      const { error: upsertError } = await supabase
-        .from("client_brand_kits")
-        .upsert(rows, {
-          onConflict: "client_id,figma_file_key,token_type,token_name,figma_node_id",
+        let rows: BrandKitRow[] = [];
+        let logoNodeIds: string[] = [];
+
+        if (styles.length > 0) {
+          rows = toStyleRows(mapping, fileKey, styles);
+        } else {
+          const fileResponse = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
+            headers: { "X-Figma-Token": FIGMA_ACCESS_TOKEN },
+          });
+          if (!fileResponse.ok) {
+            const details = await fileResponse.text();
+            throw new Error(`file ${fileResponse.status}: ${details.slice(0, 200)}`);
+          }
+          const fileJson = await fileResponse.json();
+          const extracted = extractFallbackRows(
+            mapping,
+            fileKey,
+            fileJson?.document as FigmaNode | undefined,
+          );
+          rows = extracted.rows;
+          logoNodeIds = extracted.logoNodeIds;
+        }
+
+        // Try to fetch logo previews for nodes sitting on "Logo"/"Brand" pages.
+        if (logoNodeIds.length > 0) {
+          const previews = await fetchLogoPreviews(
+            fileKey,
+            logoNodeIds,
+            FIGMA_ACCESS_TOKEN,
+          );
+          const importedAt = new Date().toISOString();
+          for (const [nodeId, url] of Object.entries(previews)) {
+            if (!url) continue;
+            rows.push({
+              client_id: mapping.client_id,
+              source: "figma-fallback",
+              figma_file_key: fileKey,
+              figma_node_id: nodeId,
+              token_type: "logo",
+              token_name: `Logo ${nodeId}`,
+              token_value: nodeId,
+              preview_url: url,
+              payload: { node_id: nodeId },
+              imported_at: importedAt,
+            });
+          }
+        }
+
+        if (rows.length === 0) {
+          summaries.push({
+            client_id: mapping.client_id,
+            status: "ok",
+            tokens: 0,
+            message: "No tokens extracted",
+          });
+          continue;
+        }
+
+        // Remove stale tokens for this file before upsert, so deleted Figma
+        // nodes don't linger in the DB.
+        const { error: deleteError } = await supabase
+          .from("client_brand_kits")
+          .delete()
+          .eq("client_id", mapping.client_id)
+          .eq("figma_file_key", fileKey);
+
+        if (deleteError) {
+          throw new Error(`delete stale: ${deleteError.message}`);
+        }
+
+        const { error: upsertError } = await supabase
+          .from("client_brand_kits")
+          .upsert(rows, {
+            onConflict: "client_id,figma_file_key,token_type,token_name,figma_node_id",
+          });
+
+        if (upsertError) {
+          throw new Error(`upsert: ${upsertError.message}`);
+        }
+
+        importedTokens += rows.length;
+        touchedClients.add(mapping.client_id);
+        summaries.push({
+          client_id: mapping.client_id,
+          status: "ok",
+          tokens: rows.length,
         });
-
-      if (upsertError) {
-        throw new Error(`Failed to upsert client_brand_kits: ${upsertError.message}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(
+          `[figma-brand-kit-import] client=${mapping.client_id} file=${fileKey}:`,
+          message,
+        );
+        summaries.push({
+          client_id: mapping.client_id,
+          status: "error",
+          tokens: 0,
+          message,
+        });
+        // Try to persist the error into client_figma_sync_state if available.
+        await supabase
+          .from("client_figma_sync_state")
+          .upsert(
+            {
+              client_id: mapping.client_id,
+              status: "error",
+              message: message.slice(0, 500),
+              last_synced_at: new Date().toISOString(),
+            },
+            { onConflict: "client_id" },
+          )
+          .then(() => undefined)
+          .catch(() => undefined);
       }
-
-      importedTokens += rows.length;
-      touchedClients.add(mapping.client_id);
     }
 
     return new Response(
       JSON.stringify({
         importedTokens,
         importedClients: touchedClients.size,
+        summaries,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

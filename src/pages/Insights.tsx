@@ -26,13 +26,24 @@ export default function Insights() {
   const handleSyncTldv = async () => {
     setSyncingTldv(true);
     const body = isAllClientsSelected ? { limit: 50 } : { clientId: currentClient?.id, limit: 50 };
+
+    // Step 1: fetch the latest meetings list from tl;dv API into Supabase
+    const list = await supabase.functions.invoke('tldv-sync-meetings', { body });
+    if (list.error) {
+      toast.error(list.error.message || 'Failed to list tl;dv meetings');
+      setSyncingTldv(false);
+      return;
+    }
+    const upserted = (list.data as { upserted?: number } | null)?.upserted ?? 0;
+
+    // Step 2: enrich transcripts, highlights and AI summaries
     const { data, error } = await supabase.functions.invoke('tldv-sync-transcripts', { body });
     if (error) {
       toast.error(error.message || 'Failed to sync tl;dv transcripts');
       setSyncingTldv(false);
       return;
     }
-    toast.success(`tl;dv sync done. Meetings: ${data?.synced ?? 0}, enriched: ${data?.enriched ?? 0}.`);
+    toast.success(`tl;dv sync done. New: ${upserted}, meetings: ${data?.synced ?? 0}, enriched: ${data?.enriched ?? 0}.`);
     refetch();
     setSyncingTldv(false);
   };

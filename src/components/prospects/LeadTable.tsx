@@ -10,11 +10,11 @@ interface LeadTableProps {
 }
 
 const stageLabels = {
-  new: { label: 'New', class: 'status-new' },
-  contacted: { label: 'Contacted', class: 'status-in-progress' },
-  qualified: { label: 'Qualified', class: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-  proposal: { label: 'Proposal', class: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  closed: { label: 'Closed', class: 'status-completed' },
+  new: { label: 'Nouveau', class: 'status-new' },
+  contacted: { label: 'Contacte', class: 'status-in-progress' },
+  qualified: { label: 'Qualifie', class: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+  proposal: { label: 'Proposition', class: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  closed: { label: 'Ferme', class: 'status-completed' },
 };
 
 const channelIcons = {
@@ -23,7 +23,28 @@ const channelIcons = {
   call: Phone,
 };
 
+const SOURCE_COLORS: Record<string, string> = {
+  lemlist: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  hubspot: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+  linkedin: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+};
+
+function formatActivity(value: string): string {
+  if (!value || value === 'NA') return '-';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export function LeadTable({ leads }: LeadTableProps) {
+  if (leads.length === 0) {
+    return (
+      <div className="bg-card rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">
+        Aucun contact trouve pour ces filtres.
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
       <div className="overflow-x-auto">
@@ -31,19 +52,22 @@ export function LeadTable({ leads }: LeadTableProps) {
           <thead>
             <tr className="border-b border-border bg-muted/30">
               <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">
-                Lead
+                Contact
+              </th>
+              <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">
+                Source
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">
                 Score
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">
-                Stage
+                Etape
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">
-                Score Breakdown
+                Scores details
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">
-                Next Action
+                Action suivante
               </th>
               <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">
                 Actions
@@ -54,6 +78,7 @@ export function LeadTable({ leads }: LeadTableProps) {
             {leads.map((lead) => {
               const stageInfo = stageLabels[lead.stage];
               const ChannelIcon = channelIcons[lead.suggestedChannel];
+              const sourceClass = SOURCE_COLORS[lead.source.toLowerCase()] ?? 'bg-muted text-muted-foreground';
 
               return (
                 <tr key={lead.id} className="lead-row">
@@ -61,8 +86,13 @@ export function LeadTable({ leads }: LeadTableProps) {
                     <div>
                       <p className="font-medium text-foreground">{lead.name}</p>
                       <p className="text-sm text-muted-foreground">{lead.company}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{lead.lastActivity}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{formatActivity(lead.lastActivity)}</p>
                     </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <Badge variant="secondary" className={cn('text-xs', sourceClass)}>
+                      {lead.source}
+                    </Badge>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
@@ -114,7 +144,7 @@ export function LeadTable({ leads }: LeadTableProps) {
                   </td>
                   <td className="px-4 py-4 text-right">
                     <Button size="sm" variant="outline" className="gap-1">
-                      View
+                      Voir
                       <ArrowUpRight className="w-3 h-3" />
                     </Button>
                   </td>

@@ -1,29 +1,37 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import {
   LayoutDashboard,
   Lightbulb,
   Newspaper,
   Users,
-  Calendar,
-  PenTool,
-  BookOpen,
   FolderOpen,
   BarChart3,
-  FileCheck,
+  ScrollText,
   MessageSquare,
   Settings,
+  Plug,
+  CheckSquare,
+  Activity,
   ChevronDown,
   Building2,
   Loader2,
+  Search,
+  Check,
+  Briefcase,
+  UserCog,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
 import { ALL_CLIENTS_CLIENT, ALL_CLIENTS_ID, useClient } from '@/contexts/ClientContext';
 import { useVisibilityMode } from '@/hooks/useVisibilityMode';
 
@@ -43,25 +51,40 @@ const navItems = [
   { path: '/meetings', icon: Lightbulb, label: 'Meetings' },
   { path: '/veille', icon: Newspaper, label: 'Veille' },
   { path: '/prospects', icon: Users, label: 'Prospects' },
-  { path: '/plan', icon: Calendar, label: 'Plan' },
-  { path: '/content', icon: PenTool, label: 'Content Creator' },
-  { path: '/contenus', icon: BookOpen, label: 'Contenus' },
   { path: '/assets', icon: FolderOpen, label: 'Assets' },
+  { path: '/actions', icon: CheckSquare, label: 'Contenus' },
+  { path: '/seo-geo', icon: Search, label: 'SEO / GEO' },
+  { path: '/kpis', icon: Activity, label: 'KPIs' },
   { path: '/reporting', icon: BarChart3, label: 'Reporting' },
-  { path: '/deliverables', icon: FileCheck, label: 'Livrables' },
+  { path: '/journal', icon: ScrollText, label: 'Journal' },
   { path: '/chat', icon: MessageSquare, label: 'Talk to DigiObs' },
 ];
 
 const bottomNavItems = [
+  { path: '/admin/my-work', icon: Briefcase, label: 'Mon travail' },
+  { path: '/settings/profile', icon: UserCog, label: 'Mon profil' },
+  { path: '/settings/integrations', icon: Plug, label: 'Intégrations' },
   { path: '/admin', icon: Settings, label: 'Admin' },
 ];
 
 export function Sidebar() {
   const location = useLocation();
-  const { clients, currentClient, setCurrentClient, isLoading } = useClient();
+  const { clients, currentClient, setCurrentClient, isLoading, isAdminUser } = useClient();
   const { isAdmin } = useVisibilityMode();
+  const showAllClientsOption = isAdmin && isAdminUser;
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
 
-  const getColorClass = (color: string) => colorClasses[color] || 'bg-blue-500';
+  const getColorClass = (color: string) => colorClasses[color ?? 'blue'] || 'bg-blue-500';
+
+  const sortedClients = useMemo(
+    () => [...clients].sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })),
+    [clients],
+  );
+
+  const handleSelectClient = (client: typeof ALL_CLIENTS_CLIENT | (typeof clients)[number]) => {
+    setCurrentClient(client);
+    setClientPickerOpen(false);
+  };
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
@@ -73,14 +96,19 @@ export function Sidebar() {
           </div>
           <span className="text-sidebar-foreground font-semibold text-lg">DigiObs</span>
         </div>
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-sidebar-accent text-sidebar-accent-foreground text-sm hover:bg-sidebar-accent/80 transition-colors">
+
+        <Popover open={clientPickerOpen} onOpenChange={setClientPickerOpen}>
+          <PopoverTrigger
+            aria-label="Sélectionner un client"
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-sidebar-accent text-sidebar-accent-foreground text-sm hover:bg-sidebar-accent/80 transition-colors"
+          >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : currentClient ? (
               <div className="flex items-center gap-2 min-w-0">
-                <div className={`w-5 h-5 rounded ${getColorClass(currentClient.color)} flex items-center justify-center shrink-0`}>
+                <div
+                  className={`w-5 h-5 rounded ${getColorClass(currentClient.color)} flex items-center justify-center shrink-0`}
+                >
                   <Building2 className="w-3 h-3 text-white" />
                 </div>
                 <span className="truncate">{currentClient.name}</span>
@@ -89,43 +117,64 @@ export function Sidebar() {
               <span className="text-muted-foreground">Select client</span>
             )}
             <ChevronDown className="w-4 h-4 shrink-0 opacity-70" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56 p-0">
-            <ScrollArea className="max-h-[400px]">
-              <div className="p-1">
-                {isAdmin && (
-                  <DropdownMenuItem
-                    onClick={() => setCurrentClient(ALL_CLIENTS_CLIENT)}
-                    className={cn(
-                      'flex items-center gap-2',
-                      currentClient?.id === ALL_CLIENTS_ID && 'bg-accent'
-                    )}
-                  >
-                    <div className="w-5 h-5 rounded bg-slate-500 flex items-center justify-center shrink-0">
-                      <Building2 className="w-3 h-3 text-white" />
-                    </div>
-                    <span className="truncate">Admin (all clients)</span>
-                  </DropdownMenuItem>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            sideOffset={4}
+            className="w-[--radix-popover-trigger-width] min-w-[240px] p-0"
+          >
+            <Command
+              filter={(value, search) =>
+                value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+              }
+            >
+              <CommandInput placeholder="Rechercher un client..." className="h-9" />
+              <CommandList className="max-h-[60vh]">
+                <CommandEmpty>Aucun client trouvé.</CommandEmpty>
+                {showAllClientsOption && (
+                  <>
+                    <CommandGroup heading="Admin">
+                      <CommandItem
+                        value="admin all clients"
+                        onSelect={() => handleSelectClient(ALL_CLIENTS_CLIENT)}
+                        className="flex items-center gap-2"
+                      >
+                        <div className="w-5 h-5 rounded bg-slate-500 flex items-center justify-center shrink-0">
+                          <Building2 className="w-3 h-3 text-white" />
+                        </div>
+                        <span className="flex-1">Admin (all clients)</span>
+                        {currentClient?.id === ALL_CLIENTS_ID && (
+                          <Check className="w-4 h-4 text-primary" />
+                        )}
+                      </CommandItem>
+                    </CommandGroup>
+                    <CommandSeparator />
+                  </>
                 )}
-                {clients.map((client) => (
-                  <DropdownMenuItem
-                    key={client.id}
-                    onClick={() => setCurrentClient(client)}
-                    className={cn(
-                      'flex items-center gap-2',
-                      client.id === currentClient?.id && 'bg-accent'
-                    )}
-                  >
-                    <div className={`w-5 h-5 rounded ${getColorClass(client.color)} flex items-center justify-center shrink-0`}>
-                      <Building2 className="w-3 h-3 text-white" />
-                    </div>
-                    <span className="truncate">{client.name}</span>
-                  </DropdownMenuItem>
-                ))}
-              </div>
-            </ScrollArea>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <CommandGroup heading={`Clients (${sortedClients.length})`}>
+                  {sortedClients.map((client) => (
+                    <CommandItem
+                      key={client.id}
+                      value={`${client.name} ${client.id}`}
+                      onSelect={() => handleSelectClient(client)}
+                      className="flex items-center gap-2"
+                    >
+                      <div
+                        className={`w-5 h-5 rounded ${getColorClass(client.color)} flex items-center justify-center shrink-0`}
+                      >
+                        <Building2 className="w-3 h-3 text-white" />
+                      </div>
+                      <span className="flex-1 break-words">{client.name}</span>
+                      {client.id === currentClient?.id && (
+                        <Check className="w-4 h-4 text-primary shrink-0" />
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Main Navigation */}

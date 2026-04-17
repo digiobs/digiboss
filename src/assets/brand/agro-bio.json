@@ -1,0 +1,13 @@
+{
+  "client_id": "agro-bio",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#2C5F9E", "name": "Bleu scientifique", "usage": "Headers, éléments structurants" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds" }
+  ],
+  "typographies": [],
+  "figma_urls": [],
+  "style_visuel": {
+    "ambiance": "scientifique, rigoureuse, biopharma"
+  }
+}

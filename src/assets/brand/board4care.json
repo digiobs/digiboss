@@ -1,0 +1,19 @@
+{
+  "client_id": "board4care",
+  "source": "client_brand_guidelines",
+  "colors": [
+    { "hex": "#2563EB", "name": "Bleu principal", "usage": "Couleur principale — IA, technologie, confiance médicale" },
+    { "hex": "#FFFFFF", "name": "Blanc", "usage": "Fonds, contenus, lisibilité" },
+    { "hex": "#F3F4F6", "name": "Gris clair", "usage": "Fonds secondaires, cards" },
+    { "hex": "#1E3A5F", "name": "Bleu foncé", "usage": "Textes, headers, éléments structurants" }
+  ],
+  "typographies": [
+    { "name": "Inter / Plus Jakarta Sans", "description": "Sans-serif moderne (style Inter/Plus Jakarta Sans)" }
+  ],
+  "figma_urls": [],
+  "style_visuel": {
+    "logo": "Board4care — typographie moderne",
+    "visuels": "Screenshots plateforme, données oncologiques anonymisées, icônes médicales",
+    "ambiance": "HealthTech / IA médicale — tonalité professionnelle et innovante"
+  }
+}

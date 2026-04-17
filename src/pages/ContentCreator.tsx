@@ -26,20 +26,19 @@ import { ContentStudio } from '@/components/content/ContentStudio';
 import { ContentKanban } from '@/components/content/ContentKanban';
 import { ContentCalendar } from '@/components/content/ContentCalendar';
 import { FeedbackLoop } from '@/components/content/FeedbackLoop';
-import { 
-  mockOpportunities, 
-  mockContentItems, 
-  contentTemplates 
+import {
+  mockOpportunities,
+  contentTemplates
 } from '@/data/contentData';
-import { 
-  ContentOpportunity, 
-  ContentItem, 
-  ContentType, 
-  ContentObjective, 
+import {
+  ContentOpportunity,
+  ContentItem,
+  ContentType,
+  ContentObjective,
   ContentStatus,
   contentTypeLabels
 } from '@/types/content';
-import { Task } from '@/types/tasks';
+import type { TaskFormData } from '@/types/tasks';
 import {
   Dialog,
   DialogContent,
@@ -48,7 +47,11 @@ import {
 } from '@/components/ui/dialog';
 import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
 import { useNavigate } from 'react-router-dom';
-import { dispatchContentTaskCreated } from '@/hooks/useContentPlanLink';
+import { useContentTasks, type ContentItemWithRow, type PlanTaskContentRow } from '@/hooks/useContentTasks';
+import { useCreateTask } from '@/hooks/useCreateTask';
+import { useClient } from '@/contexts/ClientContext';
+import { CreateTaskDialog } from '@/components/plan/CreateTaskDialog';
+import { useQueryClient } from '@tanstack/react-query';
 
 type MainTab = 'opportunities' | 'studio' | 'workflow' | 'feedback';
 type WorkflowView = 'kanban' | 'calendar';
@@ -64,7 +67,18 @@ const contentTypeIcons: Record<string, React.ElementType> = {
 export default function ContentCreator() {
   const navigate = useNavigate();
   const { isAdmin } = useVisibilityMode();
+  const { currentClient, isAllClientsSelected } = useClient();
+  const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState(false);
+
+  const clientId = isAllClientsSelected ? undefined : currentClient?.id;
+  const { data: contentItems = [] } = useContentTasks(clientId);
+  const createTask = useCreateTask();
+
+  // Task dialog state (create OR edit a content task)
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<PlanTaskContentRow | undefined>();
+  const [prefillData, setPrefillData] = useState<Partial<TaskFormData> | undefined>();
 
   const syncContent = async () => {
     setSyncing(true);
@@ -85,8 +99,8 @@ export default function ContentCreator() {
   const [activeTab, setActiveTab] = useState<MainTab>('opportunities');
   const [workflowView, setWorkflowView] = useState<WorkflowView>('kanban');
   const [opportunities] = useState<ContentOpportunity[]>(mockOpportunities);
-  const [contentItems, setContentItems] = useState<ContentItem[]>(mockContentItems);
-  
+
+
   // Studio state
   const [studioOpen, setStudioOpen] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState<ContentOpportunity | null>(null);
@@ -155,43 +169,69 @@ export default function ContentCreator() {
     setActiveTab('studio');
   };
 
+  const buildOpportunityFormData = (opp: ContentOpportunity, cid: string): TaskFormData => ({
+    title: `Create: ${opp.suggestedTitle}`,
+    description: `${opp.suggestedAngle}\n\nWhy now:\n${opp.whyNow.map((w) => `• ${w}`).join('\n')}`,
+    taskType: 'contenu',
+    clientId: cid,
+    canal: '',
+    format: '',
+    thematique: '',
+    startDate: null,
+    dueDate: null,
+    priority: opp.opportunityScore >= 80 ? 'high' : opp.opportunityScore >= 60 ? 'medium' : 'low',
+    status: 'backlog',
+    motCleCible: '',
+    nombreMots: null,
+    resourceLinks: [],
+    effortReserve: null,
+    assigneeIds: [],
+    tags: [contentTypeLabels[opp.contentType], opp.funnelStage, 'content'],
+    budgetTache: null,
+    tarifCatalogue: null,
+    forfaitMensuel: null,
+    sousTraitance: null,
+    marge: null,
+    syncToWrike: false,
+    contentType: opp.contentType,
+    contentStatus: 'idea',
+    funnelStage: opp.funnelStage,
+  });
+
   const handleCreateTask = (opp: ContentOpportunity) => {
-    const newTask: Task = {
-      id: `content-opp-${Date.now()}`,
-      title: `Create: ${opp.suggestedTitle}`,
-      description: `${opp.suggestedAngle}\n\nWhy now:\n${opp.whyNow.map(w => `• ${w}`).join('\n')}`,
-      status: 'backlog',
-      priority: opp.opportunityScore >= 80 ? 'high' : opp.opportunityScore >= 60 ? 'medium' : 'low',
-      assignee: null,
-      dueDate: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      tags: [contentTypeLabels[opp.contentType], opp.funnelStage, 'content'],
-      subtasks: [
-        { id: `s-${Date.now()}-1`, title: 'Draft content', completed: false },
-        { id: `s-${Date.now()}-2`, title: 'Review & approve', completed: false },
-        { id: `s-${Date.now()}-3`, title: 'Schedule/publish', completed: false },
-      ],
-      comments: [],
-      linkedContentId: opp.id,
-      linkedContentType: 'opportunity',
-      sourceModule: 'content-creator',
-    };
-    
-    dispatchContentTaskCreated(newTask);
-    toast.success(
-      <div className="flex items-center gap-2">
-        <span>Task created in Plan</span>
-        <Button 
-          variant="link" 
-          size="sm" 
-          className="p-0 h-auto text-primary" 
-          onClick={() => navigate('/plan')}
-        >
-          View <ExternalLink className="w-3 h-3 ml-1" />
-        </Button>
-      </div>
-    );
+    if (!clientId) {
+      toast.error('Sélectionnez un client pour créer une tâche');
+      return;
+    }
+    const formData = buildOpportunityFormData(opp, clientId);
+
+    createTask.mutate(formData, {
+      onSuccess: () => {
+        toast.success(
+          <div className="flex items-center gap-2">
+            <span>Task created in Plan</span>
+            <Button
+              variant="link"
+              size="sm"
+              className="p-0 h-auto text-primary"
+              onClick={() => navigate('/plan')}
+            >
+              View <ExternalLink className="w-3 h-3 ml-1" />
+            </Button>
+          </div>
+        );
+      },
+    });
+  };
+
+  const handleEditOpportunity = (opp: ContentOpportunity) => {
+    if (!clientId) {
+      toast.error('Sélectionnez un client pour modifier cette opportunité');
+      return;
+    }
+    setEditingTask(undefined);
+    setPrefillData(buildOpportunityFormData(opp, clientId));
+    setTaskDialogOpen(true);
   };
 
   const handleSchedule = (opp: ContentOpportunity) => {
@@ -215,32 +255,77 @@ export default function ContentCreator() {
   };
 
   const handleSendToPlan = (content: Record<string, string>) => {
-    const newItem: ContentItem = {
-      id: `content-${Date.now()}`,
-      title: content.title || content.headline || content.hook || 'Untitled',
+    if (!clientId) {
+      toast.error('Sélectionnez un client pour envoyer vers le Plan');
+      return;
+    }
+    const title = content.title || content.headline || content.hook || 'Untitled';
+    const formData: TaskFormData = {
+      title,
+      description: '',
+      taskType: 'contenu',
+      clientId,
+      canal: '',
+      format: '',
+      thematique: '',
+      startDate: null,
+      dueDate: null,
+      priority: 'medium',
+      status: 'backlog',
+      motCleCible: '',
+      nombreMots: null,
+      resourceLinks: [],
+      effortReserve: null,
+      assigneeIds: [],
+      tags: [],
+      budgetTache: null,
+      tarifCatalogue: null,
+      forfaitMensuel: null,
+      sousTraitance: null,
+      marge: null,
+      syncToWrike: false,
       contentType: selectedContentType,
-      status: 'idea',
+      contentStatus: 'idea',
       funnelStage: selectedOpportunity?.funnelStage || 'awareness',
-      opportunityId: selectedOpportunity?.id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     };
-    setContentItems(prev => [newItem, ...prev]);
-    setStudioOpen(false);
-    setActiveTab('workflow');
-    toast.success('Content added to workflow!');
+
+    createTask.mutate(formData, {
+      onSuccess: () => {
+        setStudioOpen(false);
+        setActiveTab('workflow');
+      },
+    });
   };
 
-  const handleContentStatusChange = (itemId: string, newStatus: ContentStatus) => {
-    setContentItems(prev => 
-      prev.map(item => 
-        item.id === itemId ? { ...item, status: newStatus, updatedAt: new Date().toISOString() } : item
-      )
-    );
+  const handleContentStatusChange = async (itemId: string, newStatus: ContentStatus) => {
+    try {
+      const { error } = await (supabase as unknown as {
+        from: (table: string) => Record<string, unknown>;
+      })
+        .from('plan_tasks')
+        .update({ content_status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', itemId) as unknown as { error: { message: string } | null };
+
+      if (error) throw new Error(error.message);
+      queryClient.invalidateQueries({ queryKey: ['content-tasks'] });
+    } catch (err) {
+      console.error('content status update failed:', err);
+      toast.error('Impossible de mettre à jour le statut');
+    }
   };
 
   const handleItemClick = (item: ContentItem) => {
-    toast.info(`Opening: ${item.title}`);
+    const row = (item as ContentItemWithRow)._row;
+    if (!row) return;
+    setPrefillData(undefined);
+    setEditingTask(row);
+    setTaskDialogOpen(true);
+  };
+
+  const openNewTaskDialog = () => {
+    setEditingTask(undefined);
+    setPrefillData(undefined);
+    setTaskDialogOpen(true);
   };
 
   // Render Studio View
@@ -278,6 +363,10 @@ export default function ContentCreator() {
               {syncing ? 'Syncing...' : 'Sync Content'}
             </Button>
           )}
+          <Button variant="outline" className="gap-2" onClick={openNewTaskDialog}>
+            <Plus className="w-4 h-4" />
+            Nouvelle tâche
+          </Button>
           <Button className="gap-2" onClick={() => setTypePickerOpen(true)}>
             <Plus className="w-4 h-4" />
             New Content
@@ -349,6 +438,7 @@ export default function ContentCreator() {
                   onCreateTask={handleCreateTask}
                   onSchedule={handleSchedule}
                   onSaveToBacklog={handleSaveToBacklog}
+                  onEditOpportunity={handleEditOpportunity}
                 />
               ))}
             </div>
@@ -447,6 +537,17 @@ export default function ContentCreator() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Create / Edit Task Dialog (unified — a content item is a plan task) */}
+      <CreateTaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        isAdmin={isAdmin}
+        defaultClientId={clientId}
+        clientName={isAllClientsSelected ? undefined : currentClient?.name}
+        task={editingTask}
+        prefill={prefillData}
+      />
     </div>
   );
 }

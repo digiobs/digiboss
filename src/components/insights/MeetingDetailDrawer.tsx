@@ -29,8 +29,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { Meeting, NBA } from '@/types/insights';
-import { formatTimestamp, verbatimTagConfig, getNBAsByMeetingId } from '@/data/insightsData';
+import type { Meeting } from '@/types/insights';
+import { formatTimestamp, verbatimTagConfig } from '@/data/insightsData';
 import { NBACard } from './NBACard';
 
 interface MeetingDetailDrawerProps {
@@ -45,7 +45,7 @@ export function MeetingDetailDrawer({ meeting, open, onClose }: MeetingDetailDra
 
   if (!meeting) return null;
 
-  const meetingNBAs = getNBAsByMeetingId(meeting.id);
+  const meetingNBAs = meeting.nbas ?? [];
 
   const filteredTranscript = transcriptSearch
     ? meeting.transcript.filter((segment) =>

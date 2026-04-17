@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -8,238 +10,283 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Task, TaskStatus, TaskPriority, taskColumns } from '@/types/tasks';
-import { CalendarIcon, Loader2, Sparkles } from 'lucide-react';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { createTaskSchema } from '@/lib/schemas/createTaskSchema';
+import { useCreateTask } from '@/hooks/useCreateTask';
+import { TaskTypeSelector } from './task-form/TaskTypeSelector';
+import { BasicInfoTab } from './task-form/BasicInfoTab';
+import { PlanningTab } from './task-form/PlanningTab';
+import { ProductionTab } from './task-form/ProductionTab';
+import { AdminFinanceTab } from './task-form/AdminFinanceTab';
+import { TeamMemberPicker } from './task-form/TeamMemberPicker';
+import type {
+  TaskFormData,
+  TaskType,
+  TaskNature,
+  IdeaSource,
+} from '@/types/tasks';
+import type { ContentType, ContentStatus, FunnelStage } from '@/types/content';
+import { Loader2, LayoutGrid } from 'lucide-react';
+
+interface PlanTaskRow {
+  id: string;
+  client_id: string;
+  title: string;
+  description: string | null;
+  task_type: string | null;
+  status: string;
+  priority: string;
+  canal: string | null;
+  format: string | null;
+  thematique: string | null;
+  start_date: string | null;
+  due_date: string | null;
+  mot_cle_cible: string | null;
+  nombre_mots: number | null;
+  effort_reserve: number | null;
+  resource_links: { type: string; url: string; label: string }[] | null;
+  assignee: string | null;
+  assignee_ids: { id: string; name: string; wrikeContactId?: string }[] | null;
+  tags: string[] | null;
+  budget_tache: number | null;
+  tarif_catalogue: number | null;
+  forfait_mensuel: number | null;
+  sous_traitance: number | null;
+  marge: number | null;
+  sync_to_wrike: boolean | null;
+  content_type?: string | null;
+  content_status?: string | null;
+  funnel_stage?: string | null;
+  task_nature?: string | null;
+  idea_source?: string | null;
+  idea_source_detail?: string | null;
+  idea_source_url?: string | null;
+  source_proposal_id?: string | null;
+}
 
 interface CreateTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'subtasks' | 'comments'>) => void;
-  isLoading?: boolean;
+  isAdmin: boolean;
+  defaultClientId?: string;
+  clientName?: string;
+  task?: PlanTaskRow;
+  /** When provided (and `task` is not), opens the dialog in create mode
+   *  with fields pre-filled from this partial payload. Used to edit a
+   *  content opportunity before saving it as a task. */
+  prefill?: Partial<TaskFormData>;
+  /** Monthly batch id (`YYYY-MM`) to assign to the new task. Used by the
+   *  /actions page so new tasks land in the currently-viewed month. */
+  defaultPeriod?: string;
+}
+
+function getDefaultValues(
+  defaultClientId?: string,
+  task?: PlanTaskRow,
+  prefill?: Partial<TaskFormData>,
+  defaultPeriod?: string,
+): TaskFormData {
+  if (task) {
+    return {
+      title: task.title || '',
+      description: task.description || '',
+      taskType: (task.task_type as TaskType) || 'autre',
+      taskNature: (task.task_nature as TaskNature | null) ?? null,
+      ideaSource: (task.idea_source as IdeaSource | null) ?? null,
+      ideaSourceDetail: task.idea_source_detail ?? null,
+      ideaSourceUrl: task.idea_source_url ?? null,
+      sourceProposalId: task.source_proposal_id ?? null,
+      clientId: task.client_id || defaultClientId || '',
+      canal: (task.canal as TaskFormData['canal']) || '',
+      format: (task.format as TaskFormData['format']) || '',
+      thematique: task.thematique || '',
+      startDate: task.start_date || null,
+      dueDate: task.due_date || null,
+      priority: (task.priority as TaskFormData['priority']) || 'medium',
+      status: (task.status as TaskFormData['status']) || 'backlog',
+      motCleCible: task.mot_cle_cible || '',
+      nombreMots: task.nombre_mots || null,
+      resourceLinks: (task.resource_links as TaskFormData['resourceLinks']) || [],
+      effortReserve: task.effort_reserve ? Number(task.effort_reserve) : null,
+      assigneeIds: task.assignee_ids || [],
+      tags: task.tags || [],
+      budgetTache: task.budget_tache ? Number(task.budget_tache) : null,
+      tarifCatalogue: task.tarif_catalogue ? Number(task.tarif_catalogue) : null,
+      forfaitMensuel: task.forfait_mensuel ? Number(task.forfait_mensuel) : null,
+      sousTraitance: task.sous_traitance ? Number(task.sous_traitance) : null,
+      marge: task.marge ? Number(task.marge) : null,
+      syncToWrike: task.sync_to_wrike || false,
+      contentType: (task.content_type as ContentType) || null,
+      contentStatus: (task.content_status as ContentStatus) || null,
+      funnelStage: (task.funnel_stage as FunnelStage) || null,
+      period: (task as PlanTaskRow & { period?: string | null }).period ?? null,
+    };
+  }
+
+  const base: TaskFormData = {
+    title: '',
+    description: '',
+    taskType: 'autre',
+    taskNature: null,
+    ideaSource: 'manual',
+    ideaSourceDetail: null,
+    ideaSourceUrl: null,
+    sourceProposalId: null,
+    clientId: defaultClientId || '',
+    canal: '',
+    format: '',
+    thematique: '',
+    startDate: null,
+    dueDate: null,
+    priority: 'medium',
+    status: 'backlog',
+    motCleCible: '',
+    nombreMots: null,
+    resourceLinks: [],
+    effortReserve: null,
+    assigneeIds: [],
+    tags: [],
+    budgetTache: null,
+    tarifCatalogue: null,
+    forfaitMensuel: null,
+    sousTraitance: null,
+    marge: null,
+    syncToWrike: false,
+    contentType: null,
+    contentStatus: null,
+    funnelStage: null,
+    period: defaultPeriod ?? null,
+  };
+
+  return prefill ? { ...base, ...prefill } : base;
 }
 
 export function CreateTaskDialog({
   open,
   onOpenChange,
-  onCreateTask,
-  isLoading = false,
+  isAdmin,
+  defaultClientId,
+  clientName,
+  task,
+  prefill,
+  defaultPeriod,
 }: CreateTaskDialogProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<TaskStatus>('backlog');
-  const [priority, setPriority] = useState<TaskPriority>('medium');
-  const [assignee, setAssignee] = useState('');
-  const [dueDate, setDueDate] = useState<Date | undefined>();
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
+  const isEdit = !!task;
 
-  const handleSubmit = () => {
-    if (!title.trim()) return;
+  const form = useForm<TaskFormData>({
+    resolver: zodResolver(createTaskSchema),
+    defaultValues: getDefaultValues(defaultClientId, task, prefill, defaultPeriod),
+  });
 
-    onCreateTask({
-      title: title.trim(),
-      description: description.trim(),
-      status,
-      priority,
-      assignee: assignee.trim() || null,
-      dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
-      tags,
-      linkedCampaign: undefined,
-      estimatedHours: undefined,
-      aiGenerated: false,
-    });
+  const { mutate, isPending } = useCreateTask({
+    onSuccess: () => {
+      onOpenChange(false);
+      form.reset(getDefaultValues(defaultClientId, undefined, undefined, defaultPeriod));
+    },
+  });
 
-    // Reset form
-    setTitle('');
-    setDescription('');
-    setStatus('backlog');
-    setPriority('medium');
-    setAssignee('');
-    setDueDate(undefined);
-    setTags([]);
-    setTagInput('');
-  };
-
-  const handleAddTag = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      if (!tags.includes(tagInput.trim())) {
-        setTags([...tags, tagInput.trim()]);
-      }
-      setTagInput('');
+  // Reset form when dialog opens with different task or prefill
+  useEffect(() => {
+    if (open) {
+      form.reset(getDefaultValues(defaultClientId, task, prefill, defaultPeriod));
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, task?.id, defaultClientId, prefill, defaultPeriod]);
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+  const onSubmit = (data: TaskFormData) => {
+    if (isEdit && task) {
+      mutate({ ...data, id: task.id });
+    } else {
+      mutate(data);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Create New Task
+            <LayoutGrid className="w-5 h-5 text-primary" />
+            {isEdit ? 'Modifier la tâche' : 'Nouvelle tâche'}
           </DialogTitle>
           <DialogDescription>
-            Add a new task to your marketing plan.
+            {isEdit
+              ? 'Modifiez les informations de la tâche.'
+              : 'Créez une nouvelle tâche avec tous les champs Wrike.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
-          {/* Title */}
-          <div className="grid gap-2">
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              placeholder="Task title..."
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          {/* Task Type Selector */}
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Type de tâche</Label>
+            <TaskTypeSelector
+              value={form.watch('taskType')}
+              onChange={(v) => form.setValue('taskType', v)}
             />
           </div>
 
-          {/* Description */}
-          <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Task description..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
+          {/* Tabbed sections */}
+          <Tabs defaultValue="infos" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="infos">Informations</TabsTrigger>
+              <TabsTrigger value="planning">Planning</TabsTrigger>
+              <TabsTrigger value="production">Production</TabsTrigger>
+              {isAdmin && <TabsTrigger value="admin">Admin</TabsTrigger>}
+            </TabsList>
 
-          {/* Status & Priority */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {taskColumns.map((col) => (
-                    <SelectItem key={col.id} value={col.id}>
-                      {col.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <TabsContent value="infos" className="mt-4">
+              <BasicInfoTab form={form} clientName={clientName} />
+            </TabsContent>
 
-            <div className="grid gap-2">
-              <Label>Priority</Label>
-              <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+            <TabsContent value="planning" className="mt-4">
+              <PlanningTab form={form} />
+            </TabsContent>
 
-          {/* Assignee & Due Date */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="assignee">Assignee</Label>
-              <Input
-                id="assignee"
-                placeholder="Name..."
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-              />
-            </div>
+            <TabsContent value="production" className="mt-4">
+              <ProductionTab form={form} />
+            </TabsContent>
 
-            <div className="grid gap-2">
-              <Label>Due Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'justify-start text-left font-normal',
-                      !dueDate && 'text-muted-foreground'
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate ? format(dueDate, 'PPP') : 'Pick a date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dueDate}
-                    onSelect={setDueDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div className="grid gap-2">
-            <Label htmlFor="tags">Tags</Label>
-            <Input
-              id="tags"
-              placeholder="Add tags (press Enter)..."
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleAddTag}
-            />
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-destructive/20"
-                    onClick={() => handleRemoveTag(tag)}
-                  >
-                    {tag} ×
-                  </Badge>
-                ))}
-              </div>
+            {isAdmin && (
+              <TabsContent value="admin" className="mt-4">
+                <AdminFinanceTab form={form} />
+              </TabsContent>
             )}
-          </div>
-        </div>
+          </Tabs>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={!title.trim() || isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              'Create Task'
-            )}
-          </Button>
-        </DialogFooter>
+          {/* Team Member Picker (always visible) */}
+          <TeamMemberPicker form={form} />
+
+          {/* Wrike sync toggle */}
+          <div className="flex items-center gap-2 pt-1">
+            <Checkbox
+              id="syncToWrike"
+              checked={form.watch('syncToWrike')}
+              onCheckedChange={(checked) => form.setValue('syncToWrike', checked === true)}
+            />
+            <Label htmlFor="syncToWrike" className="text-sm cursor-pointer">
+              Synchroniser avec Wrike
+            </Label>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+              Annuler
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {isEdit ? 'Enregistrement...' : 'Création...'}
+                </>
+              ) : (
+                isEdit ? 'Enregistrer' : 'Créer la tâche'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -1,6 +1,12 @@
-project_id = "cdidlnlytaomnpoirwuz"
+project_id = "sjjgxiovhbmkwsytscrc"
 
 [functions.market-news]
+verify_jwt = false
+
+[functions.lemlist-sync]
+verify_jwt = false
+
+[functions.lemlist-list-campaigns]
 verify_jwt = false
 
 [functions.dashboard-news]
@@ -19,4 +25,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-recommendations]
+verify_jwt = false
+
+[functions.invite-team-member]
 verify_jwt = false

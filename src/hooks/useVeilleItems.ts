@@ -37,7 +37,7 @@ export function useVeilleItems(options?: {
   return useQuery({
     queryKey: ['veille-items', filterClientId, filterSkill, filterSeverity],
     queryFn: async () => {
-      let query = (supabase as any)
+      let query = (supabase as unknown as { from: (table: string) => Record<string, unknown> })
         .from('veille_items')
         .select('id,client_id,title,summary,skill,source,source_url,severity,details,is_read,is_actionable,generated_at,created_at,clients(name)')
         .order('created_at', { ascending: false })

@@ -46,13 +46,13 @@ export function useHomeReportingKpis(clientId?: string) {
     queryFn: async () => {
       // reporting_kpis table may not exist in the schema yet
       try {
-        const query = supabase
-          .from('reporting_kpis' as any)
+        const query = (supabase as unknown as { from: (table: string) => Record<string, unknown> })
+          .from('reporting_kpis')
           .select('section,metric_key,label,value,unit,period_end')
           .order('period_end', { ascending: false })
           .limit(200);
         if (clientId && clientId !== ALL_CLIENTS_ID) {
-          (query as any).eq('client_id', clientId);
+          (query as unknown as { eq: (col: string, val: string) => void }).eq('client_id', clientId);
         }
         const { data, error } = await query;
         if (error) {
@@ -177,7 +177,7 @@ export function useHomeNBA() {
     queryFn: async () => {
       try {
         const oneWeekFromNow = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
-        const { data, error } = await (supabase as any)
+        const { data, error } = await (supabase as unknown as { from: (table: string) => Record<string, unknown> })
           .from('plan_tasks')
           .select('*, clients(name, id)')
           .in('status', ['in_progress', 'backlog'])
@@ -186,9 +186,9 @@ export function useHomeNBA() {
           .order('due_date', { ascending: true })
           .limit(5);
         if (error) throw error;
-        return (data ?? []) as Array<Record<string, any>>;
+        return (data ?? []) as Array<Record<string, unknown>>;
       } catch {
-        return [] as Array<Record<string, any>>;
+        return [] as Array<Record<string, unknown>>;
       }
     },
   });
@@ -197,7 +197,7 @@ export function useHomeNBA() {
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const updates: Record<string, unknown> = { status };
 
-      const { error } = await (supabase as any)
+      const { error } = await (supabase as unknown as { from: (table: string) => Record<string, unknown> })
         .from('plan_tasks')
         .update(updates)
         .eq('id', id);
@@ -256,7 +256,7 @@ export function useUrgentTasks() {
       const today = new Date().toISOString().split('T')[0];
       const oneWeekFromNow = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (supabase as unknown as { from: (table: string) => Record<string, unknown> })
         .from('plan_tasks')
         .select('*, clients(name, id)')
         .in('status', ['in_progress', 'backlog'])
@@ -277,7 +277,7 @@ export function useOverdueTasks() {
     queryFn: async () => {
       const today = new Date().toISOString().split('T')[0];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (supabase as unknown as { from: (table: string) => Record<string, unknown> })
         .from('plan_tasks')
         .select('id, client_id')
         .lt('due_date', today)
@@ -295,7 +295,7 @@ export function useHomeKPIsData() {
     queryFn: async () => {
       // home_kpis table exists but may have different structure, compute from plan_tasks
       try {
-        const sb = supabase as any;
+        const sb = supabase as unknown as { from: (table: string) => Record<string, unknown> };
         const [activeTasks, weekTasks, highPriority, completedMonth] = await Promise.all([
           sb.from('plan_tasks').select('id', { count: 'exact' }).eq('status', 'in_progress'),
           sb.from('plan_tasks').select('id', { count: 'exact' }).eq('status', 'in_progress')
@@ -327,7 +327,7 @@ export function useClientTaskHealth() {
   return useQuery({
     queryKey: ['client-task-health'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (supabase as unknown as { from: (table: string) => Record<string, unknown> })
         .from('plan_tasks')
         .select('client_id, status, clients(name, id)');
       if (error) throw error;
@@ -341,7 +341,7 @@ export function useClientTaskHealth() {
         in_progress: number;
         done: number;
       };
-      const grouped = ((data ?? []) as any[]).reduce((acc: Record<string, ClientGroup>, task: any) => {
+      const grouped = ((data ?? []) as Record<string, unknown>[]).reduce((acc: Record<string, ClientGroup>, task: Record<string, unknown>) => {
         const clientId = task.client_id;
         if (!acc[clientId]) {
           acc[clientId] = {

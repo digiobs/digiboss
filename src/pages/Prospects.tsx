@@ -1,14 +1,7 @@
-import { useState, useMemo } from 'react';
-import { LeadTable } from '@/components/prospects/LeadTable';
-import { leads as mockLeads } from '@/data/mockData';
-import { TabDataStatusBanner } from '@/components/data/TabDataStatusBanner';
-import { useSupabaseProspectLeads } from '@/hooks/useSupabaseTabData';
-import { useClient } from '@/contexts/ClientContext';
-import { useVisibilityMode } from '@/hooks/useVisibilityMode';
-import { supabase } from '@/integrations/supabase/client';
+import { useMemo, useState } from 'react';
+import { Users, Search, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Users, Search, Filter, Plus, Download, RefreshCw } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -16,166 +9,252 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useClient } from '@/contexts/ClientContext';
+import { useVisibilityMode } from '@/hooks/useVisibilityMode';
+import { LemlistLeadTable } from '@/components/prospects/LemlistLeadTable';
+import { LemlistLeadDrawer } from '@/components/prospects/LemlistLeadDrawer';
+import { LemlistCampaignPicker } from '@/components/prospects/LemlistCampaignPicker';
+import { useLemlistContacts, type LemlistContactRow } from '@/hooks/useLemlistContacts';
+import { useLemlistCampaignMapping } from '@/hooks/useLemlistCampaignMapping';
+
+type SortKey = 'recent' | 'opens' | 'replies' | 'name';
+
+function formatRelativeMinutes(iso: string | null): string {
+  if (!iso) return 'jamais';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 'jamais';
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `il y a ${hours} h`;
+  const days = Math.round(hours / 24);
+  return `il y a ${days} j`;
+}
 
 export default function Prospects() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [stageFilter, setStageFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('score-desc');
-  const [syncingLemlist, setSyncingLemlist] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<SortKey>('recent');
+  const [syncing, setSyncing] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<LemlistContactRow | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   const { currentClient, isAllClientsSelected } = useClient();
   const { isAdmin } = useVisibilityMode();
-  const { data: leads, refetch } = useSupabaseProspectLeads(mockLeads);
+  const { contacts, isLoading, stats, refetch } = useLemlistContacts();
+  const { mapping, connect, disconnect } = useLemlistCampaignMapping();
 
-  const syncLemlistLeads = async () => {
-    if (!currentClient?.id) return;
-    setSyncingLemlist(true);
+  const handleManualSync = async () => {
+    if (!currentClient?.id || isAllClientsSelected) {
+      toast.error('Sélectionnez un client pour synchroniser lemlist.');
+      return;
+    }
+    setSyncing(true);
     try {
-      const payload = isAllClientsSelected ? { limit: 50 } : { limit: 50, clientId: currentClient.id };
-      const { error } = await supabase.functions.invoke('lemlist-sync', { body: payload });
+      const { error } = await supabase.functions.invoke('lemlist-sync', {
+        body: { clientId: currentClient.id, limit: 200 },
+      });
       if (error) throw error;
+      toast.success('Sync lemlist terminée.');
       await refetch();
     } catch (error) {
       console.error('lemlist sync failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Sync lemlist échouée.');
     } finally {
-      setSyncingLemlist(false);
+      setSyncing(false);
     }
   };
 
-  // Filter and sort leads
-  const filteredLeads = useMemo(() => {
-    let result = [...leads];
+  const filteredContacts = useMemo(() => {
+    let result = [...contacts];
 
-    // Search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(
-        (lead) =>
-          lead.name.toLowerCase().includes(term) ||
-          lead.company.toLowerCase().includes(term) ||
-          lead.email.toLowerCase().includes(term)
-      );
+      result = result.filter((c) => {
+        return (
+          (c.full_name ?? '').toLowerCase().includes(term) ||
+          (c.email ?? '').toLowerCase().includes(term) ||
+          (c.company ?? '').toLowerCase().includes(term)
+        );
+      });
     }
 
-    // Stage filter
-    if (stageFilter !== 'all') {
-      result = result.filter((lead) => lead.stage === stageFilter);
+    if (statusFilter !== 'all') {
+      result = result.filter((c) => (c.status ?? '').toLowerCase().includes(statusFilter));
     }
 
-    // Sort
     switch (sortBy) {
-      case 'score-desc':
-        result.sort((a, b) => b.score - a.score);
-        break;
-      case 'score-asc':
-        result.sort((a, b) => a.score - b.score);
-        break;
       case 'recent':
-        result.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+        result.sort((a, b) => {
+          const da = new Date(a.last_event_at ?? a.contacted_at ?? a.synced_at ?? 0).getTime();
+          const db = new Date(b.last_event_at ?? b.contacted_at ?? b.synced_at ?? 0).getTime();
+          return db - da;
+        });
+        break;
+      case 'opens':
+        result.sort((a, b) => b.emails_opened - a.emails_opened);
+        break;
+      case 'replies':
+        result.sort((a, b) => b.emails_replied - a.emails_replied);
         break;
       case 'name':
-        result.sort((a, b) => a.name.localeCompare(b.name));
+        result.sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? ''));
         break;
     }
 
     return result;
-  }, [leads, searchTerm, stageFilter, sortBy]);
+  }, [contacts, searchTerm, statusFilter, sortBy]);
 
-  const totalLeads = leads.length;
-  const qualifiedLeads = leads.filter((l) => l.stage === 'qualified' || l.stage === 'proposal').length;
-  const avgScore = leads.length > 0 ? Math.round(leads.reduce((acc, l) => acc + l.score, 0) / leads.length) : 0;
+  const handleSelect = (contact: LemlistContactRow) => {
+    setSelectedContact(contact);
+    setDrawerOpen(true);
+  };
+
+  const showPicker = isAdmin && !isAllClientsSelected && Boolean(currentClient?.id);
+  const emptyNoMapping =
+    !isLoading && contacts.length === 0 && !isAllClientsSelected && !mapping;
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
-      <div className="flex items-start justify-between">
+      {/* Header */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <Users className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Prospects</h1>
+            <h1 className="text-2xl font-bold text-foreground">Prospects · lemlist</h1>
           </div>
-          <p className="text-muted-foreground mt-1">
-            AI-scored leads with prioritized outreach recommendations.
+          <p className="text-muted-foreground mt-1 text-sm">
+            Contacts et métriques lemlist synchronisés pour le client sélectionné.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Dernière synchronisation : {formatRelativeMinutes(stats.lastSyncedAt)}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
-            <Button variant="outline" className="gap-2" onClick={syncLemlistLeads} disabled={syncingLemlist}>
-              <RefreshCw className={`w-4 h-4 ${syncingLemlist ? 'animate-spin' : ''}`} />
-              {syncingLemlist ? 'Syncing Lemlist...' : 'Sync Lemlist'}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleManualSync}
+              disabled={syncing || !mapping || isAllClientsSelected}
+              title={!mapping ? 'Connectez une campagne lemlist avant de synchroniser' : undefined}
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+              Synchroniser
             </Button>
           )}
-          <Button variant="outline" className="gap-2">
-            <Download className="w-4 h-4" />
-            Export
-          </Button>
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            Add Lead
-          </Button>
         </div>
       </div>
-      <TabDataStatusBanner tab="prospects" />
+
+      {showPicker && (
+        <LemlistCampaignPicker
+          mapping={mapping}
+          enabled={showPicker}
+          clientName={currentClient?.name ?? null}
+          isConnecting={connect.isPending}
+          isDisconnecting={disconnect.isPending}
+          onConnect={(campaign) => connect.mutate(campaign)}
+          onDisconnect={() => disconnect.mutate()}
+        />
+      )}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="bg-card rounded-lg border border-border p-4">
-          <p className="text-sm text-muted-foreground">Total Leads</p>
-          <p className="text-2xl font-bold mt-1">{totalLeads}</p>
+          <p className="text-sm text-muted-foreground">Total contacts</p>
+          <p className="text-2xl font-bold mt-1">{stats.totalContacts}</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-4">
-          <p className="text-sm text-muted-foreground">Qualified</p>
-          <p className="text-2xl font-bold mt-1">{qualifiedLeads}</p>
+          <p className="text-sm text-muted-foreground">Emails envoyés</p>
+          <p className="text-2xl font-bold mt-1">{stats.emailsSent}</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-4">
-          <p className="text-sm text-muted-foreground">Avg. Score</p>
-          <p className="text-2xl font-bold mt-1">{avgScore}</p>
+          <p className="text-sm text-muted-foreground">Taux d'ouverture</p>
+          <p className="text-2xl font-bold mt-1">{(stats.openRate * 100).toFixed(0)}%</p>
+        </div>
+        <div className="bg-card rounded-lg border border-border p-4">
+          <p className="text-sm text-muted-foreground">Taux de réponse</p>
+          <p className="text-2xl font-bold mt-1">{(stats.replyRate * 100).toFixed(0)}%</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 max-w-sm min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search leads..."
+            placeholder="Rechercher nom, email, société…"
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={stageFilter} onValueChange={setStageFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Stage" />
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Statut" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Stages</SelectItem>
-            <SelectItem value="new">New</SelectItem>
-            <SelectItem value="contacted">Contacted</SelectItem>
-            <SelectItem value="qualified">Qualified</SelectItem>
-            <SelectItem value="proposal">Proposal</SelectItem>
-            <SelectItem value="closed">Closed</SelectItem>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            <SelectItem value="new">Nouveau</SelectItem>
+            <SelectItem value="contacted">Contacté</SelectItem>
+            <SelectItem value="opened">Ouvert</SelectItem>
+            <SelectItem value="clicked">Cliqué</SelectItem>
+            <SelectItem value="replied">Répondu</SelectItem>
+            <SelectItem value="interested">Intéressé</SelectItem>
+            <SelectItem value="bounced">Bounce</SelectItem>
+            <SelectItem value="unsubscribed">Désinscrit</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Sort by" />
+        <Select value={sortBy} onValueChange={(v: SortKey) => setSortBy(v)}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Trier par" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="score-desc">Score (High-Low)</SelectItem>
-            <SelectItem value="score-asc">Score (Low-High)</SelectItem>
-            <SelectItem value="recent">Most Recent</SelectItem>
-            <SelectItem value="name">Name A-Z</SelectItem>
+            <SelectItem value="recent">Plus récents</SelectItem>
+            <SelectItem value="opens">Plus d'ouvertures</SelectItem>
+            <SelectItem value="replies">Plus de réponses</SelectItem>
+            <SelectItem value="name">Nom A-Z</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" className="gap-2">
-          <Filter className="w-4 h-4" />
-          More Filters
-        </Button>
       </div>
 
-      {/* Lead Table */}
-      <LeadTable leads={filteredLeads} />
+      {/* Content */}
+      {isLoading && (
+        <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground animate-pulse">
+          Chargement des contacts lemlist…
+        </div>
+      )}
+
+      {emptyNoMapping ? (
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 py-10 text-center">
+          <Users className="w-8 h-8 text-muted-foreground mx-auto" />
+          <p className="mt-3 text-sm text-muted-foreground">
+            Aucune campagne lemlist connectée pour {currentClient?.name ?? 'ce client'}.
+          </p>
+          {isAdmin ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Utilisez le sélecteur ci-dessus pour connecter une campagne.
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Contactez un admin pour connecter une campagne lemlist.
+            </p>
+          )}
+        </div>
+      ) : (
+        <LemlistLeadTable contacts={filteredContacts} onSelect={handleSelect} />
+      )}
+
+      <LemlistLeadDrawer
+        contact={selectedContact}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }

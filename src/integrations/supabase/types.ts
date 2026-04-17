@@ -1988,6 +1988,54 @@ export type Database = {
         }
         Relationships: []
       }
+      windsor_campaign_metrics: {
+        Row: {
+          id: string
+          client_id: string | null
+          account_name: string | null
+          campaign: string | null
+          datasource: string
+          date: string
+          post_id: string | null
+          sessions: number
+          source: string | null
+          raw: Json
+          synced_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          client_id?: string | null
+          account_name?: string | null
+          campaign?: string | null
+          datasource: string
+          date: string
+          post_id?: string | null
+          sessions?: number
+          source?: string | null
+          raw?: Json
+          synced_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string | null
+          account_name?: string | null
+          campaign?: string | null
+          datasource?: string
+          date?: string
+          post_id?: string | null
+          sessions?: number
+          source?: string | null
+          raw?: Json
+          synced_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tldv_meetings: {
         Row: {
           ai_summary_json: Json

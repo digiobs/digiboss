@@ -75,6 +75,7 @@ const CORE_CONNECTORS: Array<{ provider: string; connector: string; label: strin
   { provider: "lemlist", connector: "campaigns", label: "Lemlist" },
   { provider: "tldv", connector: "meetings", label: "tl;dv" },
   { provider: "wrike", connector: "project", label: "Wrike" },
+  { provider: "windsor", connector: "campaigns", label: "Windsor.ai" },
 ];
 
 type ClientConfigLite = {

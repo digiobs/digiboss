@@ -1,4 +1,4 @@
-import { Users, Info, TrendingUp } from 'lucide-react';
+import { Users, Info, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   Tooltip,
@@ -6,12 +6,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { leadsData, leadSourceBreakdown } from '@/data/analyticsData';
 import { useSupabaseProspectLeads } from '@/hooks/useSupabaseTabData';
-import { leads as fallbackLeads } from '@/data/mockData';
 
 export function LeadsSection() {
-  const { data: prospectLeads, source } = useSupabaseProspectLeads(fallbackLeads);
+  const { data: prospectLeads, source } = useSupabaseProspectLeads([]);
+  const hasData = source === 'supabase' && prospectLeads.length > 0;
   const totalLeads = prospectLeads.length;
   const latestLeads = prospectLeads.slice(0, 4).map((lead, index) => ({
     id: lead.id,
@@ -19,7 +18,6 @@ export function LeadsSection() {
     source: lead.source,
     page: lead.company,
     lastSeen: lead.lastActivity || 'NA',
-    email: lead.email,
     date: String(index),
   }));
   const sourceCounts = Object.entries(
@@ -35,8 +33,6 @@ export function LeadsSection() {
       share: totalLeads > 0 ? (count / totalLeads) * 100 : 0,
     }))
     .sort((a, b) => b.leads - a.leads);
-  const displayedSourceBreakdown = sourceCounts.length > 0 ? sourceCounts : leadSourceBreakdown;
-  const displayedLatestLeads = latestLeads.length > 0 ? latestLeads : leadsData.slice(0, 4);
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -45,9 +41,7 @@ export function LeadsSection() {
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-primary" />
             <h2 className="font-semibold">Leads</h2>
-            <Badge variant="secondary" className="text-xs">
-              {source === 'supabase' ? 'Live Data' : 'Sample Data'}
-            </Badge>
+            {hasData && <Badge variant="secondary" className="text-xs">Live</Badge>}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger>
@@ -55,7 +49,7 @@ export function LeadsSection() {
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p className="text-sm">
-                    <strong>Attribution note:</strong> Leads may lag behind conversions. 
+                    <strong>Attribution note:</strong> Leads may lag behind conversions.
                     Compare by week/month for clearer signal.
                   </p>
                 </TooltipContent>
@@ -66,61 +60,59 @@ export function LeadsSection() {
       </div>
 
       <div className="p-5">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* KPI Card */}
-          <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-4">
-            <p className="text-sm text-muted-foreground">Total Leads</p>
-            <div className="flex items-baseline gap-2 mt-1">
+        {hasData ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-4">
+              <p className="text-sm text-muted-foreground">Total Leads</p>
               <span className="text-3xl font-bold">{totalLeads.toLocaleString()}</span>
-              <div className="flex items-center text-emerald-600">
-                <TrendingUp className="w-4 h-4" />
-                <span className="text-sm font-medium">+24.8%</span>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Source Breakdown</h3>
+              <div className="space-y-2">
+                {sourceCounts.map((s, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <span className="text-sm">{s.source}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full"
+                          style={{ width: `${s.share}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium w-8 text-right">{s.leads}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">vs previous period</p>
-          </div>
 
-          {/* Source Breakdown */}
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Source → Leads</h3>
-            <div className="space-y-2">
-              {displayedSourceBreakdown.map((source, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm">{source.source}</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div 
-                        className="h-full bg-primary rounded-full" 
-                        style={{ width: `${source.share}%` }}
-                      />
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Latest Leads</h3>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {latestLeads.map((lead) => (
+                  <div key={lead.id} className="p-2 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{lead.contact}</span>
+                      <Badge variant="outline" className="text-xs">{lead.lastSeen}</Badge>
                     </div>
-                    <span className="text-sm font-medium w-8 text-right">{source.leads}</span>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                      <span>{lead.source}</span>
+                      <span>·</span>
+                      <span className="truncate max-w-[120px]">{lead.page}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
-
-          {/* Latest Leads Table */}
-          <div className="lg:col-span-1">
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Latest Leads</h3>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-              {displayedLatestLeads.map((lead) => (
-                <div key={lead.id} className="p-2 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{lead.contact}</span>
-                    <Badge variant="outline" className="text-xs">{lead.lastSeen}</Badge>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <span>{lead.source}</span>
-                    <span>•</span>
-                    <span className="truncate max-w-[120px]">{lead.page}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Database className="w-10 h-10 text-muted-foreground mb-3" />
+            <p className="text-muted-foreground">No leads data available yet.</p>
+            <p className="text-xs text-muted-foreground mt-1">Connect HubSpot or Lemlist to populate this section.</p>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

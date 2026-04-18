@@ -18,20 +18,22 @@ const chartConfig = {
 export function WebsitePerformanceSection() {
   const { getMetric, hasData } = useReportingMetrics(['website', 'conversion']);
   const liveImpressions = getMetric('impressions', 0);
+  const liveSessions = getMetric('sessions', 0);
   const liveConversions = getMetric('conversions', 0);
   const liveConvRate = getMetric('conv_rate', 0);
 
-  const qualityIndicators = [
-    hasData
-      ? { label: 'Impressions', value: Math.round(liveImpressions).toLocaleString(), delta: 0, isGood: true }
-      : { label: 'Bounce Rate', value: '42.3%', delta: -8.1, isGood: true },
-    hasData
-      ? { label: 'Conversions', value: Math.round(liveConversions).toLocaleString(), delta: 0, isGood: true }
-      : { label: 'Avg. Session Duration', value: '2m 34s', delta: -5.3, isGood: false },
-    hasData
-      ? { label: 'Conv. Rate', value: `${liveConvRate.toFixed(2)}%`, delta: 0, isGood: true }
-      : { label: 'Pages / Session', value: '2.8', delta: 4.2, isGood: true },
-  ];
+  const qualityIndicators = hasData
+    ? [
+        { label: 'Sessions', value: Math.round(liveSessions).toLocaleString(), delta: 0, isGood: true },
+        { label: 'Impressions', value: Math.round(liveImpressions).toLocaleString(), delta: 0, isGood: true },
+        { label: 'Conversions', value: Math.round(liveConversions).toLocaleString(), delta: 0, isGood: true },
+        { label: 'Conv. Rate', value: `${liveConvRate.toFixed(2)}%`, delta: 0, isGood: true },
+      ]
+    : [
+        { label: 'Bounce Rate', value: '42.3%', delta: -8.1, isGood: true },
+        { label: 'Avg. Session Duration', value: '2m 34s', delta: -5.3, isGood: false },
+        { label: 'Pages / Session', value: '2.8', delta: 4.2, isGood: true },
+      ];
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">

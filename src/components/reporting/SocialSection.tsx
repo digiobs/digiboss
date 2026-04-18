@@ -7,12 +7,13 @@ import { useReportingMetrics } from '@/hooks/useReportingMetrics';
 export function SocialSection() {
   const { getMetric, hasData } = useReportingMetrics(['social', 'paid']);
   const liveFollowers = getMetric('li_followers', socialKPIs.followers);
+  const liveNewFollowers = getMetric('li_new_followers', 0);
   const liveImpressions = getMetric('li_impressions', socialKPIs.impressions);
   const liveClicks = getMetric('ad_clicks', socialKPIs.clicks);
 
   const kpiCards = [
     { label: 'Followers', value: Math.round(liveFollowers).toLocaleString(), icon: Users },
-    { label: 'New Followers', value: hasData ? 'NA' : `+${socialKPIs.newFollowers}`, delta: hasData ? 0 : socialKPIs.newFollowersDelta, icon: Users },
+    { label: 'New Followers', value: hasData && liveNewFollowers > 0 ? `+${Math.round(liveNewFollowers).toLocaleString()}` : hasData ? 'NA' : `+${socialKPIs.newFollowers}`, delta: hasData ? 0 : socialKPIs.newFollowersDelta, icon: Users },
     { label: 'Impressions', value: Math.round(liveImpressions).toLocaleString(), delta: 0, icon: Eye },
     { label: 'Engagements', value: hasData ? 'NA' : socialKPIs.engagements.toLocaleString(), delta: hasData ? 0 : socialKPIs.engagementsDelta, icon: MousePointerClick },
     { label: 'Clicks', value: Math.round(liveClicks).toLocaleString(), delta: 0, icon: MousePointerClick },

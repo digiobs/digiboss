@@ -83,6 +83,23 @@ serve(async (req) => {
       .gte("report_date", periodStart)
       .lte("report_date", periodEnd);
 
+    const windsorCampaignQuery = supabase
+      .from("windsor_campaign_metrics")
+      .select("account_name,sessions,source,campaign")
+      .gte("date", periodStart)
+      .lte("date", periodEnd);
+    const windsorLinkedinQuery = supabase
+      .from("windsor_linkedin_metrics")
+      .select("organization_follower_count,followers_gain_organic,followers_gain_paid,date")
+      .gte("date", periodStart)
+      .lte("date", periodEnd)
+      .order("date", { ascending: false });
+    const windsorMappingsQuery = supabase
+      .from("client_data_mappings")
+      .select("client_id,external_account_id,external_account_name,alias_external_ids")
+      .eq("provider", "windsor")
+      .eq("is_active", true);
+
     if (clientId) {
       supermetricsQuery = supermetricsQuery.eq("client_id", clientId);
       leadsQuery = leadsQuery.eq("client_id", clientId);
@@ -90,8 +107,18 @@ serve(async (req) => {
       semrushQuery = semrushQuery.eq("client_id", clientId);
     }
 
-    const [{ data: smRows, error: smError }, { data: leadRows, error: leadError }, { data: lemlistRows, error: llError }, { data: seoRows, error: seoError }] =
-      await Promise.all([supermetricsQuery, leadsQuery, lemlistQuery, semrushQuery]);
+    const [
+      { data: smRows, error: smError },
+      { data: leadRows, error: leadError },
+      { data: lemlistRows, error: llError },
+      { data: seoRows, error: seoError },
+      { data: windsorCampaignRows },
+      { data: windsorLinkedinRows },
+      { data: windsorMappings },
+    ] = await Promise.all([
+      supermetricsQuery, leadsQuery, lemlistQuery, semrushQuery,
+      windsorCampaignQuery, windsorLinkedinQuery, windsorMappingsQuery,
+    ]);
 
     if (smError) throw new Error(`Failed to load supermetrics rows: ${smError.message}`);
     if (leadError) throw new Error(`Failed to load prospect leads: ${leadError.message}`);
@@ -139,11 +166,74 @@ serve(async (req) => {
       seoPosByClient.set(id, current);
     }
 
+    // Windsor: build account_name → client_id lookup from client_data_mappings
+    const windsorAccountToClient = new Map<string, string>();
+    for (const mapping of windsorMappings ?? []) {
+      const cid = safeString(mapping.client_id);
+      if (!cid) continue;
+      const name = safeString(mapping.external_account_name);
+      const extId = safeString(mapping.external_account_id);
+      if (name) windsorAccountToClient.set(name.toLowerCase(), cid);
+      if (extId) windsorAccountToClient.set(extId.toLowerCase(), cid);
+      const aliases = Array.isArray(mapping.alias_external_ids) ? mapping.alias_external_ids : [];
+      for (const alias of aliases) {
+        const a = typeof alias === "string" ? alias.trim().toLowerCase() : "";
+        if (a) windsorAccountToClient.set(a, cid);
+      }
+    }
+
+    const windsorSessionsByClient = new Map<string, number>();
+    const windsorSourcesByClient = new Map<string, Map<string, number>>();
+    for (const row of windsorCampaignRows ?? []) {
+      const accountName = safeString(row.account_name);
+      if (!accountName) continue;
+      const resolvedClientId = windsorAccountToClient.get(accountName.toLowerCase());
+      if (!resolvedClientId) continue;
+      if (clientId && resolvedClientId !== clientId) continue;
+      const sessions = toNumber(row.sessions);
+      windsorSessionsByClient.set(resolvedClientId, (windsorSessionsByClient.get(resolvedClientId) ?? 0) + sessions);
+      const source = safeString(row.source) ?? "other";
+      const sourceMap = windsorSourcesByClient.get(resolvedClientId) ?? new Map<string, number>();
+      sourceMap.set(source, (sourceMap.get(source) ?? 0) + sessions);
+      windsorSourcesByClient.set(resolvedClientId, sourceMap);
+    }
+
+    // Windsor LinkedIn: latest follower count + gains over period
+    const windsorFollowersByClient = new Map<string, { count: number; gainOrganic: number; gainPaid: number }>();
+    // LinkedIn metrics are not per-account — use the first Windsor mapping's client_id
+    // or all mapped clients if there's a single LinkedIn account
+    const linkedinClientIds = new Set<string>();
+    for (const mapping of windsorMappings ?? []) {
+      const cid = safeString(mapping.client_id);
+      if (cid && (!clientId || cid === clientId)) linkedinClientIds.add(cid);
+    }
+    if ((windsorLinkedinRows ?? []).length > 0 && linkedinClientIds.size > 0) {
+      let latestCount = 0;
+      let totalGainOrganic = 0;
+      let totalGainPaid = 0;
+      const seen = new Set<string>();
+      for (const row of windsorLinkedinRows ?? []) {
+        const d = safeString(row.date);
+        if (!d) continue;
+        if (!seen.has("latest")) {
+          latestCount = toNumber(row.organization_follower_count);
+          seen.add("latest");
+        }
+        totalGainOrganic += toNumber(row.followers_gain_organic);
+        totalGainPaid += toNumber(row.followers_gain_paid);
+      }
+      for (const cid of linkedinClientIds) {
+        windsorFollowersByClient.set(cid, { count: latestCount, gainOrganic: totalGainOrganic, gainPaid: totalGainPaid });
+      }
+    }
+
     const clientIds = new Set<string>([
       ...metricByClient.keys(),
       ...leadStatsByClient.keys(),
       ...lemlistCountByClient.keys(),
       ...seoPosByClient.keys(),
+      ...windsorSessionsByClient.keys(),
+      ...windsorFollowersByClient.keys(),
     ]);
 
     const rows: ReportingKpiRow[] = [];
@@ -155,9 +245,14 @@ serve(async (req) => {
       const conversionCount = metrics.conversions ?? 0;
       const clickCount = metrics.clicks ?? 0;
       const conversionRate = clickCount > 0 ? Math.min(100, (conversionCount / clickCount) * 100) : 0;
+      const windsorSessions = windsorSessionsByClient.get(id) ?? 0;
+      const windsorFollowers = windsorFollowersByClient.get(id);
+      const liFollowerCount = windsorFollowers?.count ?? (lemlistCountByClient.get(id) ?? 0);
+      const liNewFollowers = windsorFollowers ? windsorFollowers.gainOrganic + windsorFollowers.gainPaid : 0;
 
       rows.push(
         { client_id: id, section: "website", metric_key: "impressions", label: "Impressions", value: metrics.impressions ?? 0, unit: "count", period_start: periodStart, period_end: periodEnd },
+        { client_id: id, section: "website", metric_key: "sessions", label: "Sessions", value: windsorSessions, unit: "count", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "paid", metric_key: "ad_clicks", label: "Ad Clicks", value: clickCount, unit: "count", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "paid", metric_key: "ad_spend", label: "Ad Spend", value: metrics.cost ?? 0, unit: "currency", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "paid", metric_key: "roas", label: "ROAS", value: metrics.roas ?? 0, unit: "ratio", period_start: periodStart, period_end: periodEnd },
@@ -166,16 +261,14 @@ serve(async (req) => {
         { client_id: id, section: "conversion", metric_key: "new_leads", label: "New Leads", value: leadStats.total, unit: "count", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "conversion", metric_key: "qualified_leads", label: "Qualified Leads", value: leadStats.qualified, unit: "count", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "social", metric_key: "li_impressions", label: "LI Impressions", value: metrics.impressions ?? 0, unit: "count", period_start: periodStart, period_end: periodEnd },
-        { client_id: id, section: "social", metric_key: "li_followers", label: "LI Followers", value: lemlistCountByClient.get(id) ?? 0, unit: "count", period_start: periodStart, period_end: periodEnd },
+        { client_id: id, section: "social", metric_key: "li_followers", label: "LI Followers", value: liFollowerCount, unit: "count", period_start: periodStart, period_end: periodEnd },
+        { client_id: id, section: "social", metric_key: "li_new_followers", label: "New Followers", value: liNewFollowers, unit: "count", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "acquisition", metric_key: "seo_clicks", label: "SEO Clicks", value: clickCount, unit: "count", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "acquisition", metric_key: "avg_position", label: "Avg Position", value: avgPosition, unit: "ratio", period_start: periodStart, period_end: periodEnd },
-        // P7: Strategy section (placeholder — populated by future PMF skill)
         { client_id: id, section: "strategy", metric_key: "pmf_score", label: "Score PMF", value: 0, unit: "score", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "strategy", metric_key: "pmf_clarity", label: "Clarté douleur", value: 0, unit: "score", period_start: periodStart, period_end: periodEnd },
-        // P8: SEO health section
         { client_id: id, section: "seo", metric_key: "health_score", label: "Score Santé SEO", value: avgPosition > 0 ? Math.round(Math.max(0, 100 - avgPosition * 2)) : 0, unit: "score", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "seo", metric_key: "quick_wins", label: "Quick Wins", value: 0, unit: "count", period_start: periodStart, period_end: periodEnd },
-        // P9: AI visibility section (placeholder — populated by future Meteoria integration)
         { client_id: id, section: "ai-visibility", metric_key: "mention_rate", label: "Taux de mention IA", value: 0, unit: "percent", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "ai-visibility", metric_key: "market_share", label: "Part de voix IA", value: 0, unit: "percent", period_start: periodStart, period_end: periodEnd },
         { client_id: id, section: "ai-visibility", metric_key: "sentiment_positive", label: "Sentiment positif", value: 0, unit: "percent", period_start: periodStart, period_end: periodEnd },
@@ -198,8 +291,10 @@ serve(async (req) => {
       const seoHealthScore = avgPos > 0 ? Math.round(Math.max(0, 100 - avgPos * 2)) : 0;
       const clickCount = metrics.clicks ?? 0;
 
+      const windsorSessions = windsorSessionsByClient.get(id) ?? 0;
+      const sessionValue = windsorSessions > 0 ? windsorSessions : (metrics.impressions ?? 0);
       homeKpiRows.push(
-        { client_id: id, key: "sessions", label: "Sessions", value: String(metrics.impressions ?? 0), delta: null, trend: null },
+        { client_id: id, key: "sessions", label: "Sessions", value: String(sessionValue), delta: null, trend: null },
         { client_id: id, key: "seo_clicks", label: "SEO Clicks", value: String(clickCount), delta: null, trend: null },
         { client_id: id, key: "li_impressions", label: "LinkedIn Impressions", value: String(metrics.impressions ?? 0), delta: null, trend: null },
         { client_id: id, key: "health_score", label: "Score Santé", value: String(seoHealthScore), delta: null, trend: null },

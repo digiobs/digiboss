@@ -9,7 +9,8 @@ export type IntegrationProvider =
   | "claude"
   | "hubspot"
   | "linkedin"
-  | "wrike";
+  | "wrike"
+  | "windsor";
 
 export type IntegrationRunStatus = "running" | "success" | "partial" | "failed";
 
